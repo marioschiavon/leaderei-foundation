@@ -1,0 +1,65 @@
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Shield, ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
+import { cn } from "@/lib/utils";
+
+export const Route = createFileRoute("/_master")({
+  component: MasterLayout,
+});
+
+const NAV = [
+  { label: "Overview", to: "/master" },
+  { label: "Organizações", to: "/master/organizations" },
+  { label: "Usuários", to: "/master/users" },
+  { label: "Planos", to: "/master/plans" },
+  { label: "Logs", to: "/master/logs" },
+];
+
+function MasterLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-secondary text-secondary-foreground">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-6">
+          <div className="flex items-center gap-3">
+            <Logo tone="light" />
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-[0.7rem] font-medium uppercase tracking-wider">
+              <Shield className="h-3 w-3 text-brand" />
+              Master
+            </span>
+          </div>
+          <nav className="ml-6 flex items-center gap-1">
+            {NAV.map((n) => {
+              const active =
+                n.to === "/master" ? pathname === "/master" : pathname.startsWith(n.to);
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-white/10 text-white"
+                      : "text-white/70 hover:bg-white/5 hover:text-white",
+                  )}
+                >
+                  {n.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <Link
+            to="/app"
+            className="ml-auto inline-flex items-center gap-1.5 text-xs text-white/60 hover:text-white"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Voltar ao app
+          </Link>
+        </div>
+      </header>
+      <main className="mx-auto max-w-[1400px] px-6 py-8">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
