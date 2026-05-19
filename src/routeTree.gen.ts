@@ -9,38 +9,277 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as MasterRouteImport } from './routes/_master'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MasterMasterRouteImport } from './routes/_master.master'
+import { Route as AppAppRouteImport } from './routes/_app.app'
+import { Route as MasterMasterUsersRouteImport } from './routes/_master.master.users'
+import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.plans'
+import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
+import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.logs'
+import { Route as AppAppSettingsRouteImport } from './routes/_app.app.settings'
+import { Route as AppAppSalesRouteImport } from './routes/_app.app.sales'
+import { Route as AppAppLeadsRouteImport } from './routes/_app.app.leads'
+import { Route as AppAppIntegrationsRouteImport } from './routes/_app.app.integrations'
+import { Route as AppAppInboxRouteImport } from './routes/_app.app.inbox'
+import { Route as AppAppCampaignsRouteImport } from './routes/_app.app.campaigns'
 
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MasterRoute = MasterRouteImport.update({
+  id: '/_master',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MasterMasterRoute = MasterMasterRouteImport.update({
+  id: '/master',
+  path: '/master',
+  getParentRoute: () => MasterRoute,
+} as any)
+const AppAppRoute = AppAppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => AppRoute,
+} as any)
+const MasterMasterUsersRoute = MasterMasterUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => MasterMasterRoute,
+} as any)
+const MasterMasterPlansRoute = MasterMasterPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => MasterMasterRoute,
+} as any)
+const MasterMasterOrganizationsRoute =
+  MasterMasterOrganizationsRouteImport.update({
+    id: '/organizations',
+    path: '/organizations',
+    getParentRoute: () => MasterMasterRoute,
+  } as any)
+const MasterMasterLogsRoute = MasterMasterLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => MasterMasterRoute,
+} as any)
+const AppAppSettingsRoute = AppAppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppAppRoute,
+} as any)
+const AppAppSalesRoute = AppAppSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AppAppRoute,
+} as any)
+const AppAppLeadsRoute = AppAppLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => AppAppRoute,
+} as any)
+const AppAppIntegrationsRoute = AppAppIntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => AppAppRoute,
+} as any)
+const AppAppInboxRoute = AppAppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AppAppRoute,
+} as any)
+const AppAppCampaignsRoute = AppAppCampaignsRouteImport.update({
+  id: '/campaigns',
+  path: '/campaigns',
+  getParentRoute: () => AppAppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/app': typeof AppAppRouteWithChildren
+  '/master': typeof MasterMasterRouteWithChildren
+  '/app/campaigns': typeof AppAppCampaignsRoute
+  '/app/inbox': typeof AppAppInboxRoute
+  '/app/integrations': typeof AppAppIntegrationsRoute
+  '/app/leads': typeof AppAppLeadsRoute
+  '/app/sales': typeof AppAppSalesRoute
+  '/app/settings': typeof AppAppSettingsRoute
+  '/master/logs': typeof MasterMasterLogsRoute
+  '/master/organizations': typeof MasterMasterOrganizationsRoute
+  '/master/plans': typeof MasterMasterPlansRoute
+  '/master/users': typeof MasterMasterUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/app': typeof AppAppRouteWithChildren
+  '/master': typeof MasterMasterRouteWithChildren
+  '/app/campaigns': typeof AppAppCampaignsRoute
+  '/app/inbox': typeof AppAppInboxRoute
+  '/app/integrations': typeof AppAppIntegrationsRoute
+  '/app/leads': typeof AppAppLeadsRoute
+  '/app/sales': typeof AppAppSalesRoute
+  '/app/settings': typeof AppAppSettingsRoute
+  '/master/logs': typeof MasterMasterLogsRoute
+  '/master/organizations': typeof MasterMasterOrganizationsRoute
+  '/master/plans': typeof MasterMasterPlansRoute
+  '/master/users': typeof MasterMasterUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_master': typeof MasterRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/_app/app': typeof AppAppRouteWithChildren
+  '/_master/master': typeof MasterMasterRouteWithChildren
+  '/_app/app/campaigns': typeof AppAppCampaignsRoute
+  '/_app/app/inbox': typeof AppAppInboxRoute
+  '/_app/app/integrations': typeof AppAppIntegrationsRoute
+  '/_app/app/leads': typeof AppAppLeadsRoute
+  '/_app/app/sales': typeof AppAppSalesRoute
+  '/_app/app/settings': typeof AppAppSettingsRoute
+  '/_master/master/logs': typeof MasterMasterLogsRoute
+  '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
+  '/_master/master/plans': typeof MasterMasterPlansRoute
+  '/_master/master/users': typeof MasterMasterUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/app'
+    | '/master'
+    | '/app/campaigns'
+    | '/app/inbox'
+    | '/app/integrations'
+    | '/app/leads'
+    | '/app/sales'
+    | '/app/settings'
+    | '/master/logs'
+    | '/master/organizations'
+    | '/master/plans'
+    | '/master/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/app'
+    | '/master'
+    | '/app/campaigns'
+    | '/app/inbox'
+    | '/app/integrations'
+    | '/app/leads'
+    | '/app/sales'
+    | '/app/settings'
+    | '/master/logs'
+    | '/master/organizations'
+    | '/master/plans'
+    | '/master/users'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_master'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/_app/app'
+    | '/_master/master'
+    | '/_app/app/campaigns'
+    | '/_app/app/inbox'
+    | '/_app/app/integrations'
+    | '/_app/app/leads'
+    | '/_app/app/sales'
+    | '/_app/app/settings'
+    | '/_master/master/logs'
+    | '/_master/master/organizations'
+    | '/_master/master/plans'
+    | '/_master/master/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  MasterRoute: typeof MasterRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_master': {
+      id: '/_master'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof MasterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +287,160 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_master/master': {
+      id: '/_master/master'
+      path: '/master'
+      fullPath: '/master'
+      preLoaderRoute: typeof MasterMasterRouteImport
+      parentRoute: typeof MasterRoute
+    }
+    '/_app/app': {
+      id: '/_app/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppAppRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_master/master/users': {
+      id: '/_master/master/users'
+      path: '/users'
+      fullPath: '/master/users'
+      preLoaderRoute: typeof MasterMasterUsersRouteImport
+      parentRoute: typeof MasterMasterRoute
+    }
+    '/_master/master/plans': {
+      id: '/_master/master/plans'
+      path: '/plans'
+      fullPath: '/master/plans'
+      preLoaderRoute: typeof MasterMasterPlansRouteImport
+      parentRoute: typeof MasterMasterRoute
+    }
+    '/_master/master/organizations': {
+      id: '/_master/master/organizations'
+      path: '/organizations'
+      fullPath: '/master/organizations'
+      preLoaderRoute: typeof MasterMasterOrganizationsRouteImport
+      parentRoute: typeof MasterMasterRoute
+    }
+    '/_master/master/logs': {
+      id: '/_master/master/logs'
+      path: '/logs'
+      fullPath: '/master/logs'
+      preLoaderRoute: typeof MasterMasterLogsRouteImport
+      parentRoute: typeof MasterMasterRoute
+    }
+    '/_app/app/settings': {
+      id: '/_app/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppAppSettingsRouteImport
+      parentRoute: typeof AppAppRoute
+    }
+    '/_app/app/sales': {
+      id: '/_app/app/sales'
+      path: '/sales'
+      fullPath: '/app/sales'
+      preLoaderRoute: typeof AppAppSalesRouteImport
+      parentRoute: typeof AppAppRoute
+    }
+    '/_app/app/leads': {
+      id: '/_app/app/leads'
+      path: '/leads'
+      fullPath: '/app/leads'
+      preLoaderRoute: typeof AppAppLeadsRouteImport
+      parentRoute: typeof AppAppRoute
+    }
+    '/_app/app/integrations': {
+      id: '/_app/app/integrations'
+      path: '/integrations'
+      fullPath: '/app/integrations'
+      preLoaderRoute: typeof AppAppIntegrationsRouteImport
+      parentRoute: typeof AppAppRoute
+    }
+    '/_app/app/inbox': {
+      id: '/_app/app/inbox'
+      path: '/inbox'
+      fullPath: '/app/inbox'
+      preLoaderRoute: typeof AppAppInboxRouteImport
+      parentRoute: typeof AppAppRoute
+    }
+    '/_app/app/campaigns': {
+      id: '/_app/app/campaigns'
+      path: '/campaigns'
+      fullPath: '/app/campaigns'
+      preLoaderRoute: typeof AppAppCampaignsRouteImport
+      parentRoute: typeof AppAppRoute
+    }
   }
 }
 
+interface AppAppRouteChildren {
+  AppAppCampaignsRoute: typeof AppAppCampaignsRoute
+  AppAppInboxRoute: typeof AppAppInboxRoute
+  AppAppIntegrationsRoute: typeof AppAppIntegrationsRoute
+  AppAppLeadsRoute: typeof AppAppLeadsRoute
+  AppAppSalesRoute: typeof AppAppSalesRoute
+  AppAppSettingsRoute: typeof AppAppSettingsRoute
+}
+
+const AppAppRouteChildren: AppAppRouteChildren = {
+  AppAppCampaignsRoute: AppAppCampaignsRoute,
+  AppAppInboxRoute: AppAppInboxRoute,
+  AppAppIntegrationsRoute: AppAppIntegrationsRoute,
+  AppAppLeadsRoute: AppAppLeadsRoute,
+  AppAppSalesRoute: AppAppSalesRoute,
+  AppAppSettingsRoute: AppAppSettingsRoute,
+}
+
+const AppAppRouteWithChildren =
+  AppAppRoute._addFileChildren(AppAppRouteChildren)
+
+interface AppRouteChildren {
+  AppAppRoute: typeof AppAppRouteWithChildren
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAppRoute: AppAppRouteWithChildren,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+interface MasterMasterRouteChildren {
+  MasterMasterLogsRoute: typeof MasterMasterLogsRoute
+  MasterMasterOrganizationsRoute: typeof MasterMasterOrganizationsRoute
+  MasterMasterPlansRoute: typeof MasterMasterPlansRoute
+  MasterMasterUsersRoute: typeof MasterMasterUsersRoute
+}
+
+const MasterMasterRouteChildren: MasterMasterRouteChildren = {
+  MasterMasterLogsRoute: MasterMasterLogsRoute,
+  MasterMasterOrganizationsRoute: MasterMasterOrganizationsRoute,
+  MasterMasterPlansRoute: MasterMasterPlansRoute,
+  MasterMasterUsersRoute: MasterMasterUsersRoute,
+}
+
+const MasterMasterRouteWithChildren = MasterMasterRoute._addFileChildren(
+  MasterMasterRouteChildren,
+)
+
+interface MasterRouteChildren {
+  MasterMasterRoute: typeof MasterMasterRouteWithChildren
+}
+
+const MasterRouteChildren: MasterRouteChildren = {
+  MasterMasterRoute: MasterMasterRouteWithChildren,
+}
+
+const MasterRouteWithChildren =
+  MasterRoute._addFileChildren(MasterRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  MasterRoute: MasterRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
