@@ -115,11 +115,15 @@ Regras visuais:
 
 ## 9. Histórico de mudanças estruturais
 
+> **Regra**: esta seção (e o manual do usuário) **devem ser atualizados a cada mudança relevante** no app — nova rota, novo módulo, alteração de design system, correção arquitetural, mudança de status de integração, etc.
+
+- **2026-05-21** — Fix de roteamento: `_app.dashboard.tsx` era pai das rotas filhas (`leads`, `inbox`, etc.) mas não renderizava `<Outlet />`, então qualquer URL filha continuava mostrando a home. Separado em layout (`_app.dashboard.tsx` com `<Outlet />`) + index (`_app.dashboard.index.tsx` com o conteúdo da home). Padrão a seguir para qualquer rota pai com filhos.
 - **2026-05-21** — Rota base `/app/*` renomeada para `/dashboard/*`. Corrigido bug de `@import` Google Fonts em `styles.css` (precisa preceder `@import "tailwindcss"`), que quebrava o build CSS e impedia render de `/leads` e `/integrations`.
 - **2026-05-21** — Criados módulos de Leads (workspace split-pane) e Integrations (7 conectores).
 - **2026-05-21** — Dashboard com 7 blocos (KPIs, atividade, onboarding, campanhas, alertas, leads recentes, integrações).
 - **2026-05-20** — Shell principal (sidebar/topbar) implementado.
 - **2026-05-20** — Design system Leaderei criado em `src/styles.css`.
+
 
 ## 10. Comandos úteis
 
