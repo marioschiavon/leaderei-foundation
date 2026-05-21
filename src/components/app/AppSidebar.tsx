@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Users,
@@ -9,7 +9,6 @@ import {
   ChevronsUpDown,
   LogOut,
   Shield,
-  Check,
   Blocks,
 } from "lucide-react";
 import {
@@ -34,11 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
-import {
-  useCurrentOrg,
-  useOrganizations,
-  setCurrentOrg,
-} from "@/lib/tenant/mock";
+import { signOut, useAuthSession, useIsMaster } from "@/lib/auth";
 
 const WORKSPACE = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -52,18 +47,33 @@ const TOOLS = [
   { title: "Builder", url: "/dashboard/builder", icon: Blocks, badge: "Beta" },
 ];
 
-const ADMIN = [
-  { title: "Settings", url: "/dashboard/settings", icon: Settings },
-];
+const ADMIN = [{ title: "Settings", url: "/dashboard/settings", icon: Settings }];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const org = useCurrentOrg();
-  const orgs = useOrganizations();
-  
+  const navigate = useNavigate();
+  const { user } = useAuthSession();
+  const { data: isMaster } = useIsMaster(user?.id);
 
   const isActive = (url: string) =>
     url === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(url);
+
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email ??
+    "Sua conta";
+  const initials = displayName
+    .split(" ")
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate({ to: "/login" });
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -128,14 +138,16 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith("/master")}>
-                  <Link to="/master">
-                    <Shield className="h-4 w-4" />
-                    <span>Master</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {isMaster && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith("/master")}>
+                    <Link to="/master">
+                      <Shield className="h-4 w-4" />
+                      <span>Master</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               {ADMIN.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
@@ -156,43 +168,25 @@ export function AppSidebar() {
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-2 rounded-md p-2 text-left hover:bg-sidebar-accent transition-colors">
               <div className="grid h-8 w-8 place-items-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground text-xs font-semibold">
-                {org.name.slice(0, 2).toUpperCase()}
+                {initials || "·"}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-sidebar-foreground">
-                  {org.name}
+                  {displayName}
                 </div>
                 <div className="truncate text-xs text-sidebar-foreground/60">
-                  Plano {org.plan}
+                  {user?.email ?? ""}
                 </div>
               </div>
               <ChevronsUpDown className="h-3.5 w-3.5 text-sidebar-foreground/60" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-64">
-            <DropdownMenuLabel>Trocar organização</DropdownMenuLabel>
+            <DropdownMenuLabel>Conta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {orgs.map((o) => (
-              <DropdownMenuItem
-                key={o.id}
-                onClick={() => setCurrentOrg(o.id)}
-                className="flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-sm font-medium">{o.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {o.membersCount} membros · {o.plan}
-                  </div>
-                </div>
-                {o.id === org.id && <Check className="h-4 w-4 text-brand" />}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/login" className="flex items-center gap-2">
-                <LogOut className="h-4 w-4" />
-                Sair
-              </Link>
+            <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2">
+              <LogOut className="h-4 w-4" />
+              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

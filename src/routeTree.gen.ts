@@ -23,7 +23,6 @@ import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.p
 import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
 import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.logs'
 import { Route as AppDashboardSettingsRouteImport } from './routes/_app.dashboard.settings'
-import { Route as AppDashboardSalesRouteImport } from './routes/_app.dashboard.sales'
 import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.leads'
 import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dashboard.integrations'
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
@@ -99,11 +98,6 @@ const AppDashboardSettingsRoute = AppDashboardSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppDashboardSalesRoute = AppDashboardSalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
-  getParentRoute: () => AppDashboardRoute,
-} as any)
 const AppDashboardLeadsRoute = AppDashboardLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -143,7 +137,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/dashboard/leads': typeof AppDashboardLeadsRoute
-  '/dashboard/sales': typeof AppDashboardSalesRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
@@ -162,7 +155,6 @@ export interface FileRoutesByTo {
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/dashboard/leads': typeof AppDashboardLeadsRoute
-  '/dashboard/sales': typeof AppDashboardSalesRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
@@ -185,7 +177,6 @@ export interface FileRoutesById {
   '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
   '/_app/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/_app/dashboard/leads': typeof AppDashboardLeadsRoute
-  '/_app/dashboard/sales': typeof AppDashboardSalesRoute
   '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
   '/_master/master/logs': typeof MasterMasterLogsRoute
   '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
@@ -207,7 +198,6 @@ export interface FileRouteTypes {
     | '/dashboard/inbox'
     | '/dashboard/integrations'
     | '/dashboard/leads'
-    | '/dashboard/sales'
     | '/dashboard/settings'
     | '/master/logs'
     | '/master/organizations'
@@ -226,7 +216,6 @@ export interface FileRouteTypes {
     | '/dashboard/inbox'
     | '/dashboard/integrations'
     | '/dashboard/leads'
-    | '/dashboard/sales'
     | '/dashboard/settings'
     | '/master/logs'
     | '/master/organizations'
@@ -248,7 +237,6 @@ export interface FileRouteTypes {
     | '/_app/dashboard/inbox'
     | '/_app/dashboard/integrations'
     | '/_app/dashboard/leads'
-    | '/_app/dashboard/sales'
     | '/_app/dashboard/settings'
     | '/_master/master/logs'
     | '/_master/master/organizations'
@@ -366,13 +354,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardSettingsRouteImport
       parentRoute: typeof AppDashboardRoute
     }
-    '/_app/dashboard/sales': {
-      id: '/_app/dashboard/sales'
-      path: '/sales'
-      fullPath: '/dashboard/sales'
-      preLoaderRoute: typeof AppDashboardSalesRouteImport
-      parentRoute: typeof AppDashboardRoute
-    }
     '/_app/dashboard/leads': {
       id: '/_app/dashboard/leads'
       path: '/leads'
@@ -417,7 +398,6 @@ interface AppDashboardRouteChildren {
   AppDashboardInboxRoute: typeof AppDashboardInboxRoute
   AppDashboardIntegrationsRoute: typeof AppDashboardIntegrationsRoute
   AppDashboardLeadsRoute: typeof AppDashboardLeadsRoute
-  AppDashboardSalesRoute: typeof AppDashboardSalesRoute
   AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
 }
@@ -428,7 +408,6 @@ const AppDashboardRouteChildren: AppDashboardRouteChildren = {
   AppDashboardInboxRoute: AppDashboardInboxRoute,
   AppDashboardIntegrationsRoute: AppDashboardIntegrationsRoute,
   AppDashboardLeadsRoute: AppDashboardLeadsRoute,
-  AppDashboardSalesRoute: AppDashboardSalesRoute,
   AppDashboardSettingsRoute: AppDashboardSettingsRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
 }
@@ -487,3 +466,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
