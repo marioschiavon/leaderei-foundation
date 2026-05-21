@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_app/app/inbox")({
+export const Route = createFileRoute("/_app/dashboard/inbox")({
   component: InboxPage,
 });
 

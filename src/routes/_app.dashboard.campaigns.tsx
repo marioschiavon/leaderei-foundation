@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
-export const Route = createFileRoute("/_app/app/campaigns")({
+export const Route = createFileRoute("/_app/dashboard/campaigns")({
   component: CampaignsPage,
 });
 

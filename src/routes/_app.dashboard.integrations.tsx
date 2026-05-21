@@ -19,7 +19,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-export const Route = createFileRoute("/_app/app/integrations")({
+export const Route = createFileRoute("/_app/dashboard/integrations")({
   component: IntegrationsPage,
 });
 

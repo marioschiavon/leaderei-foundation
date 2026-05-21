@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useCurrentOrg, useCurrentUser } from "@/lib/tenant/mock";
 
-export const Route = createFileRoute("/_app/app")({
+export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
 });
 
