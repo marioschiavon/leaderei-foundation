@@ -165,7 +165,9 @@ function LoginPage() {
         />
 
         <div className="relative z-10 flex h-full flex-col justify-between p-12 text-secondary-foreground xl:p-16">
-          <Logo tone="light" />
+          <div className="flex justify-end">
+            <Logo tone="light" size="h-10" />
+          </div>
 
           <div className="space-y-10">
             {/* Floating mock card */}
