@@ -60,7 +60,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const org = useCurrentOrg();
   const orgs = useOrganizations();
-  const user = useCurrentUser();
+  
 
   const isActive = (url: string) =>
     url === "/app" ? pathname === "/app" : pathname.startsWith(url);
