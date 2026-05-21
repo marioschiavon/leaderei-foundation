@@ -36,7 +36,6 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import {
   useCurrentOrg,
-  useCurrentUser,
   useOrganizations,
   setCurrentOrg,
 } from "@/lib/tenant/mock";
