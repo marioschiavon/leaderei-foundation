@@ -165,7 +165,7 @@ function LoginPage() {
         />
 
         <div className="relative z-10 flex h-full flex-col justify-between p-12 text-secondary-foreground xl:p-16">
-          <div className="flex justify-end">
+          <div className="flex justify-start">
             <Logo tone="light" size="h-10" />
           </div>
 
