@@ -17,6 +17,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MasterMasterRouteImport } from './routes/_master.master'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppDashboardIndexRouteImport } from './routes/_app.dashboard.index'
 import { Route as MasterMasterUsersRouteImport } from './routes/_master.master.users'
 import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.plans'
 import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
@@ -66,6 +67,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppDashboardRoute,
 } as any)
 const MasterMasterUsersRoute = MasterMasterUsersRouteImport.update({
   id: '/users',
@@ -143,13 +149,13 @@ export interface FileRoutesByFullPath {
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
   '/master/users': typeof MasterMasterUsersRoute
+  '/dashboard/': typeof AppDashboardIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/dashboard': typeof AppDashboardRouteWithChildren
   '/master': typeof MasterMasterRouteWithChildren
   '/dashboard/builder': typeof AppDashboardBuilderRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
@@ -162,6 +168,7 @@ export interface FileRoutesByTo {
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
   '/master/users': typeof MasterMasterUsersRoute
+  '/dashboard': typeof AppDashboardIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -184,6 +191,7 @@ export interface FileRoutesById {
   '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
   '/_master/master/plans': typeof MasterMasterPlansRoute
   '/_master/master/users': typeof MasterMasterUsersRoute
+  '/_app/dashboard/': typeof AppDashboardIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -205,13 +213,13 @@ export interface FileRouteTypes {
     | '/master/organizations'
     | '/master/plans'
     | '/master/users'
+    | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/forgot-password'
     | '/login'
     | '/signup'
-    | '/dashboard'
     | '/master'
     | '/dashboard/builder'
     | '/dashboard/campaigns'
@@ -224,6 +232,7 @@ export interface FileRouteTypes {
     | '/master/organizations'
     | '/master/plans'
     | '/master/users'
+    | '/dashboard'
   id:
     | '__root__'
     | '/'
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/_master/master/organizations'
     | '/_master/master/plans'
     | '/_master/master/users'
+    | '/_app/dashboard/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -313,6 +323,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard/': {
+      id: '/_app/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof AppDashboardIndexRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
     '/_master/master/users': {
       id: '/_master/master/users'
@@ -402,6 +419,7 @@ interface AppDashboardRouteChildren {
   AppDashboardLeadsRoute: typeof AppDashboardLeadsRoute
   AppDashboardSalesRoute: typeof AppDashboardSalesRoute
   AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
+  AppDashboardIndexRoute: typeof AppDashboardIndexRoute
 }
 
 const AppDashboardRouteChildren: AppDashboardRouteChildren = {
@@ -412,6 +430,7 @@ const AppDashboardRouteChildren: AppDashboardRouteChildren = {
   AppDashboardLeadsRoute: AppDashboardLeadsRoute,
   AppDashboardSalesRoute: AppDashboardSalesRoute,
   AppDashboardSettingsRoute: AppDashboardSettingsRoute,
+  AppDashboardIndexRoute: AppDashboardIndexRoute,
 }
 
 const AppDashboardRouteWithChildren = AppDashboardRoute._addFileChildren(
