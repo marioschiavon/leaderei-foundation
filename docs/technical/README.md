@@ -109,13 +109,46 @@ Regras visuais:
 
 ## 8. Decisões arquiteturais relevantes
 
-- **Multi-tenant via `lib/tenant/mock.ts`**: troca de organização puramente client-side por enquanto. Será trocado por sessão real + RLS quando o módulo de orgs entrar.
-- **Roles**: quando implementadas, **devem** ficar em tabela separada `user_roles` com `has_role()` SECURITY DEFINER (jamais no `profiles`).
+- **Auth real (Supabase)**: login/signup usam `supabase.auth.signInWithPassword` / `signUp`. Sessão persistida em `localStorage` via cliente padrão.
+- **Guards de rota**: `_app.tsx` e `_master.tsx` são gates client-side baseados em `useAuthSession()` (`src/lib/auth.ts`). Sem sessão → redirect a `/login`. `_master` valida adicionalmente `user_roles.role = master_admin` via `useIsMaster()` (RLS permite o user ler suas próprias roles).
+- **Sem mock de organização**: `lib/tenant/mock.ts` foi removido. Sidebar/topbar refletem o usuário real (`user.user_metadata.full_name`, `user.email`). A unificação completa de multi-tenancy (seletor real de orgs, sessão de org corrente) entra na Fase 2.
+- **Roles** ficam em `public.user_roles` (separado de `profiles`) com `has_role()` SECURITY DEFINER — jamais no `profiles`.
 - **Sem Edge Functions**: toda lógica server-side usa `createServerFn`.
+
+## 8.1 Estado atual da Fase 1
+
+| Área                      | Estado                                                                 |
+| ------------------------- | ---------------------------------------------------------------------- |
+| Auth (login/signup)       | **Real** — Supabase Auth, sessão persistida, gates funcionais          |
+| Master · Overview         | **Real** — KPIs e organizações recentes vêm de `companies` no banco    |
+| Master · Organizations    | **Real** — listagem, criação e mudança de status persistem no banco    |
+| Master · Users            | **Em breve / Fase 2** — empty state honesto                            |
+| Master · Plans            | **Em breve / Fase 2** — empty state honesto                            |
+| Master · Logs             | **Em breve / Fase 2** — empty state honesto                            |
+| Dashboard (home)          | **UI estrutural** — KPIs/atividade/alertas ainda mockados              |
+| Leads                     | **UI estrutural** — lista e detalhe são mock                           |
+| Inbox                     | **UI estrutural** — 4 painéis, sem envio real                          |
+| Campaigns                 | **UI estrutural** — cards/listagem mock                                |
+| Builder                   | **UI estrutural** — canvas/blocos sem DnD nem persistência             |
+| Integrations              | **UI estrutural** — status visual, sem OAuth real                      |
+| Settings                  | **UI estrutural** — nome/email pré-preenchidos da sessão; sem persist. |
+| Sidebar/Topbar (user)     | **Real** — usuário autenticado da sessão                               |
+| Seletor de organização    | **Removido na Fase 1** — entra na Fase 2 com tenancy real              |
+
 
 ## 9. Histórico de mudanças estruturais
 
-> **Regra**: esta seção (e o manual do usuário) **devem ser atualizados a cada mudança relevante** no app — nova rota, novo módulo, alteração de design system, correção arquitetural, mudança de status de integração, etc.
+> **Regra**: esta seção (e o manual do usuário) **devem ser atualizados a cada mudança relevante** no app.
+
+- **2026-05-21** — **Consolidação Fase 1**.
+  - **Auth real**: login/signup agora chamam `supabase.auth.signInWithPassword` / `signUp` (antes apenas faziam `window.location.href = "/dashboard"`).
+  - **Guards**: novo hook `src/lib/auth.ts` (`useAuthSession`, `useIsMaster`, `signOut`). `_app.tsx` redireciona a `/login` quando sem sessão. `_master.tsx` redireciona a `/login` quando sem sessão e exibe "Acesso restrito" quando o usuário não tem `master_admin` em `user_roles`. Isso elimina o erro `Unauthorized: No authorization header provided` causado por chamadas a `getMasterOverview` sem sessão.
+  - **Sidebar/Topbar reais**: passam a usar `useAuthSession()` (nome do user metadata, email, iniciais). `Sair` chama `supabase.auth.signOut()` e navega a `/login`. Link "Master" só aparece quando `useIsMaster` retorna `true`.
+  - **Removido**: rota órfã `_app.dashboard.sales.tsx` (pipeline kanban nunca linkado na sidebar). Módulo `src/lib/tenant/mock.ts` + `types.ts` (mocks de orgs/usuário). Seletor de organização da sidebar (volta na Fase 2 com tenancy real).
+  - **Master placeholders honestos**: `_master.master.users.tsx`, `.plans.tsx`, `.logs.tsx` substituídos por `EmptyState` "Em breve — Fase 2". Listas/métricas falsas foram removidas.
+  - **Toaster**: `<Toaster />` adicionado ao root para feedback de erros de auth.
+  - **Mocks que permanecem (UI estrutural)**: Dashboard home, Leads, Inbox, Campaigns, Builder, Integrations, Settings. Foram mantidos para preservar o shell visual da Fase 1; o Dashboard agora indica explicitamente que os números não refletem dados reais. Refatoração dos arquivos monolíticos e troca por dados reais ficam para fases seguintes.
+
 
 - **2026-05-21** — **Painel Master v1 — dados reais**.
   - Novo módulo de server functions `src/lib/master.functions.ts`: `getMasterOverview`, `listCompanies`, `createCompany`, `setCompanyStatus`. Todos protegidos por `requireSupabaseAuth` + checagem explícita de `master_admin` via `assertMaster()` consultando `user_roles` com `supabaseAdmin`.
