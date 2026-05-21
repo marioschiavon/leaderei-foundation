@@ -96,6 +96,7 @@ Em caso de dúvida ou problema, contate o time Leaderei pelos canais internos da
 
 > Atualizado a cada mudança visível ao usuário no produto.
 
+- **2026-05-21** — **Campanhas** ganharam visual de cards com KPIs no topo, busca, filtros por status, alternador entre cards e lista, e um estado vazio convidativo com templates. **Builder** ganhou a tela definitiva: paleta de blocos à esquerda, canvas com fluxo visual no centro (gatilho + passos conectados) e inspector à direita para editar o passo selecionado. O drag-and-drop real chega na próxima fase.
 - **2026-05-21** — Inbox v1 publicada (4 painéis, filtros multicanal, barra de IA + handoff humano, composer).
 - **2026-05-21** — Correção: navegação entre páginas filhas de `/dashboard` (Leads, Inbox, Integrations, etc.) agora funciona corretamente. Antes a URL mudava mas a tela continuava na home.
 - **2026-05-21** — Rota base passa a ser `/dashboard` (era `/app`). Módulos de Leads e Integrações documentados.
