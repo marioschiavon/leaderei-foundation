@@ -3,15 +3,21 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useCurrentUser } from "@/lib/tenant/mock";
+import { useAuthSession } from "@/lib/auth";
 
 export function AppTopbar() {
-  const user = useCurrentUser();
-  const initials = user.name
+  const { user } = useAuthSession();
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email ??
+    "";
+  const initials = displayName
     .split(" ")
     .map((n) => n[0])
+    .filter(Boolean)
     .slice(0, 2)
-    .join("");
+    .join("")
+    .toUpperCase();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -29,7 +35,7 @@ export function AppTopbar() {
         </Button>
         <Avatar className="h-9 w-9">
           <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-            {initials}
+            {initials || "·"}
           </AvatarFallback>
         </Avatar>
       </div>

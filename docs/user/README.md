@@ -2,29 +2,40 @@
 
 > Guia de uso da plataforma. Atualizado conforme novos módulos entram em produção.
 
+## Estado atual da Fase 1 (importante)
+
+A Fase 1 entrega a **estrutura visual completa** do produto e os módulos abaixo já são funcionais:
+
+- **Login / Signup** — autenticação real (email + senha).
+- **Master · Overview e Organizações** — dados reais persistidos no backend.
+
+Os demais módulos (**Dashboard, Leads, Inbox, Campaigns, Builder, Integrations, Settings**) estão como **UI estrutural** nesta fase: permitem navegar e validar a linguagem visual, mas as listas/KPIs/ações ainda são mock e serão ligados a dados reais nas próximas fases. **Master · Usuários, Planos e Logs** estão marcados como "Em breve — Fase 2".
+
 ## 1. Primeiros passos
 
-1. Acesse a tela de login e entre com seu email e senha.
-2. Após login você cai em **Dashboard** (`/dashboard`), a home operacional.
-3. No rodapé da barra lateral você pode trocar entre organizações (workspaces).
+1. Crie sua conta em `/signup` (ou entre em `/login` se já tem cadastro).
+2. Após login você cai em **Dashboard** (`/dashboard`).
+3. Tentativas de acessar `/dashboard/*` ou `/master/*` sem sessão são redirecionadas para `/login` automaticamente.
+4. A área **Master** (`/master`) só aparece na sidebar e só é acessível para usuários com o papel `master_admin` em `user_roles`.
 
 ## 2. Navegação
 
 A barra lateral organiza o produto em três grupos:
 
 **Workspace**
-- **Dashboard** — visão geral da operação dos últimos 7 dias.
-- **Campaigns** — sequências de outbound multicanal.
-- **Leads** — base comercial com filtros, estágios e detalhe.
-- **Inbox** — conversas ativas vindas das campanhas.
+- **Dashboard** — visão geral da operação (UI estrutural na Fase 1).
+- **Campaigns** — sequências de outbound multicanal (UI estrutural).
+- **Leads** — base comercial (UI estrutural).
+- **Inbox** — central de conversas multicanal (UI estrutural).
 
 **Tools**
-- **Integrations** — conectar canais, CRMs e ferramentas externas.
-- **Builder** — construtor de cadências (Beta).
+- **Integrations** — conectores (UI estrutural; OAuth real entra na Fase 2).
+- **Builder** — construtor visual de cadências (UI estrutural, sem DnD ainda).
 
 **Admin**
-- **Master** — painel administrativo (acesso restrito).
-- **Settings** — configurações da organização e do usuário.
+- **Master** — painel administrativo (visível apenas para `master_admin`).
+- **Settings** — configurações da organização e do usuário (UI estrutural).
+
 
 ## 3. Dashboard
 

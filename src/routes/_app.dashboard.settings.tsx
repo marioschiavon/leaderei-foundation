@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCurrentOrg } from "@/lib/tenant/mock";
+import { useAuthSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/_app/dashboard/settings")({
   component: SettingsPage,
@@ -18,7 +18,7 @@ const MEMBERS = [
 ];
 
 function SettingsPage() {
-  const org = useCurrentOrg();
+  const { user } = useAuthSession();
   return (
     <div className="space-y-6">
       <PageHeader title="Configurações" description="Gerencie sua organização e preferências." />
@@ -36,15 +36,19 @@ function SettingsPage() {
           <div className="max-w-xl space-y-5 rounded-xl border bg-surface p-6">
             <div className="space-y-1.5">
               <Label htmlFor="oname">Nome da organização</Label>
-              <Input id="oname" defaultValue={org.name} />
+              <Input id="oname" defaultValue={(user?.user_metadata?.org_name as string) ?? ""} placeholder="Sua organização" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="oslug">Slug</Label>
-              <Input id="oslug" defaultValue={org.slug} />
+              <Label htmlFor="oslug">Email do dono</Label>
+              <Input id="oslug" defaultValue={user?.email ?? ""} disabled />
             </div>
-            <Button>Salvar alterações</Button>
+            <p className="text-xs text-muted-foreground">
+              UI estrutural. A persistência das configurações de organização entra na Fase 2.
+            </p>
+            <Button disabled>Salvar alterações</Button>
           </div>
         </TabsContent>
+
 
         <TabsContent value="members" className="mt-6">
           <div className="rounded-xl border bg-surface">
@@ -72,7 +76,7 @@ function SettingsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border bg-surface p-6">
               <span className="text-xs uppercase tracking-wider text-muted-foreground">Plano atual</span>
-              <div className="mt-2 font-display text-2xl font-bold capitalize">{org.plan}</div>
+              <div className="mt-2 font-display text-2xl font-bold capitalize">Em breve</div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Renova automaticamente em 30 dias.
               </p>

@@ -25,7 +25,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useCurrentOrg, useCurrentUser } from "@/lib/tenant/mock";
+import { useAuthSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/_app/dashboard/")({
   component: Dashboard,
@@ -96,9 +96,13 @@ const statusStyle: Record<string, string> = {
 };
 
 function Dashboard() {
-  const org = useCurrentOrg();
-  const user = useCurrentUser();
-  const firstName = user.name.split(" ")[0];
+  const { user } = useAuthSession();
+  const fullName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email?.split("@")[0] ??
+    "";
+  const firstName = fullName.split(" ")[0] || "olá";
+  const orgName = (user?.user_metadata?.org_name as string | undefined) ?? "sua organização";
   const completed = NEXT_STEPS.filter((s) => s.done).length;
   const onboardingPct = Math.round((completed / NEXT_STEPS.length) * 100);
 
@@ -106,13 +110,14 @@ function Dashboard() {
     <div className="space-y-8">
       <PageHeader
         title={`Olá, ${firstName}`}
-        description={`Resumo operacional de ${org.name} nos últimos 7 dias.`}
+        description={`Resumo operacional de ${orgName} nos últimos 7 dias (UI estrutural — números ainda não refletem dados reais).`}
         actions={
           <Button asChild>
             <Link to="/dashboard/campaigns">
               <Plus className="h-4 w-4" />
               Nova campanha
             </Link>
+
           </Button>
         }
       />
