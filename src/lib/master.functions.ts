@@ -37,26 +37,26 @@ export const listCompanies = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertMaster(context.userId);
 
-    const { data: companies, error } = await supabaseAdmin
-      .from("companies")
+    const { data: organizations, error } = await supabaseAdmin
+      .from("organizations")
       .select("id,name,slug,status,max_users,max_leads,created_at,updated_at,logo_url")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    const ids = companies.map((c) => c.id);
+    const ids = (organizations ?? []).map((o) => o.id);
     const counts: Record<string, number> = {};
     if (ids.length) {
       const { data: members, error: mErr } = await supabaseAdmin
-        .from("company_members")
-        .select("company_id")
-        .in("company_id", ids);
+        .from("organization_members")
+        .select("organization_id")
+        .in("organization_id", ids);
       if (mErr) throw new Error(mErr.message);
       for (const m of members ?? []) {
-        counts[m.company_id] = (counts[m.company_id] ?? 0) + 1;
+        counts[m.organization_id] = (counts[m.organization_id] ?? 0) + 1;
       }
     }
 
-    return companies.map((c) => ({ ...c, member_count: counts[c.id] ?? 0 }));
+    return (organizations ?? []).map((o) => ({ ...o, member_count: counts[o.id] ?? 0 }));
   });
 
 export const getMasterOverview = createServerFn({ method: "GET" })
@@ -64,27 +64,34 @@ export const getMasterOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertMaster(context.userId);
 
-    const [{ count: totalCompanies }, { count: activeCompanies }, { count: trialCompanies }, { count: inactiveCompanies }, { count: totalMembers }, { count: totalProfiles }] = await Promise.all([
-      supabaseAdmin.from("companies").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("companies").select("*", { count: "exact", head: true }).eq("status", "active"),
-      supabaseAdmin.from("companies").select("*", { count: "exact", head: true }).eq("status", "trial"),
-      supabaseAdmin.from("companies").select("*", { count: "exact", head: true }).eq("status", "inactive"),
-      supabaseAdmin.from("company_members").select("*", { count: "exact", head: true }),
+    const [
+      { count: totalOrgs },
+      { count: activeOrgs },
+      { count: trialOrgs },
+      { count: inactiveOrgs },
+      { count: totalMembers },
+      { count: totalProfiles },
+    ] = await Promise.all([
+      supabaseAdmin.from("organizations").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("organizations").select("*", { count: "exact", head: true }).eq("status", "active"),
+      supabaseAdmin.from("organizations").select("*", { count: "exact", head: true }).eq("status", "trial"),
+      supabaseAdmin.from("organizations").select("*", { count: "exact", head: true }).eq("status", "inactive"),
+      supabaseAdmin.from("organization_members").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }),
     ]);
 
     const { data: recent } = await supabaseAdmin
-      .from("companies")
+      .from("organizations")
       .select("id,name,slug,status,created_at")
       .order("created_at", { ascending: false })
       .limit(5);
 
     return {
       totals: {
-        companies: totalCompanies ?? 0,
-        active: activeCompanies ?? 0,
-        trial: trialCompanies ?? 0,
-        inactive: inactiveCompanies ?? 0,
+        companies: totalOrgs ?? 0,
+        active: activeOrgs ?? 0,
+        trial: trialOrgs ?? 0,
+        inactive: inactiveOrgs ?? 0,
         members: totalMembers ?? 0,
         profiles: totalProfiles ?? 0,
       },
@@ -112,7 +119,7 @@ export const createCompany = createServerFn({ method: "POST" })
 
     const slug = data.slug ?? slugify(data.name);
     const { data: inserted, error } = await supabaseAdmin
-      .from("companies")
+      .from("organizations")
       .insert({
         name: data.name,
         slug,
@@ -137,7 +144,7 @@ export const setCompanyStatus = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertMaster(context.userId);
     const { data: updated, error } = await supabaseAdmin
-      .from("companies")
+      .from("organizations")
       .update({ status: data.status, updated_at: new Date().toISOString() })
       .eq("id", data.id)
       .select()
