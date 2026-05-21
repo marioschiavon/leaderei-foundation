@@ -27,12 +27,25 @@
  */
 
 @theme inline {
+  /* Typography */
   --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-brand: "Ibrand", "Poppins", sans-serif;
-  
+  --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
 
+  /* Type scale — modular, executive density */
+  --text-2xs: 0.6875rem;   /* 11px — uppercase labels */
+  --text-xs:  0.75rem;     /* 12px — meta */
+  --text-sm:  0.8125rem;   /* 13px — table / dense */
+  --text-base:0.9375rem;   /* 15px — body */
+  --text-md:  1rem;        /* 16px */
+  --text-lg:  1.125rem;    /* 18px — section title */
+  --text-xl:  1.375rem;    /* 22px — h3 */
+  --text-2xl: 1.75rem;     /* 28px — h2 */
+  --text-3xl: 2.25rem;     /* 36px — h1 */
+  --text-4xl: 3rem;        /* 48px — hero */
 
+  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -41,6 +54,13 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
+  /* Shadows — subtle only, no glow */
+  --shadow-xs: 0 1px 0 0 oklch(0 0 0 / 4%);
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 5%);
+  --shadow-md: 0 2px 6px -1px oklch(0 0 0 / 6%), 0 1px 2px -1px oklch(0 0 0 / 4%);
+  --shadow-lg: 0 8px 24px -8px oklch(0 0 0 / 10%);
+
+  /* Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -58,6 +78,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
@@ -76,8 +97,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
 }
 
 :root {
@@ -112,8 +136,16 @@
   --destructive-foreground: oklch(1 0 0);
 
   --border: oklch(0.91 0.003 60);
+  --border-strong: oklch(0.82 0.003 60);
   --input: oklch(0.91 0.003 60);
   --ring: oklch(0.628 0.205 38 / 50%);
+
+  /* Brand soft tint (10% backdrop for badges, hover states) */
+  --brand-soft: oklch(0.628 0.205 38 / 10%);
+
+  /* Status — neutral, executive (no candy colors) */
+  --success: oklch(0.55 0.13 155);
+  --warning: oklch(0.72 0.15 75);
 
   --chart-1: oklch(0.628 0.205 38);
   --chart-2: oklch(0.30 0 0);
@@ -158,8 +190,12 @@
   --destructive-foreground: oklch(1 0 0);
 
   --border: oklch(1 0 0 / 10%);
+  --border-strong: oklch(1 0 0 / 18%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.68 0.20 38 / 50%);
+  --brand-soft: oklch(0.68 0.20 38 / 14%);
+  --success: oklch(0.65 0.14 155);
+  --warning: oklch(0.78 0.15 75);
 
   --sidebar: oklch(0.10 0 0);
   --sidebar-foreground: oklch(0.88 0 0);
@@ -181,13 +217,33 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4 {
+  h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--color-foreground);
   }
+  h1 { font-size: var(--text-3xl); line-height: 1.1; font-weight: 700; }
+  h2 { font-size: var(--text-2xl); line-height: 1.2; }
+  h3 { font-size: var(--text-xl); line-height: 1.25; }
+  h4 { font-size: var(--text-lg); line-height: 1.3; }
+
+  /* Executive label — uppercase tracked */
+  .label-exec {
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    color: var(--color-muted-foreground);
+  }
+
+  /* Brand display (Ibrand only on hero/logo lockups) */
+  .font-brand { font-family: var(--font-brand); letter-spacing: 0; }
 }
