@@ -175,7 +175,7 @@ function LoginPage() {
               <div className="absolute -inset-3 rounded-2xl bg-brand/10 blur-xl" />
               <div className="relative rounded-xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm">
                 <div className="flex items-center gap-2.5 border-b border-white/10 pb-3">
-                  <LogoMark className="h-6 w-6" />
+                  <Logo tone="light" size="h-4" />
                   <div>
                     <div className="text-[0.7rem] font-medium text-white/90">
                       Leaderei Workspace
