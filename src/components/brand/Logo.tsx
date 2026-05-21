@@ -32,7 +32,7 @@ export function Logo({ className, tone = "dark", variant, size = "h-7" }: LogoPr
     <img
       src={SRC[v]}
       alt="Leaderei"
-      className={cn("w-auto select-none", size, className)}
+      className={cn("w-auto select-none object-contain text-left", size, className)}
       draggable={false}
     />
   );
