@@ -1,48 +1,71 @@
 import { cn } from "@/lib/utils";
+import logoColor from "@/assets/brand/leaderei-color.png";
+import logoWhite from "@/assets/brand/leaderei-white.png";
+import logoBlack from "@/assets/brand/leaderei-black.png";
+import logoGray from "@/assets/brand/leaderei-gray.png";
+
+type Variant = "color" | "white" | "black" | "gray";
 
 type LogoProps = {
   className?: string;
+  /** "dark" = sobre fundo claro (usa laranja). "light" = sobre fundo escuro (usa branco). */
   tone?: "light" | "dark";
-  /** Font-size in tailwind text-* class. Defaults to text-2xl. */
+  /** Força uma variante específica, sobrescrevendo `tone`. */
+  variant?: Variant;
+  /** Classe de altura tailwind. Ex.: "h-7", "h-8", "h-10". Default "h-7". */
   size?: string;
 };
 
+const SRC: Record<Variant, string> = {
+  color: logoColor,
+  white: logoWhite,
+  black: logoBlack,
+  gray: logoGray,
+};
+
 /**
- * Leaderei wordmark — official brand lockup.
- * Renders "leaderei" in lowercase using the Ibrand typeface (brandbook).
- * Never combine with a separate icon/mark.
+ * Leaderei wordmark — official brand lockup (image asset).
  */
-export function Logo({ className, tone = "dark", size = "text-2xl" }: LogoProps) {
-  const color = tone === "dark" ? "text-foreground" : "text-white";
+export function Logo({ className, tone = "dark", variant, size = "h-7" }: LogoProps) {
+  const v: Variant = variant ?? (tone === "light" ? "white" : "color");
   return (
-    <span
-      className={cn(
-        "inline-block font-brand leading-none tracking-tight select-none",
-        size,
-        color,
-        className,
-      )}
-      aria-label="Leaderei"
-    >
-      leaderei
-    </span>
+    <img
+      src={SRC[v]}
+      alt="Leaderei"
+      className={cn("w-auto select-none", size, className)}
+      draggable={false}
+    />
   );
 }
 
 /**
- * Compact mark for tight spaces (favicons, collapsed sidebar, avatars).
- * Uses the first letter of the wordmark in the brand typeface, on a brand-color tile.
+ * Compact mark for tight spaces (collapsed sidebar, avatars).
+ * Reuses the wordmark cropped via container — keeps brand consistency.
  */
-export function LogoMark({ className }: { className?: string }) {
+export function LogoMark({
+  className,
+  tone = "dark",
+  variant,
+}: {
+  className?: string;
+  tone?: "light" | "dark";
+  variant?: Variant;
+}) {
+  const v: Variant = variant ?? (tone === "light" ? "white" : "color");
   return (
     <span
       className={cn(
-        "grid h-7 w-7 place-items-center rounded-md bg-brand text-brand-foreground font-brand text-lg leading-none",
+        "inline-grid h-7 w-7 place-items-center overflow-hidden rounded-md",
         className,
       )}
       aria-hidden
     >
-      l
+      <img
+        src={SRC[v]}
+        alt=""
+        className="h-4 w-auto max-w-none -translate-x-[2%] object-contain"
+        draggable={false}
+      />
     </span>
   );
 }
