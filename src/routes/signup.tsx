@@ -1,9 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/brand/Logo";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -28,8 +31,33 @@ function slugify(s: string) {
 }
 
 function SignupPage() {
+  const navigate = useNavigate();
   const [orgName, setOrgName] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const slug = slugify(orgName);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: { full_name: name, org_name: orgName },
+      },
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Conta criada. Confirme seu email para entrar.");
+    navigate({ to: "/login" });
+  }
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
@@ -45,13 +73,7 @@ function SignupPage() {
             Em alguns segundos sua operação está pronta.
           </p>
 
-          <form
-            className="mt-8 space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              window.location.href = "/dashboard";
-            }}
-          >
+          <form className="mt-8 space-y-4" onSubmit={onSubmit}>
             <div className="space-y-1.5">
               <Label htmlFor="org">Nome da organização</Label>
               <Input
@@ -69,18 +91,18 @@ function SignupPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="name">Seu nome</Label>
-              <Input id="name" required />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email corporativo</Label>
-              <Input id="email" type="email" required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pw">Senha</Label>
-              <Input id="pw" type="password" required minLength={8} />
+              <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             </div>
-            <Button type="submit" className="w-full" size="lg">
-              Criar organização
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando…</> : "Criar organização"}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
               Ao continuar você aceita nossos Termos e Política de Privacidade.
