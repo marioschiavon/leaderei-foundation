@@ -4,7 +4,6 @@ import {
   Users,
   Inbox,
   Send,
-  GitBranch,
   Plug,
   Settings,
   ChevronsUpDown,
