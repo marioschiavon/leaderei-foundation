@@ -27,6 +27,7 @@ import { Route as AppAppLeadsRouteImport } from './routes/_app.app.leads'
 import { Route as AppAppIntegrationsRouteImport } from './routes/_app.app.integrations'
 import { Route as AppAppInboxRouteImport } from './routes/_app.app.inbox'
 import { Route as AppAppCampaignsRouteImport } from './routes/_app.app.campaigns'
+import { Route as AppAppBuilderRouteImport } from './routes/_app.app.builder'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -117,6 +118,11 @@ const AppAppCampaignsRoute = AppAppCampaignsRouteImport.update({
   path: '/campaigns',
   getParentRoute: () => AppAppRoute,
 } as any)
+const AppAppBuilderRoute = AppAppBuilderRouteImport.update({
+  id: '/builder',
+  path: '/builder',
+  getParentRoute: () => AppAppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/app': typeof AppAppRouteWithChildren
   '/master': typeof MasterMasterRouteWithChildren
+  '/app/builder': typeof AppAppBuilderRoute
   '/app/campaigns': typeof AppAppCampaignsRoute
   '/app/inbox': typeof AppAppInboxRoute
   '/app/integrations': typeof AppAppIntegrationsRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/app': typeof AppAppRouteWithChildren
   '/master': typeof MasterMasterRouteWithChildren
+  '/app/builder': typeof AppAppBuilderRoute
   '/app/campaigns': typeof AppAppCampaignsRoute
   '/app/inbox': typeof AppAppInboxRoute
   '/app/integrations': typeof AppAppIntegrationsRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/app': typeof AppAppRouteWithChildren
   '/_master/master': typeof MasterMasterRouteWithChildren
+  '/_app/app/builder': typeof AppAppBuilderRoute
   '/_app/app/campaigns': typeof AppAppCampaignsRoute
   '/_app/app/inbox': typeof AppAppInboxRoute
   '/_app/app/integrations': typeof AppAppIntegrationsRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/app'
     | '/master'
+    | '/app/builder'
     | '/app/campaigns'
     | '/app/inbox'
     | '/app/integrations'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/app'
     | '/master'
+    | '/app/builder'
     | '/app/campaigns'
     | '/app/inbox'
     | '/app/integrations'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/app'
     | '/_master/master'
+    | '/_app/app/builder'
     | '/_app/app/campaigns'
     | '/_app/app/inbox'
     | '/_app/app/integrations'
@@ -371,10 +383,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppCampaignsRouteImport
       parentRoute: typeof AppAppRoute
     }
+    '/_app/app/builder': {
+      id: '/_app/app/builder'
+      path: '/builder'
+      fullPath: '/app/builder'
+      preLoaderRoute: typeof AppAppBuilderRouteImport
+      parentRoute: typeof AppAppRoute
+    }
   }
 }
 
 interface AppAppRouteChildren {
+  AppAppBuilderRoute: typeof AppAppBuilderRoute
   AppAppCampaignsRoute: typeof AppAppCampaignsRoute
   AppAppInboxRoute: typeof AppAppInboxRoute
   AppAppIntegrationsRoute: typeof AppAppIntegrationsRoute
@@ -384,6 +404,7 @@ interface AppAppRouteChildren {
 }
 
 const AppAppRouteChildren: AppAppRouteChildren = {
+  AppAppBuilderRoute: AppAppBuilderRoute,
   AppAppCampaignsRoute: AppAppCampaignsRoute,
   AppAppInboxRoute: AppAppInboxRoute,
   AppAppIntegrationsRoute: AppAppIntegrationsRoute,

@@ -11,6 +11,7 @@ import {
   LogOut,
   Shield,
   Check,
+  Blocks,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import {
   useCurrentOrg,
@@ -40,17 +42,21 @@ import {
   setCurrentOrg,
 } from "@/lib/tenant/mock";
 
-const NAV = [
+const WORKSPACE = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
+  { title: "Campaigns", url: "/app/campaigns", icon: Send },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Inbox", url: "/app/inbox", icon: Inbox },
-  { title: "Campanhas", url: "/app/campaigns", icon: Send },
   { title: "Sales", url: "/app/sales", icon: GitBranch },
 ];
 
-const SYSTEM = [
-  { title: "Integrações", url: "/app/integrations", icon: Plug },
-  { title: "Configurações", url: "/app/settings", icon: Settings },
+const TOOLS = [
+  { title: "Integrations", url: "/app/integrations", icon: Plug },
+  { title: "Builder", url: "/app/builder", icon: Blocks, badge: "Beta" },
+];
+
+const ADMIN = [
+  { title: "Settings", url: "/app/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -77,7 +83,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV.map((item) => (
+              {WORKSPACE.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <Link to={item.url}>
@@ -93,11 +99,49 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-[0.7rem] uppercase tracking-wider text-sidebar-foreground/50">
-            Sistema
+            Tools
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {SYSTEM.map((item) => (
+              {TOOLS.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <Link to={item.url} className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4" />
+                      <span className="flex-1">{item.title}</span>
+                      {item.badge && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-auto bg-brand-soft text-brand border-transparent text-[0.6rem] px-1.5 py-0 font-medium"
+                        >
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-[0.7rem] uppercase tracking-wider text-sidebar-foreground/50">
+            Admin
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {user.isMaster && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith("/master")}>
+                    <Link to="/master">
+                      <Shield className="h-4 w-4" />
+                      <span>Master</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {ADMIN.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <Link to={item.url}>
@@ -107,16 +151,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              {user.isMaster && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link to="/master">
-                      <Shield className="h-4 w-4" />
-                      <span>Painel Master</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
