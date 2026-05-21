@@ -68,7 +68,15 @@ Integrações da Fase 1: Apollo, LinkedIn, HubSpot, **Pipedrive (ativo)**, Whats
 
 ## 7. Inbox
 
-(Em desenvolvimento.)
+Central de conversas multicanal (Email, LinkedIn, WhatsApp) em quatro painéis:
+
+1. **Views** (esquerda) — filtros rápidos: Minhas, Sem dono, Em IA, Favoritas, Todas, Resolvidas + tags.
+2. **Lista de conversas** — busca, filtros por canal, indicação de não-lida, canal, status (Aberta, Aguardando, Adiada, Resolvida) e atribuição (você / IA / sem dono).
+3. **Conversa** — thread completa, barra de IA com **Sugerir resposta** e **Passar para humano**, ações rápidas (Adiar, Arquivar, Resolver) e composer com seleção do canal de envio e modo **Nota interna**.
+4. **Contexto do lead** (direita) — perfil, empresa, score, status do funil, tags, atividade recente e resumo IA.
+
+Observação: nesta fase a UI está pronta mas o envio real por canal depende das integrações estarem conectadas.
+
 
 ## 8. Builder
 
