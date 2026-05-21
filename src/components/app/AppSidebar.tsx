@@ -41,19 +41,19 @@ import {
 } from "@/lib/tenant/mock";
 
 const WORKSPACE = [
-  { title: "Dashboard", url: "/app", icon: LayoutDashboard },
-  { title: "Campaigns", url: "/app/campaigns", icon: Send },
-  { title: "Leads", url: "/app/leads", icon: Users },
-  { title: "Inbox", url: "/app/inbox", icon: Inbox },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Campaigns", url: "/dashboard/campaigns", icon: Send },
+  { title: "Leads", url: "/dashboard/leads", icon: Users },
+  { title: "Inbox", url: "/dashboard/inbox", icon: Inbox },
 ];
 
 const TOOLS = [
-  { title: "Integrations", url: "/app/integrations", icon: Plug },
-  { title: "Builder", url: "/app/builder", icon: Blocks, badge: "Beta" },
+  { title: "Integrations", url: "/dashboard/integrations", icon: Plug },
+  { title: "Builder", url: "/dashboard/builder", icon: Blocks, badge: "Beta" },
 ];
 
 const ADMIN = [
-  { title: "Settings", url: "/app/settings", icon: Settings },
+  { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -63,12 +63,12 @@ export function AppSidebar() {
   
 
   const isActive = (url: string) =>
-    url === "/app" ? pathname === "/app" : pathname.startsWith(url);
+    url === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(url);
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="px-3 pt-3">
-        <Link to="/app" className="flex items-center gap-2 px-1.5 py-1">
+        <Link to="/dashboard" className="flex items-center gap-2 px-1.5 py-1">
           <Logo tone="light" />
         </Link>
       </SidebarHeader>

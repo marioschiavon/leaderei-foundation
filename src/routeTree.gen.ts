@@ -16,18 +16,18 @@ import { Route as MasterRouteImport } from './routes/_master'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MasterMasterRouteImport } from './routes/_master.master'
-import { Route as AppAppRouteImport } from './routes/_app.app'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as MasterMasterUsersRouteImport } from './routes/_master.master.users'
 import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.plans'
 import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
 import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.logs'
-import { Route as AppAppSettingsRouteImport } from './routes/_app.app.settings'
-import { Route as AppAppSalesRouteImport } from './routes/_app.app.sales'
-import { Route as AppAppLeadsRouteImport } from './routes/_app.app.leads'
-import { Route as AppAppIntegrationsRouteImport } from './routes/_app.app.integrations'
-import { Route as AppAppInboxRouteImport } from './routes/_app.app.inbox'
-import { Route as AppAppCampaignsRouteImport } from './routes/_app.app.campaigns'
-import { Route as AppAppBuilderRouteImport } from './routes/_app.app.builder'
+import { Route as AppDashboardSettingsRouteImport } from './routes/_app.dashboard.settings'
+import { Route as AppDashboardSalesRouteImport } from './routes/_app.dashboard.sales'
+import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.leads'
+import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dashboard.integrations'
+import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
+import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
+import { Route as AppDashboardBuilderRouteImport } from './routes/_app.dashboard.builder'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -62,9 +62,9 @@ const MasterMasterRoute = MasterMasterRouteImport.update({
   path: '/master',
   getParentRoute: () => MasterRoute,
 } as any)
-const AppAppRoute = AppAppRouteImport.update({
-  id: '/app',
-  path: '/app',
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
 const MasterMasterUsersRoute = MasterMasterUsersRouteImport.update({
@@ -88,40 +88,41 @@ const MasterMasterLogsRoute = MasterMasterLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => MasterMasterRoute,
 } as any)
-const AppAppSettingsRoute = AppAppSettingsRouteImport.update({
+const AppDashboardSettingsRoute = AppDashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => AppAppRoute,
+  getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppAppSalesRoute = AppAppSalesRouteImport.update({
+const AppDashboardSalesRoute = AppDashboardSalesRouteImport.update({
   id: '/sales',
   path: '/sales',
-  getParentRoute: () => AppAppRoute,
+  getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppAppLeadsRoute = AppAppLeadsRouteImport.update({
+const AppDashboardLeadsRoute = AppDashboardLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
-  getParentRoute: () => AppAppRoute,
+  getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppAppIntegrationsRoute = AppAppIntegrationsRouteImport.update({
-  id: '/integrations',
-  path: '/integrations',
-  getParentRoute: () => AppAppRoute,
-} as any)
-const AppAppInboxRoute = AppAppInboxRouteImport.update({
+const AppDashboardIntegrationsRoute =
+  AppDashboardIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AppDashboardRoute,
+  } as any)
+const AppDashboardInboxRoute = AppDashboardInboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
-  getParentRoute: () => AppAppRoute,
+  getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppAppCampaignsRoute = AppAppCampaignsRouteImport.update({
+const AppDashboardCampaignsRoute = AppDashboardCampaignsRouteImport.update({
   id: '/campaigns',
   path: '/campaigns',
-  getParentRoute: () => AppAppRoute,
+  getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppAppBuilderRoute = AppAppBuilderRouteImport.update({
+const AppDashboardBuilderRoute = AppDashboardBuilderRouteImport.update({
   id: '/builder',
   path: '/builder',
-  getParentRoute: () => AppAppRoute,
+  getParentRoute: () => AppDashboardRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -129,15 +130,15 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/app': typeof AppAppRouteWithChildren
+  '/dashboard': typeof AppDashboardRouteWithChildren
   '/master': typeof MasterMasterRouteWithChildren
-  '/app/builder': typeof AppAppBuilderRoute
-  '/app/campaigns': typeof AppAppCampaignsRoute
-  '/app/inbox': typeof AppAppInboxRoute
-  '/app/integrations': typeof AppAppIntegrationsRoute
-  '/app/leads': typeof AppAppLeadsRoute
-  '/app/sales': typeof AppAppSalesRoute
-  '/app/settings': typeof AppAppSettingsRoute
+  '/dashboard/builder': typeof AppDashboardBuilderRoute
+  '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
+  '/dashboard/inbox': typeof AppDashboardInboxRoute
+  '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
+  '/dashboard/leads': typeof AppDashboardLeadsRoute
+  '/dashboard/sales': typeof AppDashboardSalesRoute
+  '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
@@ -148,15 +149,15 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/app': typeof AppAppRouteWithChildren
+  '/dashboard': typeof AppDashboardRouteWithChildren
   '/master': typeof MasterMasterRouteWithChildren
-  '/app/builder': typeof AppAppBuilderRoute
-  '/app/campaigns': typeof AppAppCampaignsRoute
-  '/app/inbox': typeof AppAppInboxRoute
-  '/app/integrations': typeof AppAppIntegrationsRoute
-  '/app/leads': typeof AppAppLeadsRoute
-  '/app/sales': typeof AppAppSalesRoute
-  '/app/settings': typeof AppAppSettingsRoute
+  '/dashboard/builder': typeof AppDashboardBuilderRoute
+  '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
+  '/dashboard/inbox': typeof AppDashboardInboxRoute
+  '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
+  '/dashboard/leads': typeof AppDashboardLeadsRoute
+  '/dashboard/sales': typeof AppDashboardSalesRoute
+  '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
@@ -170,15 +171,15 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/_app/app': typeof AppAppRouteWithChildren
+  '/_app/dashboard': typeof AppDashboardRouteWithChildren
   '/_master/master': typeof MasterMasterRouteWithChildren
-  '/_app/app/builder': typeof AppAppBuilderRoute
-  '/_app/app/campaigns': typeof AppAppCampaignsRoute
-  '/_app/app/inbox': typeof AppAppInboxRoute
-  '/_app/app/integrations': typeof AppAppIntegrationsRoute
-  '/_app/app/leads': typeof AppAppLeadsRoute
-  '/_app/app/sales': typeof AppAppSalesRoute
-  '/_app/app/settings': typeof AppAppSettingsRoute
+  '/_app/dashboard/builder': typeof AppDashboardBuilderRoute
+  '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
+  '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
+  '/_app/dashboard/integrations': typeof AppDashboardIntegrationsRoute
+  '/_app/dashboard/leads': typeof AppDashboardLeadsRoute
+  '/_app/dashboard/sales': typeof AppDashboardSalesRoute
+  '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
   '/_master/master/logs': typeof MasterMasterLogsRoute
   '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
   '/_master/master/plans': typeof MasterMasterPlansRoute
@@ -191,15 +192,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
-    | '/app'
+    | '/dashboard'
     | '/master'
-    | '/app/builder'
-    | '/app/campaigns'
-    | '/app/inbox'
-    | '/app/integrations'
-    | '/app/leads'
-    | '/app/sales'
-    | '/app/settings'
+    | '/dashboard/builder'
+    | '/dashboard/campaigns'
+    | '/dashboard/inbox'
+    | '/dashboard/integrations'
+    | '/dashboard/leads'
+    | '/dashboard/sales'
+    | '/dashboard/settings'
     | '/master/logs'
     | '/master/organizations'
     | '/master/plans'
@@ -210,15 +211,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
-    | '/app'
+    | '/dashboard'
     | '/master'
-    | '/app/builder'
-    | '/app/campaigns'
-    | '/app/inbox'
-    | '/app/integrations'
-    | '/app/leads'
-    | '/app/sales'
-    | '/app/settings'
+    | '/dashboard/builder'
+    | '/dashboard/campaigns'
+    | '/dashboard/inbox'
+    | '/dashboard/integrations'
+    | '/dashboard/leads'
+    | '/dashboard/sales'
+    | '/dashboard/settings'
     | '/master/logs'
     | '/master/organizations'
     | '/master/plans'
@@ -231,15 +232,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
-    | '/_app/app'
+    | '/_app/dashboard'
     | '/_master/master'
-    | '/_app/app/builder'
-    | '/_app/app/campaigns'
-    | '/_app/app/inbox'
-    | '/_app/app/integrations'
-    | '/_app/app/leads'
-    | '/_app/app/sales'
-    | '/_app/app/settings'
+    | '/_app/dashboard/builder'
+    | '/_app/dashboard/campaigns'
+    | '/_app/dashboard/inbox'
+    | '/_app/dashboard/integrations'
+    | '/_app/dashboard/leads'
+    | '/_app/dashboard/sales'
+    | '/_app/dashboard/settings'
     | '/_master/master/logs'
     | '/_master/master/organizations'
     | '/_master/master/plans'
@@ -306,11 +307,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MasterMasterRouteImport
       parentRoute: typeof MasterRoute
     }
-    '/_app/app': {
-      id: '/_app/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppAppRouteImport
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
     '/_master/master/users': {
@@ -341,87 +342,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MasterMasterLogsRouteImport
       parentRoute: typeof MasterMasterRoute
     }
-    '/_app/app/settings': {
-      id: '/_app/app/settings'
+    '/_app/dashboard/settings': {
+      id: '/_app/dashboard/settings'
       path: '/settings'
-      fullPath: '/app/settings'
-      preLoaderRoute: typeof AppAppSettingsRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/settings'
+      preLoaderRoute: typeof AppDashboardSettingsRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
-    '/_app/app/sales': {
-      id: '/_app/app/sales'
+    '/_app/dashboard/sales': {
+      id: '/_app/dashboard/sales'
       path: '/sales'
-      fullPath: '/app/sales'
-      preLoaderRoute: typeof AppAppSalesRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/sales'
+      preLoaderRoute: typeof AppDashboardSalesRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
-    '/_app/app/leads': {
-      id: '/_app/app/leads'
+    '/_app/dashboard/leads': {
+      id: '/_app/dashboard/leads'
       path: '/leads'
-      fullPath: '/app/leads'
-      preLoaderRoute: typeof AppAppLeadsRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/leads'
+      preLoaderRoute: typeof AppDashboardLeadsRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
-    '/_app/app/integrations': {
-      id: '/_app/app/integrations'
+    '/_app/dashboard/integrations': {
+      id: '/_app/dashboard/integrations'
       path: '/integrations'
-      fullPath: '/app/integrations'
-      preLoaderRoute: typeof AppAppIntegrationsRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/integrations'
+      preLoaderRoute: typeof AppDashboardIntegrationsRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
-    '/_app/app/inbox': {
-      id: '/_app/app/inbox'
+    '/_app/dashboard/inbox': {
+      id: '/_app/dashboard/inbox'
       path: '/inbox'
-      fullPath: '/app/inbox'
-      preLoaderRoute: typeof AppAppInboxRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/inbox'
+      preLoaderRoute: typeof AppDashboardInboxRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
-    '/_app/app/campaigns': {
-      id: '/_app/app/campaigns'
+    '/_app/dashboard/campaigns': {
+      id: '/_app/dashboard/campaigns'
       path: '/campaigns'
-      fullPath: '/app/campaigns'
-      preLoaderRoute: typeof AppAppCampaignsRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/campaigns'
+      preLoaderRoute: typeof AppDashboardCampaignsRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
-    '/_app/app/builder': {
-      id: '/_app/app/builder'
+    '/_app/dashboard/builder': {
+      id: '/_app/dashboard/builder'
       path: '/builder'
-      fullPath: '/app/builder'
-      preLoaderRoute: typeof AppAppBuilderRouteImport
-      parentRoute: typeof AppAppRoute
+      fullPath: '/dashboard/builder'
+      preLoaderRoute: typeof AppDashboardBuilderRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
   }
 }
 
-interface AppAppRouteChildren {
-  AppAppBuilderRoute: typeof AppAppBuilderRoute
-  AppAppCampaignsRoute: typeof AppAppCampaignsRoute
-  AppAppInboxRoute: typeof AppAppInboxRoute
-  AppAppIntegrationsRoute: typeof AppAppIntegrationsRoute
-  AppAppLeadsRoute: typeof AppAppLeadsRoute
-  AppAppSalesRoute: typeof AppAppSalesRoute
-  AppAppSettingsRoute: typeof AppAppSettingsRoute
+interface AppDashboardRouteChildren {
+  AppDashboardBuilderRoute: typeof AppDashboardBuilderRoute
+  AppDashboardCampaignsRoute: typeof AppDashboardCampaignsRoute
+  AppDashboardInboxRoute: typeof AppDashboardInboxRoute
+  AppDashboardIntegrationsRoute: typeof AppDashboardIntegrationsRoute
+  AppDashboardLeadsRoute: typeof AppDashboardLeadsRoute
+  AppDashboardSalesRoute: typeof AppDashboardSalesRoute
+  AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
 }
 
-const AppAppRouteChildren: AppAppRouteChildren = {
-  AppAppBuilderRoute: AppAppBuilderRoute,
-  AppAppCampaignsRoute: AppAppCampaignsRoute,
-  AppAppInboxRoute: AppAppInboxRoute,
-  AppAppIntegrationsRoute: AppAppIntegrationsRoute,
-  AppAppLeadsRoute: AppAppLeadsRoute,
-  AppAppSalesRoute: AppAppSalesRoute,
-  AppAppSettingsRoute: AppAppSettingsRoute,
+const AppDashboardRouteChildren: AppDashboardRouteChildren = {
+  AppDashboardBuilderRoute: AppDashboardBuilderRoute,
+  AppDashboardCampaignsRoute: AppDashboardCampaignsRoute,
+  AppDashboardInboxRoute: AppDashboardInboxRoute,
+  AppDashboardIntegrationsRoute: AppDashboardIntegrationsRoute,
+  AppDashboardLeadsRoute: AppDashboardLeadsRoute,
+  AppDashboardSalesRoute: AppDashboardSalesRoute,
+  AppDashboardSettingsRoute: AppDashboardSettingsRoute,
 }
 
-const AppAppRouteWithChildren =
-  AppAppRoute._addFileChildren(AppAppRouteChildren)
+const AppDashboardRouteWithChildren = AppDashboardRoute._addFileChildren(
+  AppDashboardRouteChildren,
+)
 
 interface AppRouteChildren {
-  AppAppRoute: typeof AppAppRouteWithChildren
+  AppDashboardRoute: typeof AppDashboardRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppAppRoute: AppAppRouteWithChildren,
+  AppDashboardRoute: AppDashboardRouteWithChildren,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -466,3 +468,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
