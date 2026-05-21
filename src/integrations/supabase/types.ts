@@ -14,6 +14,544 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_enrollments: {
+        Row: {
+          campaign_id: string
+          completed_at: string | null
+          context: Json
+          created_at: string
+          current_node_id: string | null
+          enrolled_at: string
+          flow_definition_id: string | null
+          id: string
+          last_error: string | null
+          lead_id: string
+          next_run_at: string | null
+          organization_id: string
+          status: Database["public"]["Enums"]["enrollment_status"]
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          completed_at?: string | null
+          context?: Json
+          created_at?: string
+          current_node_id?: string | null
+          enrolled_at?: string
+          flow_definition_id?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id: string
+          next_run_at?: string | null
+          organization_id: string
+          status?: Database["public"]["Enums"]["enrollment_status"]
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          completed_at?: string | null
+          context?: Json
+          created_at?: string
+          current_node_id?: string | null
+          enrolled_at?: string
+          flow_definition_id?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id?: string
+          next_run_at?: string | null
+          organization_id?: string
+          status?: Database["public"]["Enums"]["enrollment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_enrollments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_current_node_id_fkey"
+            columns: ["current_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_flow_definition_id_fkey"
+            columns: ["flow_definition_id"]
+            isOneToOne: false
+            referencedRelation: "flow_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          channel: Database["public"]["Enums"]["campaign_channel"]
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          daily_send_limit: number | null
+          description: string | null
+          id: string
+          name: string
+          objective: string | null
+          organization_id: string
+          scheduled_at: string | null
+          settings: Json
+          started_at: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          total_enrolled: number
+          total_replied: number
+          total_sent: number
+          updated_at: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["campaign_channel"]
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_send_limit?: number | null
+          description?: string | null
+          id?: string
+          name: string
+          objective?: string | null
+          organization_id: string
+          scheduled_at?: string | null
+          settings?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          total_enrolled?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["campaign_channel"]
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_send_limit?: number | null
+          description?: string | null
+          id?: string
+          name?: string
+          objective?: string | null
+          organization_id?: string
+          scheduled_at?: string | null
+          settings?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          total_enrolled?: number
+          total_replied?: number
+          total_sent?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          ai_enabled: boolean
+          assigned_user_id: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          created_at: string
+          external_thread_id: string | null
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          lead_id: string | null
+          organization_id: string
+          status: Database["public"]["Enums"]["conversation_status"]
+          subject: string | null
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          ai_enabled?: boolean
+          assigned_user_id?: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          created_at?: string
+          external_thread_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          lead_id?: string | null
+          organization_id: string
+          status?: Database["public"]["Enums"]["conversation_status"]
+          subject?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          ai_enabled?: boolean
+          assigned_user_id?: string | null
+          channel?: Database["public"]["Enums"]["message_channel"]
+          created_at?: string
+          external_thread_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          lead_id?: string | null
+          organization_id?: string
+          status?: Database["public"]["Enums"]["conversation_status"]
+          subject?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_definitions: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          graph: Json
+          id: string
+          is_published: boolean
+          name: string
+          organization_id: string
+          published_at: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          graph?: Json
+          id?: string
+          is_published?: boolean
+          name: string
+          organization_id: string
+          published_at?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          graph?: Json
+          id?: string
+          is_published?: boolean
+          name?: string
+          organization_id?: string
+          published_at?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_definitions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_definitions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_edges: {
+        Row: {
+          condition_label: string | null
+          config: Json
+          created_at: string
+          flow_definition_id: string
+          id: string
+          organization_id: string
+          source_node_id: string
+          target_node_id: string
+        }
+        Insert: {
+          condition_label?: string | null
+          config?: Json
+          created_at?: string
+          flow_definition_id: string
+          id?: string
+          organization_id: string
+          source_node_id: string
+          target_node_id: string
+        }
+        Update: {
+          condition_label?: string | null
+          config?: Json
+          created_at?: string
+          flow_definition_id?: string
+          id?: string
+          organization_id?: string
+          source_node_id?: string
+          target_node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_edges_flow_definition_id_fkey"
+            columns: ["flow_definition_id"]
+            isOneToOne: false
+            referencedRelation: "flow_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_edges_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_edges_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_edges_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_nodes: {
+        Row: {
+          config: Json
+          created_at: string
+          flow_definition_id: string
+          id: string
+          label: string | null
+          node_key: string
+          organization_id: string
+          position_x: number
+          position_y: number
+          type: Database["public"]["Enums"]["flow_node_type"]
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          flow_definition_id: string
+          id?: string
+          label?: string | null
+          node_key: string
+          organization_id: string
+          position_x?: number
+          position_y?: number
+          type: Database["public"]["Enums"]["flow_node_type"]
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          flow_definition_id?: string
+          id?: string
+          label?: string | null
+          node_key?: string
+          organization_id?: string
+          position_x?: number
+          position_y?: number
+          type?: Database["public"]["Enums"]["flow_node_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_nodes_flow_definition_id_fkey"
+            columns: ["flow_definition_id"]
+            isOneToOne: false
+            referencedRelation: "flow_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_nodes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handoff_events: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          from_mode: string
+          id: string
+          organization_id: string
+          reason: string | null
+          to_mode: string
+          triggered_by: string | null
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          from_mode: string
+          id?: string
+          organization_id: string
+          reason?: string | null
+          to_mode: string
+          triggered_by?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          from_mode?: string
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          to_mode?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handoff_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handoff_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_credentials: {
+        Row: {
+          created_at: string
+          id: string
+          integration_id: string
+          key: string
+          metadata: Json
+          organization_id: string
+          updated_at: string
+          value_encrypted: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          integration_id: string
+          key: string
+          metadata?: Json
+          organization_id: string
+          updated_at?: string
+          value_encrypted: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          integration_id?: string
+          key?: string
+          metadata?: Json
+          organization_id?: string
+          updated_at?: string
+          value_encrypted?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_credentials_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "organization_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_credentials_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_providers: {
+        Row: {
+          category: string
+          config_schema: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          logo_url: string | null
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          config_schema?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          config_schema?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           author_user_id: string | null
@@ -259,6 +797,141 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          attachments: Json
+          body: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          conversation_id: string
+          created_at: string
+          delivered_at: string | null
+          direction: Database["public"]["Enums"]["message_direction"]
+          external_message_id: string | null
+          failed_reason: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          read_at: string | null
+          sender_user_id: string | null
+          sent_at: string | null
+          sent_by_ai: boolean
+          status: Database["public"]["Enums"]["message_status"]
+        }
+        Insert: {
+          attachments?: Json
+          body?: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          conversation_id: string
+          created_at?: string
+          delivered_at?: string | null
+          direction: Database["public"]["Enums"]["message_direction"]
+          external_message_id?: string | null
+          failed_reason?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          read_at?: string | null
+          sender_user_id?: string | null
+          sent_at?: string | null
+          sent_by_ai?: boolean
+          status?: Database["public"]["Enums"]["message_status"]
+        }
+        Update: {
+          attachments?: Json
+          body?: string | null
+          channel?: Database["public"]["Enums"]["message_channel"]
+          conversation_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          direction?: Database["public"]["Enums"]["message_direction"]
+          external_message_id?: string | null
+          failed_reason?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          read_at?: string | null
+          sender_user_id?: string | null
+          sent_at?: string | null
+          sent_by_ai?: boolean
+          status?: Database["public"]["Enums"]["message_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_integrations: {
+        Row: {
+          config: Json
+          connected_at: string | null
+          connected_by: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          organization_id: string
+          provider_id: string
+          status: Database["public"]["Enums"]["integration_status"]
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          connected_at?: string | null
+          connected_by?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          organization_id: string
+          provider_id: string
+          status?: Database["public"]["Enums"]["integration_status"]
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          connected_at?: string | null
+          connected_by?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          organization_id?: string
+          provider_id?: string
+          status?: Database["public"]["Enums"]["integration_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_integrations_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "integration_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -435,6 +1108,33 @@ export type Database = {
     }
     Enums: {
       app_role: "master_admin" | "company_admin" | "user"
+      campaign_channel: "whatsapp" | "email" | "linkedin" | "sms" | "multi"
+      campaign_status:
+        | "draft"
+        | "scheduled"
+        | "running"
+        | "paused"
+        | "completed"
+        | "archived"
+      conversation_status: "open" | "pending" | "snoozed" | "closed"
+      enrollment_status:
+        | "pending"
+        | "active"
+        | "paused"
+        | "completed"
+        | "failed"
+        | "cancelled"
+      flow_node_type:
+        | "trigger"
+        | "send_message"
+        | "wait"
+        | "condition"
+        | "action"
+        | "ai_step"
+        | "enrich"
+        | "tag"
+        | "end"
+      integration_status: "disconnected" | "connected" | "error" | "pending"
       lead_activity_type:
         | "note"
         | "status_change"
@@ -456,6 +1156,15 @@ export type Database = {
         | "archived"
       lead_temperature: "cold" | "warm" | "hot"
       member_status: "active" | "invited" | "suspended"
+      message_channel: "whatsapp" | "email" | "linkedin" | "sms" | "internal"
+      message_direction: "inbound" | "outbound"
+      message_status:
+        | "queued"
+        | "sending"
+        | "sent"
+        | "delivered"
+        | "read"
+        | "failed"
       organization_status: "active" | "inactive" | "trial"
     }
     CompositeTypes: {
@@ -585,6 +1294,36 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["master_admin", "company_admin", "user"],
+      campaign_channel: ["whatsapp", "email", "linkedin", "sms", "multi"],
+      campaign_status: [
+        "draft",
+        "scheduled",
+        "running",
+        "paused",
+        "completed",
+        "archived",
+      ],
+      conversation_status: ["open", "pending", "snoozed", "closed"],
+      enrollment_status: [
+        "pending",
+        "active",
+        "paused",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+      flow_node_type: [
+        "trigger",
+        "send_message",
+        "wait",
+        "condition",
+        "action",
+        "ai_step",
+        "enrich",
+        "tag",
+        "end",
+      ],
+      integration_status: ["disconnected", "connected", "error", "pending"],
       lead_activity_type: [
         "note",
         "status_change",
@@ -608,6 +1347,16 @@ export const Constants = {
       ],
       lead_temperature: ["cold", "warm", "hot"],
       member_status: ["active", "invited", "suspended"],
+      message_channel: ["whatsapp", "email", "linkedin", "sms", "internal"],
+      message_direction: ["inbound", "outbound"],
+      message_status: [
+        "queued",
+        "sending",
+        "sent",
+        "delivered",
+        "read",
+        "failed",
+      ],
       organization_status: ["active", "inactive", "trial"],
     },
   },
