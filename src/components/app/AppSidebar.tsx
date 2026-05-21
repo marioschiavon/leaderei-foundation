@@ -11,6 +11,7 @@ import {
   LogOut,
   Shield,
   Check,
+  Blocks,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import {
   useCurrentOrg,
@@ -40,17 +42,21 @@ import {
   setCurrentOrg,
 } from "@/lib/tenant/mock";
 
-const NAV = [
+const WORKSPACE = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
+  { title: "Campaigns", url: "/app/campaigns", icon: Send },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Inbox", url: "/app/inbox", icon: Inbox },
-  { title: "Campanhas", url: "/app/campaigns", icon: Send },
   { title: "Sales", url: "/app/sales", icon: GitBranch },
 ];
 
-const SYSTEM = [
-  { title: "Integrações", url: "/app/integrations", icon: Plug },
-  { title: "Configurações", url: "/app/settings", icon: Settings },
+const TOOLS = [
+  { title: "Integrations", url: "/app/integrations", icon: Plug },
+  { title: "Builder", url: "/app/builder", icon: Blocks, badge: "Beta" },
+];
+
+const ADMIN = [
+  { title: "Settings", url: "/app/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
