@@ -4,7 +4,6 @@ import {
   Users,
   Inbox,
   Send,
-  GitBranch,
   Plug,
   Settings,
   ChevronsUpDown,
@@ -37,7 +36,6 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import {
   useCurrentOrg,
-  useCurrentUser,
   useOrganizations,
   setCurrentOrg,
 } from "@/lib/tenant/mock";
@@ -47,7 +45,6 @@ const WORKSPACE = [
   { title: "Campaigns", url: "/app/campaigns", icon: Send },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Inbox", url: "/app/inbox", icon: Inbox },
-  { title: "Sales", url: "/app/sales", icon: GitBranch },
 ];
 
 const TOOLS = [
@@ -63,7 +60,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const org = useCurrentOrg();
   const orgs = useOrganizations();
-  const user = useCurrentUser();
+  
 
   const isActive = (url: string) =>
     url === "/app" ? pathname === "/app" : pathname.startsWith(url);
@@ -131,16 +128,14 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {user.isMaster && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith("/master")}>
-                    <Link to="/master">
-                      <Shield className="h-4 w-4" />
-                      <span>Master</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith("/master")}>
+                  <Link to="/master">
+                    <Shield className="h-4 w-4" />
+                    <span>Master</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {ADMIN.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
