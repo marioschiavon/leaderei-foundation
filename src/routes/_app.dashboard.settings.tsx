@@ -76,7 +76,7 @@ function SettingsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border bg-surface p-6">
               <span className="text-xs uppercase tracking-wider text-muted-foreground">Plano atual</span>
-              <div className="mt-2 font-display text-2xl font-bold capitalize">{org.plan}</div>
+              <div className="mt-2 font-display text-2xl font-bold capitalize">Em breve</div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Renova automaticamente em 30 dias.
               </p>
