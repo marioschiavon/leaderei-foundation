@@ -68,7 +68,15 @@ Integrações da Fase 1: Apollo, LinkedIn, HubSpot, **Pipedrive (ativo)**, Whats
 
 ## 7. Inbox
 
-(Em desenvolvimento.)
+Central de conversas multicanal (Email, LinkedIn, WhatsApp) em quatro painéis:
+
+1. **Views** (esquerda) — filtros rápidos: Minhas, Sem dono, Em IA, Favoritas, Todas, Resolvidas + tags.
+2. **Lista de conversas** — busca, filtros por canal, indicação de não-lida, canal, status (Aberta, Aguardando, Adiada, Resolvida) e atribuição (você / IA / sem dono).
+3. **Conversa** — thread completa, barra de IA com **Sugerir resposta** e **Passar para humano**, ações rápidas (Adiar, Arquivar, Resolver) e composer com seleção do canal de envio e modo **Nota interna**.
+4. **Contexto do lead** (direita) — perfil, empresa, score, status do funil, tags, atividade recente e resumo IA.
+
+Observação: nesta fase a UI está pronta mas o envio real por canal depende das integrações estarem conectadas.
+
 
 ## 8. Builder
 
@@ -88,7 +96,9 @@ Em caso de dúvida ou problema, contate o time Leaderei pelos canais internos da
 
 > Atualizado a cada mudança visível ao usuário no produto.
 
+- **2026-05-21** — Inbox v1 publicada (4 painéis, filtros multicanal, barra de IA + handoff humano, composer).
 - **2026-05-21** — Correção: navegação entre páginas filhas de `/dashboard` (Leads, Inbox, Integrations, etc.) agora funciona corretamente. Antes a URL mudava mas a tela continuava na home.
 - **2026-05-21** — Rota base passa a ser `/dashboard` (era `/app`). Módulos de Leads e Integrações documentados.
 - **2026-05-20** — Primeira versão.
+
 
