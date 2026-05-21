@@ -2,46 +2,47 @@ import { cn } from "@/lib/utils";
 
 type LogoProps = {
   className?: string;
-  variant?: "full" | "mark";
   tone?: "light" | "dark";
+  /** Font-size in tailwind text-* class. Defaults to text-2xl. */
+  size?: string;
 };
 
-export function Logo({ className, variant = "full", tone = "dark" }: LogoProps) {
-  const text = tone === "dark" ? "text-foreground" : "text-white";
+/**
+ * Leaderei wordmark — official brand lockup.
+ * Renders "leaderei" in lowercase using the Ibrand typeface (brandbook).
+ * Never combine with a separate icon/mark.
+ */
+export function Logo({ className, tone = "dark", size = "text-2xl" }: LogoProps) {
+  const color = tone === "dark" ? "text-foreground" : "text-white";
   return (
-    <div className={cn("inline-flex items-center gap-2", className)}>
-      <LogoMark />
-      {variant === "full" && (
-        <span
-          className={cn(
-            "font-display text-[1.05rem] font-extrabold tracking-tight",
-            text,
-          )}
-        >
-          Leader<span className="text-brand">ei</span>
-        </span>
+    <span
+      className={cn(
+        "inline-block font-brand leading-none tracking-tight select-none",
+        size,
+        color,
+        className,
       )}
-    </div>
+      aria-label="Leaderei"
+    >
+      leaderei
+    </span>
   );
 }
 
+/**
+ * Compact mark for tight spaces (favicons, collapsed sidebar, avatars).
+ * Uses the first letter of the wordmark in the brand typeface, on a brand-color tile.
+ */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <div
+    <span
       className={cn(
-        "grid h-7 w-7 place-items-center rounded-md bg-brand text-brand-foreground shadow-sm",
+        "grid h-7 w-7 place-items-center rounded-md bg-brand text-brand-foreground font-brand text-lg leading-none",
         className,
       )}
       aria-hidden
     >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <path
-          d="M2 2v10h10"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="square"
-        />
-      </svg>
-    </div>
+      l
+    </span>
   );
 }
