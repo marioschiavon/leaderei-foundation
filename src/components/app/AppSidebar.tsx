@@ -47,7 +47,6 @@ const WORKSPACE = [
   { title: "Campaigns", url: "/app/campaigns", icon: Send },
   { title: "Leads", url: "/app/leads", icon: Users },
   { title: "Inbox", url: "/app/inbox", icon: Inbox },
-  { title: "Sales", url: "/app/sales", icon: GitBranch },
 ];
 
 const TOOLS = [
