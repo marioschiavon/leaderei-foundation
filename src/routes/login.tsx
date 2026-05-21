@@ -51,7 +51,7 @@ function LoginPage() {
               e.preventDefault();
               setLoading(true);
               setTimeout(() => {
-                window.location.href = "/app";
+                window.location.href = "/dashboard";
               }, 600);
             }}
           >

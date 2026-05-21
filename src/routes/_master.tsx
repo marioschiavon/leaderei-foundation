@@ -49,7 +49,7 @@ function MasterLayout() {
             })}
           </nav>
           <Link
-            to="/app"
+            to="/dashboard"
             className="ml-auto inline-flex items-center gap-1.5 text-xs text-white/60 hover:text-white"
           >
             <ArrowLeft className="h-3.5 w-3.5" />

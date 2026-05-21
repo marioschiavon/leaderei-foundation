@@ -33,7 +33,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_app/app/leads")({
+export const Route = createFileRoute("/_app/dashboard/leads")({
   component: LeadsPage,
 });
 

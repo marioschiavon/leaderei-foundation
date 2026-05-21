@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useCurrentOrg, useCurrentUser } from "@/lib/tenant/mock";
 
-export const Route = createFileRoute("/_app/app")({
+export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
 });
 
@@ -69,17 +69,17 @@ const ACTIVITY = [
 ];
 
 const ALERTS = [
-  { level: "warn", text: "LinkedIn não conectado — campanhas multicanal limitadas.", cta: "Conectar", href: "/app/integrations" },
-  { level: "warn", text: "Domínio de envio sem SPF/DKIM verificados.", cta: "Verificar", href: "/app/settings" },
-  { level: "info", text: "Reativação Q4 atingiu o limite diário de envio.", cta: "Revisar", href: "/app/campaigns" },
+  { level: "warn", text: "LinkedIn não conectado — campanhas multicanal limitadas.", cta: "Conectar", href: "/dashboard/integrations" },
+  { level: "warn", text: "Domínio de envio sem SPF/DKIM verificados.", cta: "Verificar", href: "/dashboard/settings" },
+  { level: "info", text: "Reativação Q4 atingiu o limite diário de envio.", cta: "Revisar", href: "/dashboard/campaigns" },
 ];
 
 const NEXT_STEPS = [
-  { text: "Conectar primeira caixa de email", done: true, href: "/app/integrations" },
-  { text: "Importar lista inicial de leads", done: true, href: "/app/leads" },
-  { text: "Conectar LinkedIn", done: false, href: "/app/integrations" },
-  { text: "Configurar pipeline padrão", done: false, href: "/app/settings" },
-  { text: "Convidar membros da equipe", done: false, href: "/app/settings" },
+  { text: "Conectar primeira caixa de email", done: true, href: "/dashboard/integrations" },
+  { text: "Importar lista inicial de leads", done: true, href: "/dashboard/leads" },
+  { text: "Conectar LinkedIn", done: false, href: "/dashboard/integrations" },
+  { text: "Configurar pipeline padrão", done: false, href: "/dashboard/settings" },
+  { text: "Convidar membros da equipe", done: false, href: "/dashboard/settings" },
 ];
 
 const stageStyle: Record<string, string> = {
@@ -109,7 +109,7 @@ function Dashboard() {
         description={`Resumo operacional de ${org.name} nos últimos 7 dias.`}
         actions={
           <Button asChild>
-            <Link to="/app/campaigns">
+            <Link to="/dashboard/campaigns">
               <Plus className="h-4 w-4" />
               Nova campanha
             </Link>
@@ -171,7 +171,7 @@ function Dashboard() {
           <SectionHeader
             title="Campanhas em destaque"
             subtitle="Sequências ativas e recém-pausadas"
-            href="/app/campaigns"
+            href="/dashboard/campaigns"
           />
           <div className="mt-4 space-y-3">
             {ACTIVE_CAMPAIGNS.map((c) => (
@@ -247,7 +247,7 @@ function Dashboard() {
           <SectionHeader
             title="Leads recentes"
             subtitle="Últimas entradas no funil"
-            href="/app/leads"
+            href="/dashboard/leads"
           />
           <div className="mt-4 divide-y">
             {RECENT_LEADS.map((l) => (
@@ -280,7 +280,7 @@ function Dashboard() {
           <SectionHeader
             title="Integrações"
             subtitle="Status dos canais"
-            href="/app/integrations"
+            href="/dashboard/integrations"
           />
           <ul className="mt-4 space-y-2">
             {INTEGRATIONS.map((i) => (
@@ -301,7 +301,7 @@ function Dashboard() {
                   </span>
                 ) : (
                   <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                    <Link to="/app/integrations">
+                    <Link to="/dashboard/integrations">
                       <Plug className="h-3 w-3" />
                       Conectar
                     </Link>

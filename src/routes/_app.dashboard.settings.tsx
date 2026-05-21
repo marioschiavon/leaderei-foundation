@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentOrg } from "@/lib/tenant/mock";
 
-export const Route = createFileRoute("/_app/app/settings")({
+export const Route = createFileRoute("/_app/dashboard/settings")({
   component: SettingsPage,
 });
 

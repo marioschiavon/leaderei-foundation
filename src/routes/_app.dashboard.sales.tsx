@@ -3,7 +3,7 @@ import { Plus, MoreHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/_app/app/sales")({
+export const Route = createFileRoute("/_app/dashboard/sales")({
   component: SalesPage,
 });
 

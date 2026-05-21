@@ -49,7 +49,7 @@ function SignupPage() {
             className="mt-8 space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              window.location.href = "/app";
+              window.location.href = "/dashboard";
             }}
           >
             <div className="space-y-1.5">
