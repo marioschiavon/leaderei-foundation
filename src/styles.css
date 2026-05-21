@@ -136,8 +136,16 @@
   --destructive-foreground: oklch(1 0 0);
 
   --border: oklch(0.91 0.003 60);
+  --border-strong: oklch(0.82 0.003 60);
   --input: oklch(0.91 0.003 60);
   --ring: oklch(0.628 0.205 38 / 50%);
+
+  /* Brand soft tint (10% backdrop for badges, hover states) */
+  --brand-soft: oklch(0.628 0.205 38 / 10%);
+
+  /* Status — neutral, executive (no candy colors) */
+  --success: oklch(0.55 0.13 155);
+  --warning: oklch(0.72 0.15 75);
 
   --chart-1: oklch(0.628 0.205 38);
   --chart-2: oklch(0.30 0 0);
