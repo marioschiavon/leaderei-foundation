@@ -1,15 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowRight, Eye, EyeOff, Loader2, Mail, Lock, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Mail, Lock, ShieldCheck, Sparkles, Zap, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Logo } from "@/components/brand/Logo";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    reason: typeof search.reason === "string" ? (search.reason as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Entrar — Leaderei" },
