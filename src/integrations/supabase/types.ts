@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_actions: {
+        Row: {
+          conversation_id: string | null
+          cost_usd: number | null
+          created_at: string
+          error: string | null
+          id: string
+          input: Json
+          kind: Database["public"]["Enums"]["ai_action_kind"]
+          latency_ms: number | null
+          lead_id: string | null
+          model: string
+          organization_id: string
+          output: Json
+          status: Database["public"]["Enums"]["ai_action_status"]
+          tokens_input: number | null
+          tokens_output: number | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          cost_usd?: number | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          input?: Json
+          kind: Database["public"]["Enums"]["ai_action_kind"]
+          latency_ms?: number | null
+          lead_id?: string | null
+          model: string
+          organization_id: string
+          output?: Json
+          status?: Database["public"]["Enums"]["ai_action_status"]
+          tokens_input?: number | null
+          tokens_output?: number | null
+        }
+        Update: {
+          conversation_id?: string | null
+          cost_usd?: number | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          input?: Json
+          kind?: Database["public"]["Enums"]["ai_action_kind"]
+          latency_ms?: number | null
+          lead_id?: string | null
+          model?: string
+          organization_id?: string
+          output?: Json
+          status?: Database["public"]["Enums"]["ai_action_status"]
+          tokens_input?: number | null
+          tokens_output?: number | null
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: string | null
+          organization_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       campaign_enrollments: {
         Row: {
           campaign_id: string
@@ -552,6 +648,81 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_chunks: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          source_id: string
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          source_id: string
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          source_id?: string
+          token_count?: number | null
+        }
+        Relationships: []
+      }
+      knowledge_sources: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: Database["public"]["Enums"]["knowledge_source_kind"]
+          last_synced_at: string | null
+          name: string
+          organization_id: string
+          settings: Json
+          source_url: string | null
+          status: Database["public"]["Enums"]["knowledge_source_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["knowledge_source_kind"]
+          last_synced_at?: string | null
+          name: string
+          organization_id: string
+          settings?: Json
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["knowledge_source_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["knowledge_source_kind"]
+          last_synced_at?: string | null
+          name?: string
+          organization_id?: string
+          settings?: Json
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["knowledge_source_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           author_user_id: string | null
@@ -1043,6 +1214,123 @@ export type Database = {
         }
         Relationships: []
       }
+      outbound_messages: {
+        Row: {
+          attempts: number
+          body: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          conversation_id: string | null
+          created_at: string
+          delivered_at: string | null
+          external_id: string | null
+          failed_reason: string | null
+          id: string
+          integration_id: string | null
+          lead_id: string | null
+          organization_id: string
+          payload: Json
+          scheduled_for: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["outbound_status"]
+          to_address: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          body?: string | null
+          channel: Database["public"]["Enums"]["message_channel"]
+          conversation_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          external_id?: string | null
+          failed_reason?: string | null
+          id?: string
+          integration_id?: string | null
+          lead_id?: string | null
+          organization_id: string
+          payload?: Json
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["outbound_status"]
+          to_address: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          body?: string | null
+          channel?: Database["public"]["Enums"]["message_channel"]
+          conversation_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          external_id?: string | null
+          failed_reason?: string | null
+          id?: string
+          integration_id?: string | null
+          lead_id?: string | null
+          organization_id?: string
+          payload?: Json
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["outbound_status"]
+          to_address?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      plans: {
+        Row: {
+          billing_period: Database["public"]["Enums"]["billing_period"]
+          created_at: string
+          currency: string
+          description: string | null
+          features: Json
+          id: string
+          is_active: boolean
+          is_public: boolean
+          max_leads: number
+          max_messages_per_month: number
+          max_users: number
+          name: string
+          price_cents: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          billing_period?: Database["public"]["Enums"]["billing_period"]
+          created_at?: string
+          currency?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          max_leads?: number
+          max_messages_per_month?: number
+          max_users?: number
+          name: string
+          price_cents?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          billing_period?: Database["public"]["Enums"]["billing_period"]
+          created_at?: string
+          currency?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          max_leads?: number
+          max_messages_per_month?: number
+          max_users?: number
+          name?: string
+          price_cents?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1067,6 +1355,135 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      scheduled_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          kind: string
+          last_error: string | null
+          locked_at: string | null
+          locked_by: string | null
+          max_attempts: number
+          organization_id: string | null
+          payload: Json
+          run_at: string
+          scope: string
+          status: Database["public"]["Enums"]["job_status"]
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          max_attempts?: number
+          organization_id?: string | null
+          payload?: Json
+          run_at?: string
+          scope?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          max_attempts?: number
+          organization_id?: string | null
+          payload?: Json
+          run_at?: string
+          scope?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          external_subscription_id: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          plan_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          external_subscription_id?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          plan_id: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          external_subscription_id?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          plan_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      usage_counters: {
+        Row: {
+          created_at: string
+          id: string
+          metric: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric?: string
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          value?: number
         }
         Relationships: []
       }
@@ -1107,7 +1524,17 @@ export type Database = {
       }
     }
     Enums: {
+      ai_action_kind:
+        | "reply_draft"
+        | "auto_reply"
+        | "classify"
+        | "summarize"
+        | "enrich"
+        | "extract"
+        | "other"
+      ai_action_status: "pending" | "succeeded" | "failed"
       app_role: "master_admin" | "company_admin" | "user"
+      billing_period: "monthly" | "quarterly" | "yearly"
       campaign_channel: "whatsapp" | "email" | "linkedin" | "sms" | "multi"
       campaign_status:
         | "draft"
@@ -1135,6 +1562,9 @@ export type Database = {
         | "tag"
         | "end"
       integration_status: "disconnected" | "connected" | "error" | "pending"
+      job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      knowledge_source_kind: "url" | "file" | "text" | "faq"
+      knowledge_source_status: "pending" | "syncing" | "ready" | "error"
       lead_activity_type:
         | "note"
         | "status_change"
@@ -1166,6 +1596,20 @@ export type Database = {
         | "read"
         | "failed"
       organization_status: "active" | "inactive" | "trial"
+      outbound_status:
+        | "queued"
+        | "sending"
+        | "sent"
+        | "delivered"
+        | "failed"
+        | "cancelled"
+      subscription_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "incomplete"
+        | "paused"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1293,7 +1737,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_action_kind: [
+        "reply_draft",
+        "auto_reply",
+        "classify",
+        "summarize",
+        "enrich",
+        "extract",
+        "other",
+      ],
+      ai_action_status: ["pending", "succeeded", "failed"],
       app_role: ["master_admin", "company_admin", "user"],
+      billing_period: ["monthly", "quarterly", "yearly"],
       campaign_channel: ["whatsapp", "email", "linkedin", "sms", "multi"],
       campaign_status: [
         "draft",
@@ -1324,6 +1779,9 @@ export const Constants = {
         "end",
       ],
       integration_status: ["disconnected", "connected", "error", "pending"],
+      job_status: ["pending", "running", "completed", "failed", "cancelled"],
+      knowledge_source_kind: ["url", "file", "text", "faq"],
+      knowledge_source_status: ["pending", "syncing", "ready", "error"],
       lead_activity_type: [
         "note",
         "status_change",
@@ -1358,6 +1816,22 @@ export const Constants = {
         "failed",
       ],
       organization_status: ["active", "inactive", "trial"],
+      outbound_status: [
+        "queued",
+        "sending",
+        "sent",
+        "delivered",
+        "failed",
+        "cancelled",
+      ],
+      subscription_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+        "paused",
+      ],
     },
   },
 } as const
