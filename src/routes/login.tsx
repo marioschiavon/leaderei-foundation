@@ -25,6 +25,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { reason } = Route.useSearch();
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
