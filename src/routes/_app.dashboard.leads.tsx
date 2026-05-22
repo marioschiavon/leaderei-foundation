@@ -207,7 +207,7 @@ function LeadsPage() {
               <Upload className="h-4 w-4" />
               Importar
             </Button>
-            <Button>
+            <Button onClick={() => setNewLeadOpen(true)}>
               <Plus className="h-4 w-4" />
               Novo lead
             </Button>
