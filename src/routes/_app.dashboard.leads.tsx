@@ -513,38 +513,124 @@ function LeadDetailPanel({
     <div className="space-y-5 p-5">
       <div className="space-y-3 border-b pb-4">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-semibold">{lead.full_name}</h2>
-            <p className="text-sm text-muted-foreground">
-              {[lead.job_title, lead.company_name].filter(Boolean).join(" · ") || "Lead sem cargo ou empresa definidos"}
-            </p>
+          <div className="min-w-0">
+            {editing ? (
+              <Input
+                {...form.register("full_name")}
+                className="font-display text-lg font-semibold"
+              />
+            ) : (
+              <h2 className="font-display text-lg font-semibold">{lead.full_name}</h2>
+            )}
+            {!editing && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {[lead.job_title, lead.company_name].filter(Boolean).join(" · ") || "Lead sem cargo ou empresa definidos"}
+              </p>
+            )}
           </div>
-          <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium", statusMeta.chip)}>
+          <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium shrink-0", statusMeta.chip)}>
             <span className={cn("h-1.5 w-1.5 rounded-full", statusMeta.dot)} />
             {statusMeta.label}
           </span>
         </div>
 
-        <div className="grid gap-2 text-sm text-muted-foreground">
-          {lead.email && (
-            <div className="inline-flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              {lead.email}
+        {editing ? (
+          <form
+            onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}
+            className="space-y-3"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="edit-email" className="text-xs">Email</Label>
+                <Input id="edit-email" type="email" {...form.register("email")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-phone" className="text-xs">Telefone</Label>
+                <Input id="edit-phone" {...form.register("phone")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-company" className="text-xs">Empresa</Label>
+                <Input id="edit-company" {...form.register("company_name")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-job" className="text-xs">Cargo</Label>
+                <Input id="edit-job" {...form.register("job_title")} />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Status</Label>
+                <Select
+                  value={form.watch("status")}
+                  onValueChange={(v) => form.setValue("status", v as (typeof LEAD_STATUSES)[number])}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LEAD_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{STATUS_META[s]?.label ?? s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          )}
-          {lead.phone && (
-            <div className="inline-flex items-center gap-2">
-              <Phone className="h-4 w-4" />
-              {lead.phone}
+            {form.formState.errors.full_name && (
+              <p className="text-xs text-destructive">{form.formState.errors.full_name.message}</p>
+            )}
+            {form.formState.errors.email && (
+              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Salvar alterações
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setEditing(false); form.reset(); }}>
+                <X className="h-3.5 w-3.5" />
+                Cancelar
+              </Button>
             </div>
-          )}
-          {lead.website_url && (
-            <div className="inline-flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              {lead.website_url}
+          </form>
+        ) : (
+          <>
+            <div className="grid gap-2 text-sm text-muted-foreground">
+              {lead.email && (
+                <div className="inline-flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  {lead.email}
+                </div>
+              )}
+              {lead.phone && (
+                <div className="inline-flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  {lead.phone}
+                </div>
+              )}
+              {lead.website_url && (
+                <div className="inline-flex items-center gap-2">
+                  <Link2 className="h-4 w-4" />
+                  {lead.website_url}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" />
+                Editar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => archiveMutation.mutate()}
+                disabled={archiveMutation.isPending || lead.status === "archived"}
+              >
+                {archiveMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Archive className="h-3.5 w-3.5" />
+                )}
+                Arquivar
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
