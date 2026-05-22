@@ -1522,6 +1522,16 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      provision_user_account: {
+        Args: {
+          _email: string
+          _full_name: string
+          _org_name: string
+          _user_id: string
+        }
+        Returns: string
+      }
+      slugify: { Args: { _input: string }; Returns: string }
     }
     Enums: {
       ai_action_kind:
