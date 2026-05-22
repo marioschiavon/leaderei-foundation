@@ -276,7 +276,7 @@ function LeadsPage() {
               action={
                 !query && statusFilter === "all" && sourceFilter === "all" && (
                   <div className="flex gap-2">
-                    <Button>
+                    <Button onClick={() => setNewLeadOpen(true)}>
                       <Plus className="h-4 w-4" />
                       Adicionar lead
                     </Button>
