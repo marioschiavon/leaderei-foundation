@@ -44,6 +44,18 @@ type ImportResult = {
 
 const IGNORE = "__ignore" as const;
 
+type DbField =
+  | "full_name"
+  | "email"
+  | "phone"
+  | "company_name"
+  | "job_title"
+  | "linkedin_url"
+  | "website_url"
+  | "city"
+  | "country"
+  | "tags";
+
 type DbFieldDef = { value: DbField; label: string; required?: boolean };
 const DB_FIELDS: DbFieldDef[] = [
   { value: "full_name", label: "Nome completo", required: true },
@@ -57,8 +69,6 @@ const DB_FIELDS: DbFieldDef[] = [
   { value: "country", label: "País" },
   { value: "tags", label: "Tags (separadas por , ou ;)" },
 ];
-
-type DbField = (typeof DB_FIELDS)[number]["value"];
 
 const REQUIRED: DbField[] = ["full_name", "email"];
 
