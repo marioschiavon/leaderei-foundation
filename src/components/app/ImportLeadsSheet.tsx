@@ -156,7 +156,7 @@ export function ImportLeadsSheet({
         return;
       }
 
-      Papa.parse<ParsedRow>(text, {
+      Papa.parse<string[]>(text, {
         header: false,
         skipEmptyLines: true,
         delimitersToGuess: [",", ";", "\t", "|"],
