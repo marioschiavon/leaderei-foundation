@@ -282,7 +282,7 @@ function LeadsPage() {
                       <Plus className="h-4 w-4" />
                       Adicionar lead
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => setImportOpen(true)}>
                       <Upload className="h-4 w-4" />
                       Importar CSV
                     </Button>
