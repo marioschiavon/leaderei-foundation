@@ -205,7 +205,7 @@ function LeadsPage() {
         description="Pipeline comercial com origem, contexto e atividade real por contato."
         actions={
           <>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Importar
             </Button>
