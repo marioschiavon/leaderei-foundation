@@ -1,31 +1,72 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
 import {
+  Archive,
   ArrowUpRight,
   Building2,
   CalendarClock,
   CircleDollarSign,
   Inbox as InboxIcon,
   Link2,
+  Loader2,
   Mail,
+  Pencil,
   Phone,
   Plus,
   Search,
   Sparkles,
   Upload,
+  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getLeadDetail, listLeads, listLeadSources } from "@/lib/tenant.functions";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  archiveLead,
+  createLead,
+  getLeadDetail,
+  listLeads,
+  listLeadSources,
+  updateLead,
+} from "@/lib/tenant.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/leads")({
   component: LeadsPage,
 });
+
+const LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "qualified",
+  "proposal",
+  "won",
+  "lost",
+  "archived",
+] as const;
 
 const STATUS_META: Record<string, { label: string; chip: string; dot: string }> = {
   new: { label: "Novo", chip: "bg-muted text-foreground", dot: "bg-foreground/60" },
