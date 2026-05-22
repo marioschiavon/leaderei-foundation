@@ -1,5 +1,35 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "qualified",
+  "in_conversation",
+  "proposal",
+  "won",
+  "lost",
+  "archived",
+] as const;
+const LEAD_TEMPERATURES = ["cold", "warm", "hot"] as const;
+
+async function getActiveOrgId(
+  supabase: { from: (table: string) => any },
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("joined_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sem organização ativa para este usuário.");
+  return data.organization_id as string;
+}
 
 /**
  * Returns the active organization of the authenticated user, the org-scoped
