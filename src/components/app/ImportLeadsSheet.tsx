@@ -516,7 +516,10 @@ export function ImportLeadsSheet({
             Fechar
           </Button>
           {step === 1 && (
-            <Button disabled={rows.length === 0} onClick={() => setStep(2)}>
+            <Button
+              disabled={rows.length === 0 || encodingError}
+              onClick={() => setStep(2)}
+            >
               Avançar <ArrowRight className="h-4 w-4" />
             </Button>
           )}
