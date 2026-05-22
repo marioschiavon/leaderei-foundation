@@ -1,168 +1,65 @@
-# Fase 1 — Leaderei (escopo fechado)
+## Objetivo
 
-Objetivo: entregar a **fundação SaaS multi-tenant** + **identidade visual final do produto** + **shell completo do workspace comercial**, com todas as áreas navegáveis e prontas para receber integrações reais nas próximas fases. Nenhuma integração externa é finalizada agora; tudo aparece como estrutura visual + estados (`coming soon`, `setup needed`, `not connected`).
+Substituir o import atual de CSV (que exige cabeçalhos fixos `full_name`, `email`, etc.) por um fluxo de **mapeamento de colunas** no estilo Bubble/HubSpot: o usuário sobe qualquer CSV, vê as colunas detectadas, escolhe para qual campo do banco cada uma vai, e só então confirma a importação.
 
----
+## Fluxo novo (3 passos dentro do mesmo Sheet)
 
-## 1. Módulos exatos da Fase 1
+```text
+[1 Upload]  →  [2 Mapear colunas]  →  [3 Revisar e importar]
+```
 
-1. **Fundação SaaS**
-   - Auth (signup, login, forgot password, verificação de email)
-   - Multi-tenant: `companies` + `company_members` + `user_roles`
-   - Papéis: `master_admin`, `company_admin`, `user`
-   - RLS já ativa (já existe no schema atual)
-   - Onboarding mínimo (criar/entrar em empresa, nome, slug)
+**Passo 1 — Upload**
+- Drop / file picker (mantém o atual).
+- Papaparse lê headers + primeiras 5 linhas para preview.
+- Opcional: origem padrão (igual hoje).
 
-2. **Shell do produto (visual final)**
-   - Sidebar principal (colapsável, com grupos)
-   - Topbar (busca, notificações, avatar/menu, switcher de empresa)
-   - Sistema de design tokens consolidado (cores, fontes IBrand + Poppins)
-   - Componentes base shadcn já tematizados
-   - Layout responsivo
+**Passo 2 — Mapeamento**
+- Tabela com 3 colunas:
+  - **Coluna do CSV** (ex.: `Nome completo`)
+  - **Amostra** (primeiros 2 valores da coluna, em cinza)
+  - **Campo no Leaderei** (Select com opções fixas + "Ignorar")
+- Auto-sugestão inicial por heurística de nome (case-insensitive, acentos removidos):
+  - `nome|name|full_name|nome completo` → `full_name`
+  - `email|e-mail|mail` → `email`
+  - `telefone|phone|celular|whatsapp` → `phone`
+  - `empresa|company|company_name|organização` → `company_name`
+  - `cargo|job|job_title|posição` → `job_title`
+  - `linkedin|linkedin_url` → `linkedin_url`
+  - `site|website|website_url` → `website_url`
+  - `cidade|city` → `city`
+  - `país|pais|country` → `country`
+  - `tags` → `tags` (split por `;` ou `,`)
+  - Demais → "Ignorar" por padrão.
+- Validação inline: `full_name` e `email` são obrigatórios — botão "Avançar" desativado até ambos serem mapeados. Mensagem clara explicando o porquê.
+- Um mesmo campo do banco só pode ser usado uma vez (Select desabilita opções já escolhidas).
 
-3. **Dashboard principal** (`/app`)
-   - KPIs reais do tenant (contagens vindas do banco, mesmo que zeradas)
-   - Gráfico de atividade semanal (mock visual aceitável nesta fase)
-   - Checklist de próximos passos (onboarding contextual)
+**Passo 3 — Revisar e importar**
+- Resumo: "X linhas serão importadas, Y campos mapeados, origem: Z".
+- Botão "Importar" dispara `importLeads` com payload **já normalizado no cliente** (chaves já são os nomes canônicos do banco), reutilizando 100% a server function existente.
+- Após sucesso: mesmo painel de resultado de hoje (criados / ignorados / erros por linha).
 
-4. **Campanhas** (`/app/campaigns`)
-   - Listagem visual completa
-   - Estados: Ativa / Pausada / Rascunho
-   - CRUD básico de campanha (nome, status, canal-alvo) — sem execução real
-   - Botões de play/pause apenas mudam status no banco
+## Campos do banco oferecidos no Select
 
-5. **Leads** (`/app/leads`)
-   - Tabela com filtros (estágio, origem, responsável, busca)
-   - CRUD real de leads (criar, editar, excluir)
-   - Import CSV estrutural (UI presente, parsing simples funcional)
-   - Estágios fixos nesta fase: Novo, Qualificado, Em conversa, Proposta
+Lidos diretamente da tabela `leads`, apenas os que fazem sentido em import: `full_name*`, `email*`, `phone`, `company_name`, `job_title`, `linkedin_url`, `website_url`, `city`, `country`, `tags`. (`*` = obrigatório.)
 
-6. **Inbox / Conversas** (`/app/inbox`)
-   - Layout 3 colunas (lista de conversas / thread / detalhes do lead)
-   - Dados mock por enquanto (estrutura de tabelas `conversations` + `messages` criada, mas sem ingestão real)
-   - Composer desabilitado com tooltip "Conecte um canal em Integrações"
+`status`, `temperature`, `score`, `owner`, `custom_fields` ficam fora desta versão — entram em uma rodada futura se você quiser.
 
-7. **Integrações** (`/app/integrations`)
-   - Catálogo visual de todos os conectores planejados:
-     Apollo, LinkedIn, HubSpot, Pipedrive, WhatsApp Business API, Resend, ElevenLabs, Email IMAP/SMTP, Google Calendar, Slack
-   - Cada card mostra estado: `not connected` / `setup needed` / `coming soon`
-   - Fluxo de conexão presente apenas para: **Resend** (real, via secret) e **Email IMAP/SMTP** (form estrutural salvo no banco, não testa de fato)
-   - Demais: botão "Conectar" abre modal "Em breve na Fase 2"
+## Mudanças técnicas
 
-8. **Pipeline / Vendas** (`/app/sales`)
-   - Kanban visual já presente
-   - CRUD de deals real (criar/mover entre colunas)
-   - Colunas fixas: Qualificado, Em proposta, Negociação, Fechamento
-
-9. **Construtor visual drag-and-drop (inicial)** (`/app/builder`)
-   - Tela do builder com canvas vazio + paleta lateral de blocos
-   - Blocos disponíveis na Fase 1: Texto, Imagem, Botão, Espaçador
-   - Salvar/carregar layout em JSON por campanha (estrutural)
-   - Sem export real, sem renderização externa
-   - Marcado como **Beta** no menu
-
-10. **Painel Master** (`/master/*`)
-    - Acesso restrito a `master_admin`
-    - `/master` — visão geral (total de empresas, usuários, MRR mock)
-    - `/master/organizations` — listar/criar/suspender empresas
-    - `/master/users` — listar usuários globais, alterar papel
-    - `/master/plans` — definição de planos (estrutural, sem billing)
-    - `/master/logs` — feed de eventos do sistema (estrutural)
-
-11. **Configurações** (`/app/settings`)
-    - Organização (nome, slug, logo)
-    - Membros (convidar, remover, alterar papel) — real
-    - Billing — **coming soon**
-    - Preferências — **coming soon**
-    - API keys — gerar/revogar key real por tenant
-
----
-
-## 2. Telas que existirão
-
-| Rota | Tipo |
+| Camada | Mudança |
 |---|---|
-| `/login`, `/signup`, `/forgot-password` | Funcional |
-| `/onboarding` | Funcional |
-| `/app` (dashboard) | Funcional + dados reais |
-| `/app/leads` | Funcional CRUD |
-| `/app/campaigns` | Funcional CRUD básico |
-| `/app/sales` | Funcional CRUD |
-| `/app/inbox` | Estrutural (mock) |
-| `/app/integrations` | Estrutural + 2 conectores reais parciais |
-| `/app/builder` | Estrutural-funcional (salva JSON) |
-| `/app/settings` (org, membros, api) | Funcional |
-| `/app/settings` (billing, prefs) | Estrutural |
-| `/master`, `/master/organizations`, `/master/users` | Funcional |
-| `/master/plans`, `/master/logs` | Estrutural |
+| `src/components/app/ImportLeadsSheet.tsx` | Reescrita para wizard de 3 passos com estado `step`, `mapping: Record<csvHeader, dbField \| "__ignore">`, auto-sugestão, validação. |
+| `src/lib/tenant.functions.ts` `importLeads` | **Sem mudança de schema.** Continua aceitando `rows` com chaves canônicas. O cliente passa a enviar as linhas já remapeadas, então o backend fica mais simples (podemos até remover o fallback `nome → full_name` numa limpeza futura, mas não nesta rodada para não quebrar nada). |
+| Documentação | Atualizar `docs/user/README.md` da seção "Importar CSV" para descrever o novo fluxo de mapeamento. |
 
----
+Nenhuma migration. Nenhuma alteração em outras telas. RLS e permissões intocadas.
 
-## 3. Telas apenas estruturais nesta fase
+## Critérios de aceite
 
-- **Inbox**: layout completo + mocks; sem ingestão de canais.
-- **Integrações** (exceto Resend e Email IMAP/SMTP form): cards + modais "Em breve".
-- **Builder**: canvas com 4 blocos básicos, salva JSON, sem renderização externa.
-- **Master / Plans** e **Master / Logs**: tabelas com dados de exemplo.
-- **Settings / Billing** e **Settings / Preferências**: cards "coming soon".
-- **Campanhas**: o "executar" é apenas mudança de status, sem disparo real.
+1. Subir um CSV com cabeçalhos arbitrários (ex.: `Nome,Mail,Telefone,Empresa`) abre a tela de mapeamento já com sugestões corretas.
+2. Não é possível avançar sem mapear `full_name` e `email`.
+3. Mesmo campo do banco não pode ser escolhido em duas colunas.
+4. Importação final reaproveita `importLeads` e mostra criados/ignorados/erros como hoje.
+5. Cancelar/fechar reseta o wizard.
 
----
-
-## 4. Dados reais que devem existir já na Fase 1
-
-Tabelas a criar/garantir (além das já existentes `companies`, `company_members`, `profiles`, `user_roles`):
-
-- `leads` (id, company_id, name, email, company_name, stage, source, owner_id, created_at)
-- `campaigns` (id, company_id, name, status, channel, created_by, created_at)
-- `campaign_steps` (id, campaign_id, order, type, payload jsonb) — estrutural
-- `deals` (id, company_id, lead_id, stage, value, owner_id, created_at)
-- `conversations` (id, company_id, lead_id, channel, last_message_at) — estrutural
-- `messages` (id, conversation_id, direction, body, created_at) — estrutural
-- `integrations` (id, company_id, provider, status, config jsonb)
-- `api_keys` (id, company_id, key_hash, created_at, revoked_at)
-- `builder_documents` (id, company_id, campaign_id, schema jsonb)
-- `audit_logs` (id, company_id, actor_id, action, target, created_at) — para master/logs
-
-Todas com RLS por `company_id` via `get_user_company_id(auth.uid())`.
-Master vê tudo via `has_role(auth.uid(), 'master_admin')`.
-
----
-
-## 5. Estados de módulo (rótulos visuais)
-
-- **`coming soon`**: ElevenLabs, WhatsApp API, LinkedIn, Apollo, HubSpot, Pipedrive, Slack, Google Calendar, Billing, Preferências, Master/Plans, Master/Logs.
-- **`setup needed`**: Email IMAP/SMTP (form presente, credenciais não validadas), API keys (até gerar a primeira), Builder (até salvar primeiro doc).
-- **`not connected`**: Resend (até o usuário colar a API key real e salvar como secret).
-- **`beta`**: Construtor visual drag-and-drop.
-
----
-
-## 6. Critérios de aceite da Fase 1
-
-A Fase 1 está concluída quando **todos** os itens abaixo forem verdadeiros:
-
-1. ✅ Usuário consegue: signup → verificar email → criar empresa → entrar no `/app` com dashboard renderizado.
-2. ✅ Sidebar + topbar presentes em todas as rotas `/app/*` e `/master/*`, com identidade visual final.
-3. ✅ Multi-tenant funciona via RLS.
-4. ✅ Papéis funcionam (`user`, `company_admin`, `master_admin`).
-5. ✅ CRUDs reais funcionando: **Leads (com import CSV)**, **Campanhas (criar/editar/duplicar/play-pause/arquivar)**, Membros, API keys (tabela), Builder documents (tabela com `schema` + `campaign_id`).
-6. ⏳ Integrações: catálogo real listado; Resend/IMAP reais ainda pendentes.
-7. ✅ Inbox renderiza layout de 3 colunas sem quebrar.
-8. ⏳ Builder: tabela pronta, canvas drag-and-drop ainda pendente.
-9. ✅ Painel Master lista empresas/usuários reais.
-10. ✅ Empty states em todas as listas.
-11. ✅ Build de produção passa; rotas protegidas redirecionam.
-12. ✅ Documento `/.lovable/plan.md` atualizado.
-
----
-
-## Fora de escopo da Fase 1 (explícito)
-
-- Disparo real de email/LinkedIn/WhatsApp
-- Cadências multicanal e automações condicionais
-- IA generativa de copy / agentes / voz (ElevenLabs)
-- OAuth real de Apollo, HubSpot, Pipedrive, LinkedIn
-- Billing/Stripe
-- Relatórios analíticos avançados
-- Renderização pública de landing pages do builder
+Quer que eu siga assim, ou prefere ajustar a lista de campos oferecidos (ex.: incluir `status`/`tags`/`custom_fields`) antes de eu implementar?
