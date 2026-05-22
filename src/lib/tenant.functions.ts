@@ -70,11 +70,109 @@ export const listLeads = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("leads")
-      .select("id, full_name, email, company_name, job_title, status, temperature, score, source_id, created_at, last_contact_at")
+      .select(`
+        id,
+        full_name,
+        email,
+        phone,
+        company_name,
+        job_title,
+        status,
+        temperature,
+        score,
+        source_id,
+        estimated_value,
+        next_followup_at,
+        created_at,
+        last_contact_at,
+        lead_sources (
+          id,
+          name,
+          slug,
+          color
+        )
+      `)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const listLeadSources = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("lead_sources")
+      .select("id, name, slug, color")
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const getLeadDetail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((payload: { leadId: string }) => payload)
+  .handler(async ({ context, data }) => {
+    const { leadId } = data;
+
+    const [leadRes, activitiesRes, enrichmentRes] = await Promise.all([
+      context.supabase
+        .from("leads")
+        .select(`
+          id,
+          full_name,
+          email,
+          phone,
+          company_name,
+          job_title,
+          status,
+          temperature,
+          score,
+          city,
+          country,
+          linkedin_url,
+          website_url,
+          tags,
+          currency,
+          estimated_value,
+          next_followup_at,
+          last_contact_at,
+          created_at,
+          lead_sources (
+            id,
+            name,
+            slug,
+            color
+          )
+        `)
+        .eq("id", leadId)
+        .maybeSingle(),
+      context.supabase
+        .from("lead_activities")
+        .select("id, type, title, description, created_at")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false })
+        .limit(12),
+      context.supabase
+        .from("lead_enrichment")
+        .select("id, provider, confidence, fetched_at, payload")
+        .eq("lead_id", leadId)
+        .order("fetched_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (leadRes.error) throw new Error(leadRes.error.message);
+    if (activitiesRes.error) throw new Error(activitiesRes.error.message);
+    if (enrichmentRes.error) throw new Error(enrichmentRes.error.message);
+
+    return {
+      lead: leadRes.data,
+      activities: activitiesRes.data ?? [],
+      enrichment: enrichmentRes.data ?? null,
+    };
   });
 
 export const listCampaigns = createServerFn({ method: "GET" })

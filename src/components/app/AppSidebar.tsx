@@ -1,4 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Users,
@@ -34,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import { signOut, useAuthSession, useIsMaster } from "@/lib/auth";
+import { getMyContext } from "@/lib/tenant.functions";
 
 const WORKSPACE = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -54,6 +57,12 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { user } = useAuthSession();
   const { data: isMaster } = useIsMaster(user?.id);
+  const fetchContext = useServerFn(getMyContext);
+  const { data: tenantContext } = useQuery({
+    enabled: !!user,
+    queryKey: ["tenant", "context"],
+    queryFn: () => fetchContext(),
+  });
 
   const isActive = (url: string) =>
     url === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(url);
@@ -62,6 +71,14 @@ export function AppSidebar() {
     (user?.user_metadata?.full_name as string | undefined) ??
     user?.email ??
     "Sua conta";
+  const organizationName = tenantContext?.organization?.name ?? "Sem organização ativa";
+  const roleLabel = tenantContext?.isMaster
+    ? "Master admin"
+    : tenantContext?.role === "company_admin"
+      ? "Admin da organização"
+      : tenantContext?.role === "user"
+        ? "Agente"
+        : "Membro";
   const initials = displayName
     .split(" ")
     .map((s) => s[0])
@@ -175,7 +192,10 @@ export function AppSidebar() {
                   {displayName}
                 </div>
                 <div className="truncate text-xs text-sidebar-foreground/60">
-                  {user?.email ?? ""}
+                  {organizationName}
+                </div>
+                <div className="truncate text-[11px] text-sidebar-foreground/45">
+                  {roleLabel}
                 </div>
               </div>
               <ChevronsUpDown className="h-3.5 w-3.5 text-sidebar-foreground/60" />

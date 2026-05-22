@@ -1,117 +1,152 @@
 # Manual do Usuário — Leaderei
 
-> Guia de uso da plataforma. Atualizado conforme novos módulos entram em produção.
+> Guia de uso da plataforma. Atualizado conforme os módulos entram em operação real.
 
-## Estado atual da Fase 1 (importante)
+## Estado atual da Fase 1
 
-A Fase 1 entrega a **estrutura visual completa** do produto e os módulos abaixo já são funcionais:
+Hoje a Fase 1 já entrega estes módulos com dados reais:
 
-- **Login / Signup** — autenticação real (email + senha).
-- **Master · Overview e Organizações** — dados reais persistidos no backend.
+- Login / Signup
+- Dashboard
+- Leads
+- Integrations
+- Master · Overview
+- Master · Organizations
+- Master · Users
+- Master · Plans
 
-Os demais módulos (**Dashboard, Leads, Inbox, Campaigns, Builder, Integrations, Settings**) estão como **UI estrutural** nesta fase: permitem navegar e validar a linguagem visual, mas as listas/KPIs/ações ainda são mock e serão ligados a dados reais nas próximas fases. **Master · Usuários, Planos e Logs** estão marcados como "Em breve — Fase 2".
+Os módulos abaixo continuam estruturais nesta etapa:
+
+- Inbox
+- Campaigns
+- Builder
+- Settings
+- Master · Logs
 
 ## 1. Primeiros passos
 
-1. Crie sua conta em `/signup` (ou entre em `/login` se já tem cadastro).
-2. Após login você cai em **Dashboard** (`/dashboard`).
-3. Tentativas de acessar `/dashboard/*` ou `/master/*` sem sessão são redirecionadas para `/login` automaticamente.
-4. A área **Master** (`/master`) só aparece na sidebar e só é acessível para usuários com o papel `master_admin` em `user_roles`.
+1. Crie sua conta em `/signup` ou entre em `/login`.
+2. Depois do login, você cai em `/dashboard`.
+3. Se não houver sessão, o sistema redireciona automaticamente para `/login`.
+4. A área `/master` aparece apenas para usuários com papel `master_admin`.
 
 ## 2. Navegação
 
-A barra lateral organiza o produto em três grupos:
+### Workspace
 
-**Workspace**
-- **Dashboard** — visão geral da operação (UI estrutural na Fase 1).
-- **Campaigns** — sequências de outbound multicanal (UI estrutural).
-- **Leads** — base comercial (UI estrutural).
-- **Inbox** — central de conversas multicanal (UI estrutural).
+- Dashboard
+- Campaigns
+- Leads
+- Inbox
 
-**Tools**
-- **Integrations** — conectores (UI estrutural; OAuth real entra na Fase 2).
-- **Builder** — construtor visual de cadências (UI estrutural, sem DnD ainda).
+### Tools
 
-**Admin**
-- **Master** — painel administrativo (visível apenas para `master_admin`).
-- **Settings** — configurações da organização e do usuário (UI estrutural).
+- Integrations
+- Builder
 
+### Admin
+
+- Master
+- Settings
+
+No rodapé da sidebar, a conta mostra:
+
+- nome do usuário autenticado
+- organização ativa
+- papel atual no workspace
 
 ## 3. Dashboard
 
-A home reúne em uma só tela:
+O Dashboard já usa dados reais da organização atual.
 
-- **Visão geral** — KPIs de leads, conversas, mensagens enviadas e taxa de resposta, com variação vs. semana anterior.
-- **Atividade da semana** — gráfico de mensagens por dia.
-- **Próximos passos** — checklist de onboarding (% concluído).
-- **Campanhas em destaque** — ativas e pausadas, com progresso e ações de play/pause.
-- **Alertas** — pendências acionáveis (LinkedIn não conectado, SPF/DKIM, limites).
-- **Leads recentes** — últimas entradas no funil.
-- **Integrações** — status compacto dos canais principais.
-- **Atividade recente** — feed de eventos do workspace.
+Hoje ele mostra:
+
+- total de leads
+- leads novos
+- conversas abertas
+- mensagens enviadas nos últimos 7 dias
+- campanhas ativas
+
+Se ainda não houver operação no tenant, a tela mostra um empty state real com os próximos passos sugeridos.
 
 ## 4. Leads
 
-Workspace comercial com dois painéis:
+O módulo de Leads já funciona com base real.
 
-- **Lista (esquerda)** — busca, filtros por estágio e origem, KPIs, seleção múltipla para ações em lote (mover de estágio, adicionar a campanha).
-- **Detalhe (direita)** — informações do lead selecionado, score, histórico e atalhos rápidos. Pode ser fechado.
+Recursos disponíveis:
 
-Cada lead tem **estágio** (Novo, Qualificado, Em conversa, Proposta, Ganho, Perdido) e **origem** (LinkedIn, Email, Inbound, Importado, Apollo).
+- busca por nome, email, empresa, cargo e origem
+- filtro por status
+- filtro por origem
+- lista real de leads da organização
+- painel lateral com:
+  - score
+  - temperatura
+  - origem
+  - próximo follow-up
+  - potencial comercial
+  - enrichment mais recente
+  - atividade recente
 
-## 5. Integrações
+Observação:
 
-Sete integrações na Fase 1, cada uma com um destes estados:
+- criação, edição avançada e ações em lote ainda não entraram nesta rodada
 
-| Estado                  | O que significa                                            |
-| ----------------------- | ---------------------------------------------------------- |
-| **Connected**           | Pronto para uso.                                           |
-| **Not connected**       | Disponível, basta clicar em **Conectar**.                  |
-| **Setup required**      | Falta uma configuração (ex.: SPF/DKIM, validação de conta).|
-| **Internal setup needed** | Provisionamento feito pelo time Leaderei.                |
-| **Coming soon**         | Em desenvolvimento, ainda não disponível.                  |
+## 5. Integrations
 
-Integrações da Fase 1: Apollo, LinkedIn, HubSpot, **Pipedrive (ativo)**, WhatsApp API, Resend, ElevenLabs (em breve).
+O módulo de Integrações já lê os providers e as conexões reais da organização.
 
-## 6. Campanhas
+Estados usados na tela:
 
-(Em desenvolvimento — esta seção será expandida quando o módulo entrar em produção.)
+| Estado | Significado |
+| --- | --- |
+| Connected | A integração está ativa no tenant |
+| Pending | O setup foi iniciado, mas ainda não terminou |
+| Disconnected | O provider existe, mas não está conectado |
+| Error | Houve falha na autenticação ou sincronização |
 
-## 7. Inbox
+A tela também mostra:
 
-Central de conversas multicanal (Email, LinkedIn, WhatsApp) em quatro painéis:
+- nome do provider
+- categoria
+- nome da conexão quando existir
+- último sync
+- erro mais recente, se houver
 
-1. **Views** (esquerda) — filtros rápidos: Minhas, Sem dono, Em IA, Favoritas, Todas, Resolvidas + tags.
-2. **Lista de conversas** — busca, filtros por canal, indicação de não-lida, canal, status (Aberta, Aguardando, Adiada, Resolvida) e atribuição (você / IA / sem dono).
-3. **Conversa** — thread completa, barra de IA com **Sugerir resposta** e **Passar para humano**, ações rápidas (Adiar, Arquivar, Resolver) e composer com seleção do canal de envio e modo **Nota interna**.
-4. **Contexto do lead** (direita) — perfil, empresa, score, status do funil, tags, atividade recente e resumo IA.
+## 6. Área Master
 
-Observação: nesta fase a UI está pronta mas o envio real por canal depende das integrações estarem conectadas.
+Para usuários `master_admin`, o painel Master já permite:
 
+- acompanhar overview da plataforma
+- listar e criar organizações
+- alterar status de organizações
+- visualizar memberships reais
+- visualizar e criar planos
 
-## 8. Builder
+`Master · Logs` continua como área futura.
 
-(Beta — construtor visual de cadências.)
+## 7. Módulos ainda estruturais
 
-## 9. Configurações
+### Campaigns
 
-Em **Settings** você gerencia organização, membros, pipeline padrão, domínios de envio e preferências.
+Tela visual pronta, ainda sem execução operacional real.
 
-## 10. Suporte
+### Inbox
 
-Em caso de dúvida ou problema, contate o time Leaderei pelos canais internos da sua organização.
+Tela visual pronta, ainda sem envio e sincronização multicanal reais.
 
----
+### Builder
 
-## Histórico de versões deste manual
+Base visual pronta, sem drag-and-drop persistido nesta fase.
 
-> Atualizado a cada mudança visível ao usuário no produto.
+### Settings
 
-- **2026-05-21** — **Painel Master** repaginado com dados reais: Overview mostra contagens reais de organizações (ativas, trial, inativas), membros e perfis; a tela de Organizações lista as empresas do banco com busca, filtros por status, criação por diálogo (nome, slug, limites) e ações de Ativar/Trial/Inativar direto na linha. Nada de métricas falsas — MRR e eventos só aparecem quando o billing real entrar.
-- **2026-05-21** — **Campanhas** ganharam visual de cards com KPIs no topo, busca, filtros por status, alternador entre cards e lista, e um estado vazio convidativo com templates. **Builder** ganhou a tela definitiva: paleta de blocos à esquerda, canvas com fluxo visual no centro (gatilho + passos conectados) e inspector à direita para editar o passo selecionado. O drag-and-drop real chega na próxima fase.
-- **2026-05-21** — Inbox v1 publicada (4 painéis, filtros multicanal, barra de IA + handoff humano, composer).
-- **2026-05-21** — Correção: navegação entre páginas filhas de `/dashboard` (Leads, Inbox, Integrations, etc.) agora funciona corretamente. Antes a URL mudava mas a tela continuava na home.
-- **2026-05-21** — Rota base passa a ser `/dashboard` (era `/app`). Módulos de Leads e Integrações documentados.
-- **2026-05-20** — Primeira versão.
+Estrutura visual pronta, sem persistência completa.
 
+## 8. Histórico recente
 
+- 2026-05-22 — Dashboard passou a operar com KPIs reais por tenant.
+- 2026-05-22 — Leads passaram a usar lista, filtros, detalhe e atividade reais.
+- 2026-05-22 — Integrations passaram a exibir estados reais das conexões da organização.
+- 2026-05-22 — Sidebar passou a mostrar organização ativa e papel do usuário.
+- 2026-05-21 — Área Master foi conectada ao backend real.
