@@ -29,7 +29,7 @@ function slugify(name: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Reads
+// Organizations
 // ---------------------------------------------------------------------------
 
 export const listCompanies = createServerFn({ method: "GET" })
@@ -99,10 +99,6 @@ export const getMasterOverview = createServerFn({ method: "GET" })
     };
   });
 
-// ---------------------------------------------------------------------------
-// Writes
-// ---------------------------------------------------------------------------
-
 const CreateCompanySchema = z.object({
   name: z.string().min(2).max(120),
   slug: z.string().min(2).max(48).regex(/^[a-z0-9-]+$/).optional(),
@@ -146,6 +142,79 @@ export const setCompanyStatus = createServerFn({ method: "POST" })
     const { data: updated, error } = await supabaseAdmin
       .from("organizations")
       .update({ status: data.status, updated_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return updated;
+  });
+
+// ---------------------------------------------------------------------------
+// Plans
+// ---------------------------------------------------------------------------
+
+export const listPlans = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertMaster(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("plans")
+      .select("*")
+      .order("price_cents", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    const ids = (data ?? []).map((p) => p.id);
+    const subsByPlan: Record<string, number> = {};
+    if (ids.length) {
+      const { data: subs } = await supabaseAdmin
+        .from("subscriptions")
+        .select("plan_id, status")
+        .in("plan_id", ids)
+        .in("status", ["trialing", "active"]);
+      for (const s of subs ?? []) {
+        subsByPlan[s.plan_id] = (subsByPlan[s.plan_id] ?? 0) + 1;
+      }
+    }
+    return (data ?? []).map((p) => ({ ...p, active_subscriptions: subsByPlan[p.id] ?? 0 }));
+  });
+
+const CreatePlanSchema = z.object({
+  slug: z.string().min(2).max(48).regex(/^[a-z0-9-]+$/),
+  name: z.string().min(2).max(80),
+  description: z.string().max(280).optional(),
+  price_cents: z.number().int().min(0).max(100_000_000),
+  currency: z.string().min(3).max(3).default("BRL"),
+  billing_period: z.enum(["monthly", "quarterly", "yearly"]).default("monthly"),
+  max_users: z.number().int().min(1).max(100_000),
+  max_leads: z.number().int().min(0).max(100_000_000),
+  max_messages_per_month: z.number().int().min(0).max(100_000_000),
+  is_public: z.boolean().default(true),
+});
+
+export const createPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CreatePlanSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { data: inserted, error } = await supabaseAdmin
+      .from("plans")
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return inserted;
+  });
+
+const TogglePlanSchema = z.object({ id: z.string().uuid(), is_active: z.boolean() });
+
+export const setPlanActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => TogglePlanSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { data: updated, error } = await supabaseAdmin
+      .from("plans")
+      .update({ is_active: data.is_active })
       .eq("id", data.id)
       .select()
       .single();
