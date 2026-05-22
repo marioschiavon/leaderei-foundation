@@ -52,6 +52,7 @@ import {
   listLeadSources,
   updateLead,
 } from "@/lib/tenant.functions";
+import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/leads")({
