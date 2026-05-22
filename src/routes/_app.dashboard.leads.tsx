@@ -384,6 +384,11 @@ function LeadsPage() {
         onOpenChange={setNewLeadOpen}
         sources={sources ?? []}
       />
+      <ImportLeadsSheet
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        sources={sources ?? []}
+      />
     </div>
   );
 }
