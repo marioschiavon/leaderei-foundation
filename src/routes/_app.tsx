@@ -1,9 +1,13 @@
 import { createFileRoute, Outlet, Navigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { AppTopbar } from "@/components/app/AppTopbar";
-import { useAuthSession } from "@/lib/auth";
+import { useAuthSession, signOut } from "@/lib/auth";
+import { getMyContext } from "@/lib/tenant.functions";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -11,8 +15,22 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user, loading } = useAuthSession();
+  const fetchContext = useServerFn(getMyContext);
+  const { data: ctx, isLoading: ctxLoading } = useQuery({
+    enabled: !!user,
+    queryKey: ["my-context", user?.id],
+    queryFn: () => fetchContext(),
+  });
 
-  if (loading) {
+  const inactive = ctx?.organization?.status === "inactive";
+
+  useEffect(() => {
+    if (inactive) {
+      void signOut();
+    }
+  }, [inactive]);
+
+  if (loading || (user && ctxLoading)) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -22,6 +40,10 @@ function AppLayout() {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (inactive) {
+    return <Navigate to="/login" search={{ reason: "inactive" }} replace />;
   }
 
   return (
