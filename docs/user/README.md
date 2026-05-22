@@ -8,7 +8,8 @@ Hoje a Fase 1 já entrega estes módulos com dados reais:
 
 - Login / Signup
 - Dashboard
-- Leads
+- Leads (lista, filtros, criação, edição, arquivamento, **import CSV**)
+- Campaigns (criar, editar, duplicar, iniciar, pausar, arquivar)
 - Integrations
 - Master · Overview
 - Master · Organizations
@@ -18,7 +19,6 @@ Hoje a Fase 1 já entrega estes módulos com dados reais:
 Os módulos abaixo continuam estruturais nesta etapa:
 
 - Inbox
-- Campaigns
 - Builder
 - Settings
 - Master · Logs
