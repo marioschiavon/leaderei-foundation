@@ -86,7 +86,7 @@ type LeadDetailData = {
     provider: string;
     confidence: number | null;
     fetched_at: string;
-    payload: Record<string, unknown> | null;
+    payload: unknown;
   } | null;
 };
 
