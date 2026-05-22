@@ -6,7 +6,6 @@ const LEAD_STATUSES = [
   "new",
   "contacted",
   "qualified",
-  "in_conversation",
   "proposal",
   "won",
   "lost",
