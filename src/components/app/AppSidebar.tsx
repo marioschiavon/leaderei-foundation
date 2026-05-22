@@ -119,9 +119,17 @@ export function AppSidebar() {
               {WORKSPACE.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
+                    <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {item.badge && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-auto bg-muted text-muted-foreground border-transparent text-[0.6rem] px-1.5 py-0 font-medium"
+                        >
+                          {item.badge}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -132,7 +140,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-[0.7rem] uppercase tracking-wider text-sidebar-foreground/50">
-            Tools
+            Ferramentas
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -160,7 +168,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-[0.7rem] uppercase tracking-wider text-sidebar-foreground/50">
-            Admin
+            Administração
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
