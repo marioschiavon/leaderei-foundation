@@ -422,11 +422,80 @@ function FilterPills({
 
 function LeadDetailPanel({
   detail,
+  sources,
+  onArchived,
 }: {
   detail: LeadDetailData;
+  sources: LeadSource[];
+  onArchived: () => void;
 }) {
   const lead = detail.lead!;
   const statusMeta = STATUS_META[lead.status] ?? STATUS_META.new;
+  const queryClient = useQueryClient();
+  const updateFn = useServerFn(updateLead);
+  const archiveFn = useServerFn(archiveLead);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    setEditing(false);
+  }, [lead.id]);
+
+  const editSchema = z.object({
+    full_name: z.string().trim().min(1, "Obrigatório").max(120),
+    email: z.string().trim().email("Email inválido").max(255).or(z.literal("")).optional(),
+    phone: z.string().trim().max(40).optional(),
+    company_name: z.string().trim().max(160).optional(),
+    job_title: z.string().trim().max(160).optional(),
+    status: z.enum(LEAD_STATUSES),
+  });
+  type EditValues = z.infer<typeof editSchema>;
+
+  const form = useForm<EditValues>({
+    resolver: zodResolver(editSchema),
+    values: {
+      full_name: lead.full_name,
+      email: lead.email ?? "",
+      phone: lead.phone ?? "",
+      company_name: lead.company_name ?? "",
+      job_title: lead.job_title ?? "",
+      status: (LEAD_STATUSES.includes(lead.status as (typeof LEAD_STATUSES)[number])
+        ? lead.status
+        : "new") as (typeof LEAD_STATUSES)[number],
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: EditValues) =>
+      updateFn({
+        data: {
+          id: lead.id,
+          full_name: values.full_name,
+          email: values.email ? values.email : null,
+          phone: values.phone ? values.phone : null,
+          company_name: values.company_name ? values.company_name : null,
+          job_title: values.job_title ? values.job_title : null,
+          status: values.status,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Lead atualizado.");
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", "detail", lead.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => archiveFn({ data: { id: lead.id } }),
+    onSuccess: () => {
+      toast.success("Lead arquivado.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onArchived();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const enrichmentPayload =
     detail.enrichment?.payload && typeof detail.enrichment.payload === "object" && !Array.isArray(detail.enrichment.payload)
       ? (detail.enrichment.payload as Record<string, unknown>)
