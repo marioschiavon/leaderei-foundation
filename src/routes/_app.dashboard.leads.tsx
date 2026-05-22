@@ -746,3 +746,126 @@ function StatCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+const newLeadSchema = z.object({
+  full_name: z.string().trim().min(1, "Nome obrigatório").max(120),
+  email: z.string().trim().email("Email inválido").max(255),
+  phone: z.string().trim().max(40).optional(),
+  company_name: z.string().trim().max(160).optional(),
+  job_title: z.string().trim().max(160).optional(),
+  source_id: z.string().uuid().optional().or(z.literal("")),
+});
+type NewLeadValues = z.infer<typeof newLeadSchema>;
+
+function NewLeadSheet({
+  open,
+  onOpenChange,
+  sources,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sources: LeadSource[];
+}) {
+  const queryClient = useQueryClient();
+  const createFn = useServerFn(createLead);
+  const form = useForm<NewLeadValues>({
+    resolver: zodResolver(newLeadSchema),
+    defaultValues: { full_name: "", email: "", phone: "", company_name: "", job_title: "", source_id: "" },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: NewLeadValues) =>
+      createFn({
+        data: {
+          full_name: values.full_name,
+          email: values.email,
+          phone: values.phone || null,
+          company_name: values.company_name || null,
+          job_title: values.job_title || null,
+          source_id: values.source_id ? values.source_id : null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Lead criado.");
+      form.reset();
+      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) form.reset();
+      }}
+    >
+      <SheetContent className="w-full sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Novo lead</SheetTitle>
+          <SheetDescription>Cadastre um novo contato no pipeline.</SheetDescription>
+        </SheetHeader>
+
+        <form
+          onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+          className="mt-6 space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-name">Nome completo *</Label>
+            <Input id="nl-name" {...form.register("full_name")} />
+            {form.formState.errors.full_name && (
+              <p className="text-xs text-destructive">{form.formState.errors.full_name.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-email">E-mail *</Label>
+            <Input id="nl-email" type="email" {...form.register("email")} />
+            {form.formState.errors.email && (
+              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-phone">Telefone</Label>
+            <Input id="nl-phone" {...form.register("phone")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-company">Empresa</Label>
+            <Input id="nl-company" {...form.register("company_name")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-job">Cargo</Label>
+            <Input id="nl-job" {...form.register("job_title")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Origem</Label>
+            <Select
+              value={form.watch("source_id") || ""}
+              onValueChange={(v) => form.setValue("source_id", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a origem (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {sources.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <SheetFooter className="mt-6">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
