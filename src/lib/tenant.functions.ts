@@ -11,23 +11,31 @@ export const getMyContext = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const [{ data: membership }, { data: roles }] = await Promise.all([
-      supabase
-        .from("organization_members")
-        .select("organization_id, role, status, joined_at, organizations(id, name, slug, status, max_users, max_leads, logo_url)")
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .order("joined_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
+    const { data: membership } = await supabase
+      .from("organization_members")
+      .select("organization_id, role, status, joined_at")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .order("joined_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const [orgRes, rolesRes] = await Promise.all([
+      membership
+        ? supabase
+            .from("organizations")
+            .select("id, name, slug, status, max_users, max_leads, logo_url")
+            .eq("id", membership.organization_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       supabase.from("user_roles").select("role").eq("user_id", userId),
     ]);
 
     return {
       userId,
-      organization: membership?.organizations ?? null,
+      organization: orgRes.data ?? null,
       role: membership?.role ?? null,
-      isMaster: (roles ?? []).some((r) => r.role === "master_admin"),
+      isMaster: (rolesRes.data ?? []).some((r) => r.role === "master_admin"),
     };
   });
 
