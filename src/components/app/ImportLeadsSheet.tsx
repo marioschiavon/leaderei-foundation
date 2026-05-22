@@ -44,7 +44,8 @@ type ImportResult = {
 
 const IGNORE = "__ignore" as const;
 
-const DB_FIELDS = [
+type DbFieldDef = { value: DbField; label: string; required?: boolean };
+const DB_FIELDS: DbFieldDef[] = [
   { value: "full_name", label: "Nome completo", required: true },
   { value: "email", label: "Email", required: true },
   { value: "phone", label: "Telefone" },
@@ -55,7 +56,7 @@ const DB_FIELDS = [
   { value: "city", label: "Cidade" },
   { value: "country", label: "País" },
   { value: "tags", label: "Tags (separadas por , ou ;)" },
-] as const;
+];
 
 type DbField = (typeof DB_FIELDS)[number]["value"];
 
