@@ -52,6 +52,7 @@ import {
   listLeadSources,
   updateLead,
 } from "@/lib/tenant.functions";
+import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/leads")({
@@ -150,6 +151,7 @@ function LeadsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return (leads ?? []).filter((lead) => {
@@ -203,7 +205,7 @@ function LeadsPage() {
         description="Pipeline comercial com origem, contexto e atividade real por contato."
         actions={
           <>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Importar
             </Button>
@@ -280,7 +282,7 @@ function LeadsPage() {
                       <Plus className="h-4 w-4" />
                       Adicionar lead
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => setImportOpen(true)}>
                       <Upload className="h-4 w-4" />
                       Importar CSV
                     </Button>
@@ -380,6 +382,11 @@ function LeadsPage() {
       <NewLeadSheet
         open={newLeadOpen}
         onOpenChange={setNewLeadOpen}
+        sources={sources ?? []}
+      />
+      <ImportLeadsSheet
+        open={importOpen}
+        onOpenChange={setImportOpen}
         sources={sources ?? []}
       />
     </div>

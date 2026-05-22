@@ -142,18 +142,18 @@ Master vê tudo via `has_role(auth.uid(), 'master_admin')`.
 
 A Fase 1 está concluída quando **todos** os itens abaixo forem verdadeiros:
 
-1. Usuário consegue: signup → verificar email → criar empresa → entrar no `/app` com dashboard renderizado.
-2. Sidebar + topbar presentes em todas as rotas `/app/*` e `/master/*`, com identidade visual final (logo IBrand, tipografia oficial + Poppins, paleta tokenizada).
-3. Multi-tenant funciona: dois usuários em empresas diferentes nunca veem dados um do outro (validado via RLS).
-4. Papéis funcionam: `user` não acessa `/master/*`; `company_admin` acessa Settings/Membros; `master_admin` acessa todo `/master/*`.
-5. CRUDs reais funcionando: Leads, Campanhas (básico), Deals, Membros, API keys, Builder documents.
-6. Integrações: catálogo visual com 10 conectores listados, estados corretos exibidos, Resend conectável de verdade, Email IMAP/SMTP com form salvando config.
-7. Inbox renderiza layout de 3 colunas com dados mock por tenant, sem quebrar.
-8. Builder abre, permite arrastar 4 tipos de bloco no canvas e salvar/recuperar layout JSON da campanha.
-9. Painel Master lista empresas/usuários reais e permite suspender/alterar papel.
-10. Nenhuma tela quebra ao estar vazia (empty states desenhados em todas as listas).
-11. Build de produção passa sem erros; rotas protegidas redirecionam para `/login`.
-12. Documento `/.lovable/plan.md` atualizado refletindo este escopo como Fase 1.
+1. ✅ Usuário consegue: signup → verificar email → criar empresa → entrar no `/app` com dashboard renderizado.
+2. ✅ Sidebar + topbar presentes em todas as rotas `/app/*` e `/master/*`, com identidade visual final.
+3. ✅ Multi-tenant funciona via RLS.
+4. ✅ Papéis funcionam (`user`, `company_admin`, `master_admin`).
+5. ✅ CRUDs reais funcionando: **Leads (com import CSV)**, **Campanhas (criar/editar/duplicar/play-pause/arquivar)**, Membros, API keys (tabela), Builder documents (tabela com `schema` + `campaign_id`).
+6. ⏳ Integrações: catálogo real listado; Resend/IMAP reais ainda pendentes.
+7. ✅ Inbox renderiza layout de 3 colunas sem quebrar.
+8. ⏳ Builder: tabela pronta, canvas drag-and-drop ainda pendente.
+9. ✅ Painel Master lista empresas/usuários reais.
+10. ✅ Empty states em todas as listas.
+11. ✅ Build de produção passa; rotas protegidas redirecionam.
+12. ✅ Documento `/.lovable/plan.md` atualizado.
 
 ---
 
