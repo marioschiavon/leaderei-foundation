@@ -27,9 +27,9 @@ function SettingsPage() {
         <TabsList>
           <TabsTrigger value="org">Organização</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="api">API keys</TabsTrigger>
+          <TabsTrigger value="billing">Faturamento</TabsTrigger>
           <TabsTrigger value="prefs">Preferências</TabsTrigger>
-          <TabsTrigger value="api">API</TabsTrigger>
         </TabsList>
 
         <TabsContent value="org" className="mt-6">
