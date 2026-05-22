@@ -221,3 +221,59 @@ export const setPlanActive = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return updated;
   });
+
+// ---------------------------------------------------------------------------
+// Members (global, master view)
+// ---------------------------------------------------------------------------
+
+export const listAllMembers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertMaster(context.userId);
+
+    const { data: members, error } = await supabaseAdmin
+      .from("organization_members")
+      .select("id,user_id,organization_id,role,status,joined_at")
+      .order("joined_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const userIds = Array.from(new Set((members ?? []).map((m) => m.user_id)));
+    const orgIds = Array.from(new Set((members ?? []).map((m) => m.organization_id)));
+
+    const [profilesRes, orgsRes, rolesRes] = await Promise.all([
+      userIds.length
+        ? supabaseAdmin.from("profiles").select("user_id,full_name,avatar_url").in("user_id", userIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      orgIds.length
+        ? supabaseAdmin.from("organizations").select("id,name,slug,status").in("id", orgIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      userIds.length
+        ? supabaseAdmin.from("user_roles").select("user_id,role").in("user_id", userIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+    if (orgsRes.error) throw new Error(orgsRes.error.message);
+    if (rolesRes.error) throw new Error(rolesRes.error.message);
+
+    const profilesMap = new Map((profilesRes.data ?? []).map((p) => [p.user_id, p]));
+    const orgsMap = new Map((orgsRes.data ?? []).map((o) => [o.id, o]));
+    const rolesByUser = new Map<string, string[]>();
+    for (const r of rolesRes.data ?? []) {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(r.role);
+      rolesByUser.set(r.user_id, arr);
+    }
+
+    return (members ?? []).map((m) => ({
+      id: m.id,
+      user_id: m.user_id,
+      organization_id: m.organization_id,
+      role: m.role,
+      status: m.status,
+      joined_at: m.joined_at,
+      profile: profilesMap.get(m.user_id) ?? null,
+      organization: orgsMap.get(m.organization_id) ?? null,
+      global_roles: rolesByUser.get(m.user_id) ?? [],
+    }));
+  });
+
