@@ -324,12 +324,32 @@ export function ImportLeadsSheet({
                     <Loader2 className="h-3 w-3 animate-spin" /> Lendo arquivo…
                   </p>
                 )}
-                {fileName && !parsing && (
+                {fileName && !parsing && !encodingError && (
                   <div className="rounded-lg border bg-surface-muted/40 p-3 text-xs">
                     <div className="inline-flex items-center gap-2 font-medium">
                       <FileText className="h-3.5 w-3.5" />
                       {fileName} — {rows.length} linha(s), {headers.length} coluna(s)
                     </div>
+                  </div>
+                )}
+                {encodingError && (
+                  <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Este arquivo parece estar em um encoding diferente de UTF-8
+                      (caracteres especiais aparecem corrompidos). Reabra o arquivo
+                      no Excel/Google Sheets e salve como <strong>CSV UTF-8</strong>{" "}
+                      antes de subir.
+                    </span>
+                  </div>
+                )}
+                {delimiterWarning && !encodingError && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-300/50 bg-amber-50/60 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Não consegui detectar separador de colunas. Confirme que o
+                      arquivo é um CSV válido.
+                    </span>
                   </div>
                 )}
               </div>
