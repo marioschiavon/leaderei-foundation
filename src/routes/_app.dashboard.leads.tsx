@@ -368,10 +368,20 @@ function LeadsPage() {
               ))}
             </div>
           ) : (
-            <LeadDetailPanel detail={detail} />
+            <LeadDetailPanel
+              detail={detail}
+              sources={sources ?? []}
+              onArchived={() => setSelectedLeadId(null)}
+            />
           )}
         </aside>
       </div>
+
+      <NewLeadSheet
+        open={newLeadOpen}
+        onOpenChange={setNewLeadOpen}
+        sources={sources ?? []}
+      />
     </div>
   );
 }
