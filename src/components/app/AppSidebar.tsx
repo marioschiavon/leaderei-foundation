@@ -12,6 +12,7 @@ import {
   LogOut,
   Shield,
   Blocks,
+  KanbanSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,19 +39,27 @@ import { Logo } from "@/components/brand/Logo";
 import { signOut, useAuthSession, useIsMaster } from "@/lib/auth";
 import { getMyContext } from "@/lib/tenant.functions";
 
-const WORKSPACE = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Campaigns", url: "/dashboard/campaigns", icon: Send },
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  badge?: string;
+};
+
+const WORKSPACE: NavItem[] = [
+  { title: "Painel", url: "/dashboard", icon: LayoutDashboard },
   { title: "Leads", url: "/dashboard/leads", icon: Users },
-  { title: "Inbox", url: "/dashboard/inbox", icon: Inbox },
+  { title: "Pipeline", url: "/dashboard/pipeline", icon: KanbanSquare, badge: "Em breve" },
+  { title: "Campanhas", url: "/dashboard/campaigns", icon: Send },
+  { title: "Caixa de entrada", url: "/dashboard/inbox", icon: Inbox },
 ];
 
-const TOOLS = [
-  { title: "Integrations", url: "/dashboard/integrations", icon: Plug },
+const TOOLS: NavItem[] = [
+  { title: "Integrações", url: "/dashboard/integrations", icon: Plug },
   { title: "Builder", url: "/dashboard/builder", icon: Blocks, badge: "Beta" },
 ];
 
-const ADMIN = [{ title: "Settings", url: "/dashboard/settings", icon: Settings }];
+const ADMIN: NavItem[] = [{ title: "Configurações", url: "/dashboard/settings", icon: Settings }];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -110,9 +119,17 @@ export function AppSidebar() {
               {WORKSPACE.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
+                    <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {item.badge && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-auto bg-muted text-muted-foreground border-transparent text-[0.6rem] px-1.5 py-0 font-medium"
+                        >
+                          {item.badge}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -123,7 +140,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-[0.7rem] uppercase tracking-wider text-sidebar-foreground/50">
-            Tools
+            Ferramentas
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -151,7 +168,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-[0.7rem] uppercase tracking-wider text-sidebar-foreground/50">
-            Admin
+            Administração
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
