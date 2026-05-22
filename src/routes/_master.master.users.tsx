@@ -154,7 +154,7 @@ function UsersPage() {
                 filtered.map((m) => {
                   const meta = ROLE_META[m.role] ?? ROLE_META.user;
                   const name = m.profile?.full_name ?? "Sem nome";
-                  const initials = name.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase() || "·";
+                  const initials = name.split(" ").map((s: string) => s[0]).slice(0, 2).join("").toUpperCase() || "·";
                   return (
                     <TableRow key={m.id}>
                       <TableCell>
