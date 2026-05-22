@@ -374,6 +374,21 @@ export function ImportLeadsSheet({
 
           {step === 2 && (
             <div className="space-y-4">
+              {headerNotices.length > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-300/50 bg-amber-50/60 p-2.5 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div className="space-y-0.5">
+                    <div className="font-medium">
+                      Cabeçalhos ajustados automaticamente:
+                    </div>
+                    <ul className="list-disc pl-4">
+                      {headerNotices.map((n, i) => (
+                        <li key={i}>{n}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
               {missingRequired.length > 0 && (
                 <div className="inline-flex items-start gap-2 rounded-md border border-amber-300/50 bg-amber-50/60 p-2.5 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
