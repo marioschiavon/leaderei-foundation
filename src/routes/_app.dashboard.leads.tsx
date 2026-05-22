@@ -151,6 +151,7 @@ function LeadsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return (leads ?? []).filter((lead) => {
