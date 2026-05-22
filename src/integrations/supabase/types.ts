@@ -68,6 +68,48 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string
+          revoked_at: string | null
+          scopes: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          organization_id: string
+          revoked_at?: string | null
+          scopes?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          organization_id?: string
+          revoked_at?: string | null
+          scopes?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -107,6 +149,48 @@ export type Database = {
           ip_address?: string | null
           organization_id?: string | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      builder_documents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          document: Json
+          id: string
+          is_published: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          document?: Json
+          id?: string
+          is_published?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          document?: Json
+          id?: string
+          is_published?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
         }
         Relationships: []
       }
@@ -330,6 +414,74 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deals: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          expected_close_at: string | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          organization_id: string
+          owner_user_id: string | null
+          position: number
+          probability: number
+          stage: Database["public"]["Enums"]["deal_stage"]
+          status: Database["public"]["Enums"]["deal_status"]
+          title: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          expected_close_at?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          organization_id: string
+          owner_user_id?: string | null
+          position?: number
+          probability?: number
+          stage?: Database["public"]["Enums"]["deal_stage"]
+          status?: Database["public"]["Enums"]["deal_status"]
+          title: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          expected_close_at?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          owner_user_id?: string | null
+          position?: number
+          probability?: number
+          stage?: Database["public"]["Enums"]["deal_stage"]
+          status?: Database["public"]["Enums"]["deal_status"]
+          title?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
@@ -1554,6 +1706,14 @@ export type Database = {
         | "completed"
         | "archived"
       conversation_status: "open" | "pending" | "snoozed" | "closed"
+      deal_stage:
+        | "lead"
+        | "qualified"
+        | "proposal"
+        | "negotiation"
+        | "won"
+        | "lost"
+      deal_status: "open" | "won" | "lost"
       enrollment_status:
         | "pending"
         | "active"
@@ -1769,6 +1929,15 @@ export const Constants = {
         "archived",
       ],
       conversation_status: ["open", "pending", "snoozed", "closed"],
+      deal_stage: [
+        "lead",
+        "qualified",
+        "proposal",
+        "negotiation",
+        "won",
+        "lost",
+      ],
+      deal_status: ["open", "won", "lost"],
       enrollment_status: [
         "pending",
         "active",
