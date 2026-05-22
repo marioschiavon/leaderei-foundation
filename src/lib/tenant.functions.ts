@@ -491,12 +491,15 @@ export const changeCampaignStatus = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ context, data }) => {
-    const patch: Record<string, unknown> = {
-      status: data.status,
-      updated_at: new Date().toISOString(),
-    };
-    if (data.status === "running") patch.started_at = new Date().toISOString();
-    if (data.status === "completed") patch.completed_at = new Date().toISOString();
+    const nowIso = new Date().toISOString();
+    const patch: {
+      status: typeof data.status;
+      updated_at: string;
+      started_at?: string;
+      completed_at?: string;
+    } = { status: data.status, updated_at: nowIso };
+    if (data.status === "running") patch.started_at = nowIso;
+    if (data.status === "completed") patch.completed_at = nowIso;
     const { data: row, error } = await context.supabase
       .from("campaigns")
       .update(patch)
