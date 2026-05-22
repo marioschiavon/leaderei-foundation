@@ -129,6 +129,15 @@ function LoginPage() {
             </Button>
           </form>
 
+          {reason === "inactive" && (
+            <Alert variant="destructive" className="mt-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Sua conta foi desativada. Entre em contato com o administrador.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Ainda não tem conta?{" "}
             <Link to="/signup" className="font-semibold text-brand hover:underline">
