@@ -76,21 +76,21 @@ O módulo de Leads já funciona com base real.
 Recursos disponíveis:
 
 - busca por nome, email, empresa, cargo e origem
-- filtro por status
-- filtro por origem
-- lista real de leads da organização
-- painel lateral com:
-  - score
-  - temperatura
-  - origem
-  - próximo follow-up
-  - potencial comercial
-  - enrichment mais recente
-  - atividade recente
+- filtro por status e por origem
+- criação de lead (sheet "Novo lead")
+- edição inline e arquivamento no painel lateral
+- **importação via CSV** (botão "Importar")
+- painel lateral com score, temperatura, origem, próximo follow-up, potencial comercial, enrichment recente e atividade
 
-Observação:
+### Importar CSV
 
-- criação, edição avançada e ações em lote ainda não entraram nesta rodada
+1. Clique em **Importar** no topo da página.
+2. Selecione um arquivo `.csv` com cabeçalho. Cabeçalhos aceitos:
+   `full_name` (ou `nome`), `email`, `phone`, `company_name`, `job_title`.
+3. Opcional: escolha uma origem padrão para todos os leads importados.
+4. Linhas sem nome ou email válido são **ignoradas** e listadas no resumo
+   pós-importação (com número da linha original e motivo).
+5. Os leads criados aparecem imediatamente na lista.
 
 ## 5. Integrations
 
