@@ -1,5 +1,34 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "qualified",
+  "proposal",
+  "won",
+  "lost",
+  "archived",
+] as const;
+const LEAD_TEMPERATURES = ["cold", "warm", "hot"] as const;
+
+async function getActiveOrgId(
+  supabase: { from: (table: string) => any },
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("joined_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sem organização ativa para este usuário.");
+  return data.organization_id as string;
+}
 
 /**
  * Returns the active organization of the authenticated user, the org-scoped
@@ -222,4 +251,81 @@ export const listIntegrations = createServerFn({ method: "GET" })
       ...p,
       connection: byProvider.get(p.id) ?? null,
     }));
+  });
+
+const CreateLeadSchema = z.object({
+  full_name: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().max(255),
+  phone: z.string().trim().max(40).optional().nullable(),
+  company_name: z.string().trim().max(160).optional().nullable(),
+  job_title: z.string().trim().max(160).optional().nullable(),
+  source_id: z.string().uuid().optional().nullable(),
+  status: z.enum(LEAD_STATUSES).optional(),
+});
+
+export const createLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CreateLeadSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    const organization_id = await getActiveOrgId(context.supabase, context.userId);
+    const { data: inserted, error } = await context.supabase
+      .from("leads")
+      .insert({
+        organization_id,
+        full_name: data.full_name,
+        email: data.email,
+        phone: data.phone ?? null,
+        company_name: data.company_name ?? null,
+        job_title: data.job_title ?? null,
+        source_id: data.source_id ?? null,
+        status: data.status ?? "new",
+        created_by: context.userId,
+      })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return inserted;
+  });
+
+const UpdateLeadSchema = z.object({
+  id: z.string().uuid(),
+  full_name: z.string().trim().min(1).max(120).optional(),
+  email: z.string().trim().email().max(255).nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  company_name: z.string().trim().max(160).nullable().optional(),
+  job_title: z.string().trim().max(160).nullable().optional(),
+  status: z.enum(LEAD_STATUSES).optional(),
+  temperature: z.enum(LEAD_TEMPERATURES).optional(),
+  score: z.number().int().min(0).max(100).optional(),
+  estimated_value: z.number().min(0).nullable().optional(),
+  next_followup_at: z.string().datetime().nullable().optional(),
+});
+
+export const updateLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => UpdateLeadSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    const { id, ...patch } = data;
+    const { data: updated, error } = await context.supabase
+      .from("leads")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return updated;
+  });
+
+export const archiveLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { data: updated, error } = await context.supabase
+      .from("leads")
+      .update({ status: "archived", archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return updated;
   });

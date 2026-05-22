@@ -1,31 +1,72 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
 import {
+  Archive,
   ArrowUpRight,
   Building2,
   CalendarClock,
   CircleDollarSign,
   Inbox as InboxIcon,
   Link2,
+  Loader2,
   Mail,
+  Pencil,
   Phone,
   Plus,
   Search,
   Sparkles,
   Upload,
+  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getLeadDetail, listLeads, listLeadSources } from "@/lib/tenant.functions";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  archiveLead,
+  createLead,
+  getLeadDetail,
+  listLeads,
+  listLeadSources,
+  updateLead,
+} from "@/lib/tenant.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/leads")({
   component: LeadsPage,
 });
+
+const LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "qualified",
+  "proposal",
+  "won",
+  "lost",
+  "archived",
+] as const;
 
 const STATUS_META: Record<string, { label: string; chip: string; dot: string }> = {
   new: { label: "Novo", chip: "bg-muted text-foreground", dot: "bg-foreground/60" },
@@ -108,6 +149,7 @@ function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return (leads ?? []).filter((lead) => {
@@ -165,7 +207,7 @@ function LeadsPage() {
               <Upload className="h-4 w-4" />
               Importar
             </Button>
-            <Button>
+            <Button onClick={() => setNewLeadOpen(true)}>
               <Plus className="h-4 w-4" />
               Novo lead
             </Button>
@@ -234,7 +276,7 @@ function LeadsPage() {
               action={
                 !query && statusFilter === "all" && sourceFilter === "all" && (
                   <div className="flex gap-2">
-                    <Button>
+                    <Button onClick={() => setNewLeadOpen(true)}>
                       <Plus className="h-4 w-4" />
                       Adicionar lead
                     </Button>
@@ -326,10 +368,20 @@ function LeadsPage() {
               ))}
             </div>
           ) : (
-            <LeadDetailPanel detail={detail} />
+            <LeadDetailPanel
+              detail={detail}
+              sources={sources ?? []}
+              onArchived={() => setSelectedLeadId(null)}
+            />
           )}
         </aside>
       </div>
+
+      <NewLeadSheet
+        open={newLeadOpen}
+        onOpenChange={setNewLeadOpen}
+        sources={sources ?? []}
+      />
     </div>
   );
 }
@@ -370,11 +422,80 @@ function FilterPills({
 
 function LeadDetailPanel({
   detail,
+  sources,
+  onArchived,
 }: {
   detail: LeadDetailData;
+  sources: LeadSource[];
+  onArchived: () => void;
 }) {
   const lead = detail.lead!;
   const statusMeta = STATUS_META[lead.status] ?? STATUS_META.new;
+  const queryClient = useQueryClient();
+  const updateFn = useServerFn(updateLead);
+  const archiveFn = useServerFn(archiveLead);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    setEditing(false);
+  }, [lead.id]);
+
+  const editSchema = z.object({
+    full_name: z.string().trim().min(1, "Obrigatório").max(120),
+    email: z.string().trim().email("Email inválido").max(255).or(z.literal("")).optional(),
+    phone: z.string().trim().max(40).optional(),
+    company_name: z.string().trim().max(160).optional(),
+    job_title: z.string().trim().max(160).optional(),
+    status: z.enum(LEAD_STATUSES),
+  });
+  type EditValues = z.infer<typeof editSchema>;
+
+  const form = useForm<EditValues>({
+    resolver: zodResolver(editSchema),
+    values: {
+      full_name: lead.full_name,
+      email: lead.email ?? "",
+      phone: lead.phone ?? "",
+      company_name: lead.company_name ?? "",
+      job_title: lead.job_title ?? "",
+      status: (LEAD_STATUSES.includes(lead.status as (typeof LEAD_STATUSES)[number])
+        ? lead.status
+        : "new") as (typeof LEAD_STATUSES)[number],
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: EditValues) =>
+      updateFn({
+        data: {
+          id: lead.id,
+          full_name: values.full_name,
+          email: values.email ? values.email : null,
+          phone: values.phone ? values.phone : null,
+          company_name: values.company_name ? values.company_name : null,
+          job_title: values.job_title ? values.job_title : null,
+          status: values.status,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Lead atualizado.");
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", "detail", lead.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => archiveFn({ data: { id: lead.id } }),
+    onSuccess: () => {
+      toast.success("Lead arquivado.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onArchived();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const enrichmentPayload =
     detail.enrichment?.payload && typeof detail.enrichment.payload === "object" && !Array.isArray(detail.enrichment.payload)
       ? (detail.enrichment.payload as Record<string, unknown>)
@@ -392,38 +513,124 @@ function LeadDetailPanel({
     <div className="space-y-5 p-5">
       <div className="space-y-3 border-b pb-4">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-semibold">{lead.full_name}</h2>
-            <p className="text-sm text-muted-foreground">
-              {[lead.job_title, lead.company_name].filter(Boolean).join(" · ") || "Lead sem cargo ou empresa definidos"}
-            </p>
+          <div className="min-w-0">
+            {editing ? (
+              <Input
+                {...form.register("full_name")}
+                className="font-display text-lg font-semibold"
+              />
+            ) : (
+              <h2 className="font-display text-lg font-semibold">{lead.full_name}</h2>
+            )}
+            {!editing && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {[lead.job_title, lead.company_name].filter(Boolean).join(" · ") || "Lead sem cargo ou empresa definidos"}
+              </p>
+            )}
           </div>
-          <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium", statusMeta.chip)}>
+          <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium shrink-0", statusMeta.chip)}>
             <span className={cn("h-1.5 w-1.5 rounded-full", statusMeta.dot)} />
             {statusMeta.label}
           </span>
         </div>
 
-        <div className="grid gap-2 text-sm text-muted-foreground">
-          {lead.email && (
-            <div className="inline-flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              {lead.email}
+        {editing ? (
+          <form
+            onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}
+            className="space-y-3"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="edit-email" className="text-xs">Email</Label>
+                <Input id="edit-email" type="email" {...form.register("email")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-phone" className="text-xs">Telefone</Label>
+                <Input id="edit-phone" {...form.register("phone")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-company" className="text-xs">Empresa</Label>
+                <Input id="edit-company" {...form.register("company_name")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-job" className="text-xs">Cargo</Label>
+                <Input id="edit-job" {...form.register("job_title")} />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Status</Label>
+                <Select
+                  value={form.watch("status")}
+                  onValueChange={(v) => form.setValue("status", v as (typeof LEAD_STATUSES)[number])}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LEAD_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{STATUS_META[s]?.label ?? s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          )}
-          {lead.phone && (
-            <div className="inline-flex items-center gap-2">
-              <Phone className="h-4 w-4" />
-              {lead.phone}
+            {form.formState.errors.full_name && (
+              <p className="text-xs text-destructive">{form.formState.errors.full_name.message}</p>
+            )}
+            {form.formState.errors.email && (
+              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Salvar alterações
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setEditing(false); form.reset(); }}>
+                <X className="h-3.5 w-3.5" />
+                Cancelar
+              </Button>
             </div>
-          )}
-          {lead.website_url && (
-            <div className="inline-flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              {lead.website_url}
+          </form>
+        ) : (
+          <>
+            <div className="grid gap-2 text-sm text-muted-foreground">
+              {lead.email && (
+                <div className="inline-flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  {lead.email}
+                </div>
+              )}
+              {lead.phone && (
+                <div className="inline-flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  {lead.phone}
+                </div>
+              )}
+              {lead.website_url && (
+                <div className="inline-flex items-center gap-2">
+                  <Link2 className="h-4 w-4" />
+                  {lead.website_url}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" />
+                Editar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => archiveMutation.mutate()}
+                disabled={archiveMutation.isPending || lead.status === "archived"}
+              >
+                {archiveMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Archive className="h-3.5 w-3.5" />
+                )}
+                Arquivar
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -537,5 +744,128 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium">{value}</div>
     </div>
+  );
+}
+
+const newLeadSchema = z.object({
+  full_name: z.string().trim().min(1, "Nome obrigatório").max(120),
+  email: z.string().trim().email("Email inválido").max(255),
+  phone: z.string().trim().max(40).optional(),
+  company_name: z.string().trim().max(160).optional(),
+  job_title: z.string().trim().max(160).optional(),
+  source_id: z.string().uuid().optional().or(z.literal("")),
+});
+type NewLeadValues = z.infer<typeof newLeadSchema>;
+
+function NewLeadSheet({
+  open,
+  onOpenChange,
+  sources,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sources: LeadSource[];
+}) {
+  const queryClient = useQueryClient();
+  const createFn = useServerFn(createLead);
+  const form = useForm<NewLeadValues>({
+    resolver: zodResolver(newLeadSchema),
+    defaultValues: { full_name: "", email: "", phone: "", company_name: "", job_title: "", source_id: "" },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: NewLeadValues) =>
+      createFn({
+        data: {
+          full_name: values.full_name,
+          email: values.email,
+          phone: values.phone || null,
+          company_name: values.company_name || null,
+          job_title: values.job_title || null,
+          source_id: values.source_id ? values.source_id : null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Lead criado.");
+      form.reset();
+      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) form.reset();
+      }}
+    >
+      <SheetContent className="w-full sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Novo lead</SheetTitle>
+          <SheetDescription>Cadastre um novo contato no pipeline.</SheetDescription>
+        </SheetHeader>
+
+        <form
+          onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+          className="mt-6 space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-name">Nome completo *</Label>
+            <Input id="nl-name" {...form.register("full_name")} />
+            {form.formState.errors.full_name && (
+              <p className="text-xs text-destructive">{form.formState.errors.full_name.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-email">E-mail *</Label>
+            <Input id="nl-email" type="email" {...form.register("email")} />
+            {form.formState.errors.email && (
+              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-phone">Telefone</Label>
+            <Input id="nl-phone" {...form.register("phone")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-company">Empresa</Label>
+            <Input id="nl-company" {...form.register("company_name")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="nl-job">Cargo</Label>
+            <Input id="nl-job" {...form.register("job_title")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Origem</Label>
+            <Select
+              value={form.watch("source_id") || ""}
+              onValueChange={(v) => form.setValue("source_id", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a origem (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {sources.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <SheetFooter className="mt-6">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
