@@ -111,6 +111,9 @@ export function ImportLeadsSheet({
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [headerNotices, setHeaderNotices] = useState<string[]>([]);
+  const [encodingError, setEncodingError] = useState(false);
+  const [delimiterWarning, setDelimiterWarning] = useState(false);
   const [mapping, setMapping] = useState<Record<string, DbField | typeof IGNORE>>({});
   const [sourceId, setSourceId] = useState<string>("");
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -121,6 +124,9 @@ export function ImportLeadsSheet({
     setFileName(null);
     setRows([]);
     setHeaders([]);
+    setHeaderNotices([]);
+    setEncodingError(false);
+    setDelimiterWarning(false);
     setMapping({});
     setSourceId("");
     setResult(null);
@@ -129,35 +135,103 @@ export function ImportLeadsSheet({
   const onFile = (file: File) => {
     setParsing(true);
     setResult(null);
-    Papa.parse<ParsedRow>(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim(),
-      complete: (res) => {
-        const hs = res.meta.fields ?? [];
-        const initial: Record<string, DbField | typeof IGNORE> = {};
-        const used = new Set<DbField>();
-        for (const h of hs) {
-          const s = suggest(h);
-          if (s !== IGNORE && !used.has(s)) {
-            initial[h] = s;
-            used.add(s);
-          } else {
-            initial[h] = IGNORE;
+    setHeaderNotices([]);
+    setEncodingError(false);
+    setDelimiterWarning(false);
+    setHeaders([]);
+    setRows([]);
+    setMapping({});
+    setFileName(file.name);
+
+    // Pre-read raw text to detect encoding issues (replacement char) and first-line size.
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      const hasEncodingIssue = text.includes("\uFFFD");
+      const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
+
+      if (hasEncodingIssue) {
+        setEncodingError(true);
+        setParsing(false);
+        return;
+      }
+
+      Papa.parse<ParsedRow>(text, {
+        header: false,
+        skipEmptyLines: true,
+        delimitersToGuess: [",", ";", "\t", "|"],
+        complete: (res) => {
+          const all = (res.data ?? []) as string[][];
+          if (all.length === 0) {
+            setParsing(false);
+            toast.error("CSV vazio.");
+            return;
           }
-        }
-        setFileName(file.name);
-        setHeaders(hs);
-        setRows((res.data ?? []).slice(0, 2000));
-        setMapping(initial);
-        setParsing(false);
-      },
-      error: (err) => {
-        setParsing(false);
-        toast.error(`Falha ao ler CSV: ${err.message}`);
-      },
-    });
+          const rawHeaders = all[0].map((h) => (h ?? "").toString().trim());
+
+          // Detect bad single-column parse on a fat first line.
+          if (rawHeaders.length === 1 && firstLine.length > 100) {
+            setDelimiterWarning(true);
+          }
+
+          // Normalize: empty → "Coluna N"; duplicates → suffix _2, _3…
+          const notices: string[] = [];
+          const seen = new Map<string, number>();
+          const cleaned: string[] = rawHeaders.map((h, i) => {
+            let name = h;
+            if (!name) {
+              name = `Coluna ${i + 1}`;
+              notices.push(`Coluna ${i + 1} estava sem cabeçalho.`);
+            }
+            const count = seen.get(name) ?? 0;
+            seen.set(name, count + 1);
+            if (count > 0) {
+              const suffixed = `${name}_${count + 1}`;
+              notices.push(`Cabeçalho duplicado "${name}" renomeado para "${suffixed}".`);
+              return suffixed;
+            }
+            return name;
+          });
+
+          const dataRows: ParsedRow[] = all.slice(1, 2001).map((arr) => {
+            const obj: ParsedRow = {};
+            cleaned.forEach((k, idx) => {
+              obj[k] = arr[idx] ?? null;
+            });
+            return obj;
+          });
+
+          const initial: Record<string, DbField | typeof IGNORE> = {};
+          const used = new Set<DbField>();
+          for (const h of cleaned) {
+            const s = suggest(h);
+            if (s !== IGNORE && !used.has(s)) {
+              initial[h] = s;
+              used.add(s);
+            } else {
+              initial[h] = IGNORE;
+            }
+          }
+
+          setHeaders(cleaned);
+          setHeaderNotices(notices);
+          setRows(dataRows);
+          setMapping(initial);
+          setParsing(false);
+        },
+        error: (err: Error) => {
+          setParsing(false);
+          toast.error(`Falha ao ler CSV: ${err.message}`);
+        },
+      });
+    };
+    reader.onerror = () => {
+      setParsing(false);
+      toast.error("Não foi possível ler o arquivo.");
+    };
+    reader.readAsText(file, "utf-8");
   };
+
 
   const usedFields = useMemo(() => {
     const s = new Set<DbField>();
