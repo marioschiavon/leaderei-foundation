@@ -154,40 +154,43 @@ export type Database = {
       }
       builder_documents: {
         Row: {
+          campaign_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
-          document: Json
           id: string
           is_published: boolean
           name: string
           organization_id: string
+          schema: Json
           updated_at: string
           updated_by: string | null
           version: number
         }
         Insert: {
+          campaign_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
-          document?: Json
           id?: string
           is_published?: boolean
           name: string
           organization_id: string
+          schema?: Json
           updated_at?: string
           updated_by?: string | null
           version?: number
         }
         Update: {
+          campaign_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
-          document?: Json
           id?: string
           is_published?: boolean
           name?: string
           organization_id?: string
+          schema?: Json
           updated_at?: string
           updated_by?: string | null
           version?: number
