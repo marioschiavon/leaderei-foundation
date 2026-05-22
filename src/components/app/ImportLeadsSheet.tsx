@@ -268,10 +268,14 @@ export function ImportLeadsSheet({
         },
       }),
     onSuccess: (r) => {
-      setResult(r as ImportResult);
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       const msg = `${r.created} criados · ${r.skipped} ignorados`;
       r.skipped > 0 ? toast.warning(msg) : toast.success(msg);
+      if (r.errors.length === 0) {
+        reset();
+      } else {
+        setResult(r as ImportResult);
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
