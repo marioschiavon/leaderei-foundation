@@ -113,7 +113,7 @@ export const listLeadSources = createServerFn({ method: "GET" })
 
 export const getLeadDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .validator((payload: { leadId: string }) => payload)
+  .inputValidator((payload: { leadId: string }) => payload)
   .handler(async ({ context, data }) => {
     const { leadId } = data;
 

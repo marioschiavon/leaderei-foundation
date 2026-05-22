@@ -86,7 +86,7 @@ type LeadDetailData = {
     provider: string;
     confidence: number | null;
     fetched_at: string;
-    payload: Record<string, unknown> | null;
+    payload: unknown;
   } | null;
 };
 
@@ -377,7 +377,7 @@ function LeadDetailPanel({
   const statusMeta = STATUS_META[lead.status] ?? STATUS_META.new;
   const enrichmentPayload =
     detail.enrichment?.payload && typeof detail.enrichment.payload === "object" && !Array.isArray(detail.enrichment.payload)
-      ? detail.enrichment.payload
+      ? (detail.enrichment.payload as Record<string, unknown>)
       : null;
 
   const enrichmentHighlights = enrichmentPayload
