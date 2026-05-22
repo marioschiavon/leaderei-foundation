@@ -469,7 +469,7 @@ export function ImportLeadsSheet({
                 <div className="font-medium">Pronto para importar</div>
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                   <li>• Arquivo: {fileName}</li>
-                  <li>• {rows.length} linha(s) serão processadas</li>
+                  <li>• {rows.length} linha(s) serão enviadas para importação</li>
                   <li>• {usedFields.size} campo(s) mapeados</li>
                   <li>
                     • Origem padrão:{" "}
