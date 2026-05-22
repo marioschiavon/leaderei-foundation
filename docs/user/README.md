@@ -129,7 +129,8 @@ Para usuários `master_admin`, o painel Master já permite:
 
 ### Campaigns
 
-Tela visual pronta, ainda sem execução operacional real.
+Já é possível criar, editar, duplicar, iniciar, pausar e arquivar campanhas.
+Disparo real multicanal entra em fase posterior.
 
 ### Inbox
 
@@ -145,6 +146,9 @@ Estrutura visual pronta, sem persistência completa.
 
 ## 8. Histórico recente
 
+- 2026-05-22 — Leads ganharam **importação via CSV** com validação por linha.
+- 2026-05-22 — Campaigns ganharam **CRUD real** (criar, editar, duplicar, iniciar/pausar, arquivar).
+- 2026-05-22 — Tabela `builder_documents` renomeou `document` para `schema` e ganhou vínculo opcional a campanhas.
 - 2026-05-22 — Dashboard passou a operar com KPIs reais por tenant.
 - 2026-05-22 — Leads passaram a usar lista, filtros, detalhe e atividade reais.
 - 2026-05-22 — Integrations passaram a exibir estados reais das conexões da organização.
