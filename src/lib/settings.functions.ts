@@ -114,7 +114,7 @@ export const listOrgInvitations = createServerFn({ method: "GET" })
     const m = await getActiveOrg(supabase, userId);
     const { data, error } = await supabase
       .from("organization_invitations")
-      .select("id, email, role, expires_at, created_at, accepted_at, revoked_at")
+      .select("id, email, role, token, expires_at, created_at, accepted_at, revoked_at")
       .eq("organization_id", m.organization_id)
       .is("accepted_at", null)
       .is("revoked_at", null)
