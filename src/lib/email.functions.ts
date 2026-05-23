@@ -112,13 +112,13 @@ export async function sendEmailInternal(input: SendEmailInput): Promise<SendResu
 
   // Log queued
   const { data: logId, error: logErr } = await sa.rpc("log_email_send", {
-    _organization_id: input.organization_id ?? null,
+    _organization_id: (input.organization_id ?? null) as any,
     _purpose: input.purpose,
     _from_email: fromEmail,
     _to_email: toArr.join(","),
     _subject: input.subject,
-    _template_key: input.template_key ?? null,
-    _triggered_by: input.triggered_by ?? null,
+    _template_key: (input.template_key ?? null) as any,
+    _triggered_by: (input.triggered_by ?? null) as any,
     _metadata: (input.metadata ?? {}) as any,
   });
   if (logErr) throw new Error(`log_email_send: ${logErr.message}`);
