@@ -489,6 +489,65 @@ export type Database = {
           },
         ]
       }
+      email_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          from_email: string
+          id: string
+          metadata: Json
+          organization_id: string | null
+          provider: string
+          provider_message_id: string | null
+          purpose: string
+          status: string
+          subject: string
+          template_key: string | null
+          to_email: string
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          from_email: string
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          provider?: string
+          provider_message_id?: string | null
+          purpose: string
+          status?: string
+          subject: string
+          template_key?: string | null
+          to_email: string
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          from_email?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          provider?: string
+          provider_message_id?: string | null
+          purpose?: string
+          status?: string
+          subject?: string
+          template_key?: string | null
+          to_email?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_send_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flow_definitions: {
         Row: {
           campaign_id: string | null
@@ -1266,6 +1325,7 @@ export type Database = {
           expires_at: string
           id: string
           invited_by: string
+          last_sent_at: string | null
           organization_id: string
           revoked_at: string | null
           role: Database["public"]["Enums"]["app_role"]
@@ -1278,6 +1338,7 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by: string
+          last_sent_at?: string | null
           organization_id: string
           revoked_at?: string | null
           role?: Database["public"]["Enums"]["app_role"]
@@ -1290,6 +1351,7 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by?: string
+          last_sent_at?: string | null
           organization_id?: string
           revoked_at?: string | null
           role?: Database["public"]["Enums"]["app_role"]
@@ -1533,6 +1595,36 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          description: string | null
+          is_secret: boolean
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value_encrypted: string | null
+          value_plain: Json | null
+        }
+        Insert: {
+          description?: string | null
+          is_secret?: boolean
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value_encrypted?: string | null
+          value_plain?: Json | null
+        }
+        Update: {
+          description?: string | null
+          is_secret?: boolean
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value_encrypted?: string | null
+          value_plain?: Json | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1712,6 +1804,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _platform_passphrase: { Args: never; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: string }
       get_invitation_by_token: {
         Args: { _token: string }
@@ -1724,6 +1817,8 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
         }[]
       }
+      get_platform_plain: { Args: { _key: string }; Returns: Json }
+      get_platform_secret: { Args: { _key: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -1748,6 +1843,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      log_email_send: {
+        Args: {
+          _from_email: string
+          _metadata: Json
+          _organization_id: string
+          _purpose: string
+          _subject: string
+          _template_key: string
+          _to_email: string
+          _triggered_by: string
+        }
+        Returns: string
+      }
       provision_user_account: {
         Args: {
           _email: string
@@ -1757,7 +1865,24 @@ export type Database = {
         }
         Returns: string
       }
+      set_platform_plain: {
+        Args: { _key: string; _value: Json }
+        Returns: undefined
+      }
+      set_platform_secret: {
+        Args: { _key: string; _value: string }
+        Returns: undefined
+      }
       slugify: { Args: { _input: string }; Returns: string }
+      update_email_send_status: {
+        Args: {
+          _error_message: string
+          _id: string
+          _provider_message_id: string
+          _status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       ai_action_kind:

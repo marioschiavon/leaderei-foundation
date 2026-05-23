@@ -1,65 +1,59 @@
-## Objetivo
 
-Substituir o import atual de CSV (que exige cabeçalhos fixos `full_name`, `email`, etc.) por um fluxo de **mapeamento de colunas** no estilo Bubble/HubSpot: o usuário sobe qualquer CSV, vê as colunas detectadas, escolhe para qual campo do banco cada uma vai, e só então confirma a importação.
+# Resend híbrido + envio real de convites
 
-## Fluxo novo (3 passos dentro do mesmo Sheet)
+## Decisão de arquitetura: encryption
 
-```text
-[1 Upload]  →  [2 Mapear colunas]  →  [3 Revisar e importar]
-```
+Vou usar **Supabase Vault + pgcrypto** (não pgsodium):
 
-**Passo 1 — Upload**
-- Drop / file picker (mantém o atual).
-- Papaparse lê headers + primeiras 5 linhas para preview.
-- Opcional: origem padrão (igual hoje).
+- `pgsodium` está **deprecado** no Supabase managed (já não é instalado em projetos novos desde 2024). Usar agora cria dívida.
+- **Vault** é o cofre nativo do Supabase para segredos. Guarda a passphrase de encryption (gerada randomicamente na migration) criptografada com a master key gerenciada pela infra do Supabase. Nunca vai pro código nem pra migration em plaintext.
+- `platform_settings.value_encrypted` guarda os segredos cifrados com `pgp_sym_encrypt(value, passphrase)`. A passphrase é lida via `vault.read_secret('platform_encryption_key')` dentro das funções SECURITY DEFINER.
+- Resultado: rotacionar a master key não exige redeploy; ninguém com acesso só ao Postgres consegue ler os segredos sem ser `master_admin`.
 
-**Passo 2 — Mapeamento**
-- Tabela com 3 colunas:
-  - **Coluna do CSV** (ex.: `Nome completo`)
-  - **Amostra** (primeiros 2 valores da coluna, em cinza)
-  - **Campo no Leaderei** (Select com opções fixas + "Ignorar")
-- Auto-sugestão inicial por heurística de nome (case-insensitive, acentos removidos):
-  - `nome|name|full_name|nome completo` → `full_name`
-  - `email|e-mail|mail` → `email`
-  - `telefone|phone|celular|whatsapp` → `phone`
-  - `empresa|company|company_name|organização` → `company_name`
-  - `cargo|job|job_title|posição` → `job_title`
-  - `linkedin|linkedin_url` → `linkedin_url`
-  - `site|website|website_url` → `website_url`
-  - `cidade|city` → `city`
-  - `país|pais|country` → `country`
-  - `tags` → `tags` (split por `;` ou `,`)
-  - Demais → "Ignorar" por padrão.
-- Validação inline: `full_name` e `email` são obrigatórios — botão "Avançar" desativado até ambos serem mapeados. Mensagem clara explicando o porquê.
-- Um mesmo campo do banco só pode ser usado uma vez (Select desabilita opções já escolhidas).
+## Entregas (ordem de execução)
 
-**Passo 3 — Revisar e importar**
-- Resumo: "X linhas serão importadas, Y campos mapeados, origem: Z".
-- Botão "Importar" dispara `importLeads` com payload **já normalizado no cliente** (chaves já são os nomes canônicos do banco), reutilizando 100% a server function existente.
-- Após sucesso: mesmo painel de resultado de hoje (criados / ignorados / erros por linha).
+### 1. Migration única
+- `CREATE EXTENSION pgcrypto`
+- Insere `vault.create_secret(gen_random_uuid()::text, 'platform_encryption_key', 'Resend keys encryption')`
+- Tabela `platform_settings` (key, value_encrypted bytea, value_plain jsonb, is_secret, description, updated_by, updated_at) com RLS exclusiva pra `master_admin`
+- Tabela `email_send_log` (organization_id, purpose, provider, from_email, to_email, subject, template_key, provider_message_id, status, error_message, triggered_by, metadata) com RLS leitura só `master_admin`, índices
+- Funções SECURITY DEFINER: `set_platform_secret(key, value)`, `get_platform_secret(key)`, `get_platform_plain(key)`, `set_platform_plain(key, jsonb)`, `log_email_send(...)`, `update_email_send_status(id, status, message_id, error)`
+- Seed: linhas iniciais para `resend_global_api_key`, `resend_global_from_email='leaderei@s7cloud.com.br'`, `resend_global_from_name='Leaderei'`, `app_public_url`, `logo_public_url`
+- `organization_invitations` ganha coluna `last_sent_at timestamptz`
+- Storage bucket público `public-assets`
 
-## Campos do banco oferecidos no Select
+### 2. Backend
+- `src/lib/email.functions.ts` — função roteadora `sendEmail({to, subject, html, text, purpose, organization_id?, template_key?, metadata?, reply_to?})`:
+  - Roteia pra chave global se `purpose ∈ {invitation, welcome, password_reset, system_alert}`, lendo via service-role + `get_platform_secret`
+  - Pra `campaign`/`inbox_reply` busca `organization_integrations` + `integration_credentials`, erro claro se ausente (sem fallback)
+  - `fetch` direto pra `api.resend.com/emails`, timeout 10s, log antes/depois, nunca logga apiKey
+- `src/lib/platform.functions.ts` — funções master-only: `getPlatformSettings`, `setPlatformResendKey` (valida contra `api.resend.com/domains`), `setPlatformPlain`, `sendTestEmail`, `listEmailSendLogs({filters, page})`, `uploadProjectLogoToStorage`
+- `src/lib/settings.functions.ts` — `sendInvitationEmail` agora monta payload de convite e chama `sendEmail`, marca `last_sent_at`
 
-Lidos diretamente da tabela `leads`, apenas os que fazem sentido em import: `full_name*`, `email*`, `phone`, `company_name`, `job_title`, `linkedin_url`, `website_url`, `city`, `country`, `tags`. (`*` = obrigatório.)
+### 3. Templates de email
+- `src/lib/email-templates/base.ts` — `renderBaseTemplate({preheader, content, ctaUrl?, ctaLabel?})` retornando `{html, text}`. HTML 100% inline, tabela-based, max 600px, system fonts, hex literais extraídos do styles.css, footer com endereço fictício "S7 — Curitiba, PR, Brasil"
+- `src/lib/email-templates/invitation.ts` — `renderInvitationEmail({org_name, inviter_name, role_label, invite_url, expires_at})`
 
-`status`, `temperature`, `score`, `owner`, `custom_fields` ficam fora desta versão — entram em uma rodada futura se você quiser.
+### 4. UI
+- Nova rota `src/routes/_master.master.platform.tsx` com 3 seções:
+  - **Email transacional global**: badge status, input chave Resend (mascarada), botão Salvar (com confirm se substituir), botão "Enviar email de teste"
+  - **Branding em emails**: input `logo_public_url` + botão "Usar logo do projeto" (faz upload de `/public/logo` pro bucket)
+  - **Logs recentes**: tabela paginada com filtros (status, purpose, data), drawer de detalhes
+- Tab "Plataforma" adicionada em `_master.master.tsx`
+- `_app.dashboard.settings.tsx` (aba Membros): botão "Enviar por email" no dialog vira ação primária funcional, com toast verde no sucesso e mensagem clara + link "Configurar agora" (só master) no erro de chave não configurada
+- `_app.dashboard.integrations.tsx`: banner explicativo "Resend por-org é pra campanhas. Pra emails do sistema o Leaderei já cuida." + card Resend com form que persiste em `integration_credentials` (sem usar ainda em campanhas)
 
-## Mudanças técnicas
+### 5. Docs
+- `docs/user/README.md`: nova seção "Email transacional" explicando híbrido
+- `.lovable/plan.md`: marcar critérios fechados
 
-| Camada | Mudança |
-|---|---|
-| `src/components/app/ImportLeadsSheet.tsx` | Reescrita para wizard de 3 passos com estado `step`, `mapping: Record<csvHeader, dbField \| "__ignore">`, auto-sugestão, validação. |
-| `src/lib/tenant.functions.ts` `importLeads` | **Sem mudança de schema.** Continua aceitando `rows` com chaves canônicas. O cliente passa a enviar as linhas já remapeadas, então o backend fica mais simples (podemos até remover o fallback `nome → full_name` numa limpeza futura, mas não nesta rodada para não quebrar nada). |
-| Documentação | Atualizar `docs/user/README.md` da seção "Importar CSV" para descrever o novo fluxo de mapeamento. |
+## Fora do escopo desta rodada
+- Envio real de campanhas / inbox reply (Fase 3)
+- Webhooks de bounce/delivered do Resend (Fase 3)
+- Templates welcome / password reset (não pedidos)
 
-Nenhuma migration. Nenhuma alteração em outras telas. RLS e permissões intocadas.
+## Riscos conhecidos
+- **Deliverability do `leaderei@s7cloud.com.br`**: requer que o domínio `s7cloud.com.br` esteja verificado na conta Resend cuja chave o master vai colar. Se não estiver, todo send retorna 403. Vou tratar o erro do Resend e mostrar mensagem clara apontando pra "verifique o domínio em resend.com/domains".
+- **Vault**: requer extensão habilitada. Se a migration falhar nisso, fallback é passphrase em env var `PLATFORM_ENCRYPTION_KEY` (documento qual caminho ficou no commit).
 
-## Critérios de aceite
-
-1. Subir um CSV com cabeçalhos arbitrários (ex.: `Nome,Mail,Telefone,Empresa`) abre a tela de mapeamento já com sugestões corretas.
-2. Não é possível avançar sem mapear `full_name` e `email`.
-3. Mesmo campo do banco não pode ser escolhido em duas colunas.
-4. Importação final reaproveita `importLeads` e mostra criados/ignorados/erros como hoje.
-5. Cancelar/fechar reseta o wizard.
-
-Quer que eu siga assim, ou prefere ajustar a lista de campos oferecidos (ex.: incluir `status`/`tags`/`custom_fields`) antes de eu implementar?
+Posso seguir?
