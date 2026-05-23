@@ -154,18 +154,18 @@ export async function sendEmailInternal(input: SendEmailInput): Promise<SendResu
     if (!res.ok) {
       const msg = (payload as any)?.message || (payload as any)?.error || `HTTP ${res.status}`;
       await sa.rpc("update_email_send_status", {
-        _id: id, _status: "failed", _provider_message_id: null, _error_message: String(msg).slice(0, 1000),
+        _id: id, _status: "failed", _provider_message_id: null as any, _error_message: String(msg).slice(0, 1000),
       });
       throw new Error(`Resend: ${msg}`);
     }
     const messageId = (payload as any)?.id ?? null;
     await sa.rpc("update_email_send_status", {
-      _id: id, _status: "sent", _provider_message_id: messageId, _error_message: null,
+      _id: id, _status: "sent", _provider_message_id: (messageId ?? null) as any, _error_message: null as any,
     });
     return { id, provider_message_id: messageId, status: "sent" };
   } catch (e: any) {
     await sa.rpc("update_email_send_status", {
-      _id: id, _status: "failed", _provider_message_id: null,
+      _id: id, _status: "failed", _provider_message_id: null as any,
       _error_message: String(e?.message ?? e).slice(0, 1000),
     });
     throw e;
