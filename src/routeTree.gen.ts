@@ -15,6 +15,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as MasterRouteImport } from './routes/_master'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as MasterMasterRouteImport } from './routes/_master.master'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppDashboardIndexRouteImport } from './routes/_app.dashboard.index'
@@ -56,6 +57,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MasterMasterRoute = MasterMasterRouteImport.update({
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRouteWithChildren
   '/master': typeof MasterMasterRouteWithChildren
+  '/invite/$token': typeof InviteTokenRoute
   '/dashboard/builder': typeof AppDashboardBuilderRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/master': typeof MasterMasterRouteWithChildren
+  '/invite/$token': typeof InviteTokenRoute
   '/dashboard/builder': typeof AppDashboardBuilderRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRouteWithChildren
   '/_master/master': typeof MasterMasterRouteWithChildren
+  '/invite/$token': typeof InviteTokenRoute
   '/_app/dashboard/builder': typeof AppDashboardBuilderRoute
   '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/master'
+    | '/invite/$token'
     | '/dashboard/builder'
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/master'
+    | '/invite/$token'
     | '/dashboard/builder'
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/dashboard'
     | '/_master/master'
+    | '/invite/$token'
     | '/_app/dashboard/builder'
     | '/_app/dashboard/campaigns'
     | '/_app/dashboard/inbox'
@@ -264,6 +276,7 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  InviteTokenRoute: typeof InviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_master/master': {
@@ -483,7 +503,18 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
