@@ -184,30 +184,54 @@ export const sendInvitationEmail = createServerFn({ method: "POST" })
 
     const { data: inv, error } = await supabase
       .from("organization_invitations")
-      .select("id, email, organization_id")
+      .select("id, email, organization_id, role, token, expires_at")
       .eq("id", data.invitation_id)
       .eq("organization_id", m.organization_id)
       .single();
     if (error || !inv) throw new Error("Convite não encontrado.");
 
-    const { data: provider } = await supabase
-      .from("integration_providers")
-      .select("id")
-      .eq("slug", "resend")
-      .maybeSingle();
-    if (!provider) throw new Error("Resend not configured for this organization");
+    const { sendEmailInternal } = await import("./email.functions");
+    const { renderInvitationEmail } = await import("./email-templates/invitation");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: conn } = await supabase
-      .from("organization_integrations")
-      .select("status")
-      .eq("organization_id", m.organization_id)
-      .eq("provider_id", provider.id)
-      .maybeSingle();
-    if (!conn || conn.status !== "connected") {
-      throw new Error("Resend not configured for this organization");
-    }
-    // Real send wired in next round.
-    return { sent: false, queued: true };
+    const [{ data: org }, { data: inviterProfile }, { data: appUrlRow }, { data: logoRow }] = await Promise.all([
+      supabaseAdmin.from("organizations").select("name").eq("id", m.organization_id).single(),
+      supabaseAdmin.from("profiles").select("full_name").eq("user_id", userId).maybeSingle(),
+      supabaseAdmin.rpc("get_platform_plain", { _key: "app_public_url" }),
+      supabaseAdmin.rpc("get_platform_plain", { _key: "logo_public_url" }),
+    ]);
+
+    const baseUrl = (typeof appUrlRow === "string" && appUrlRow) || process.env.VITE_PUBLIC_APP_URL || "";
+    const logoUrl = typeof logoRow === "string" ? logoRow : null;
+    const inviteUrl = `${baseUrl}/invite/${inv.token}`;
+    const inviterName = inviterProfile?.full_name ?? "Um administrador";
+    const orgName = org?.name ?? "sua organização";
+
+    const { subject, html, text } = renderInvitationEmail({
+      org_name: orgName,
+      inviter_name: inviterName,
+      role_label: inv.role === "company_admin" ? "administrador" : "membro",
+      invite_url: inviteUrl,
+      expires_at: inv.expires_at,
+      logo_url: logoUrl,
+    });
+
+    const r = await sendEmailInternal({
+      to: inv.email,
+      subject, html, text,
+      purpose: "invitation",
+      organization_id: m.organization_id,
+      template_key: "invitation_v1",
+      triggered_by: userId,
+      metadata: { inviter_user_id: userId, role: inv.role, expires_at: inv.expires_at },
+    });
+
+    await supabaseAdmin
+      .from("organization_invitations")
+      .update({ last_sent_at: new Date().toISOString() })
+      .eq("id", inv.id);
+
+    return { sent: true, provider_message_id: r.provider_message_id };
   });
 
 export const updateMemberRole = createServerFn({ method: "POST" })
