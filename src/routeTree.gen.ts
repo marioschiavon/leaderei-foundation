@@ -20,6 +20,7 @@ import { Route as MasterMasterRouteImport } from './routes/_master.master'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppDashboardIndexRouteImport } from './routes/_app.dashboard.index'
 import { Route as MasterMasterUsersRouteImport } from './routes/_master.master.users'
+import { Route as MasterMasterPlatformRouteImport } from './routes/_master.master.platform'
 import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.plans'
 import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
 import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.logs'
@@ -82,6 +83,11 @@ const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
 const MasterMasterUsersRoute = MasterMasterUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => MasterMasterRoute,
+} as any)
+const MasterMasterPlatformRoute = MasterMasterPlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
   getParentRoute: () => MasterMasterRoute,
 } as any)
 const MasterMasterPlansRoute = MasterMasterPlansRouteImport.update({
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
+  '/master/platform': typeof MasterMasterPlatformRoute
   '/master/users': typeof MasterMasterUsersRoute
   '/dashboard/': typeof AppDashboardIndexRoute
 }
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
+  '/master/platform': typeof MasterMasterPlatformRoute
   '/master/users': typeof MasterMasterUsersRoute
   '/dashboard': typeof AppDashboardIndexRoute
 }
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/_master/master/logs': typeof MasterMasterLogsRoute
   '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
   '/_master/master/plans': typeof MasterMasterPlansRoute
+  '/_master/master/platform': typeof MasterMasterPlatformRoute
   '/_master/master/users': typeof MasterMasterUsersRoute
   '/_app/dashboard/': typeof AppDashboardIndexRoute
 }
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/master/logs'
     | '/master/organizations'
     | '/master/plans'
+    | '/master/platform'
     | '/master/users'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/master/logs'
     | '/master/organizations'
     | '/master/plans'
+    | '/master/platform'
     | '/master/users'
     | '/dashboard'
   id:
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/_master/master/logs'
     | '/_master/master/organizations'
     | '/_master/master/plans'
+    | '/_master/master/platform'
     | '/_master/master/users'
     | '/_app/dashboard/'
   fileRoutesById: FileRoutesById
@@ -356,6 +368,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/master/users'
       preLoaderRoute: typeof MasterMasterUsersRouteImport
+      parentRoute: typeof MasterMasterRoute
+    }
+    '/_master/master/platform': {
+      id: '/_master/master/platform'
+      path: '/platform'
+      fullPath: '/master/platform'
+      preLoaderRoute: typeof MasterMasterPlatformRouteImport
       parentRoute: typeof MasterMasterRoute
     }
     '/_master/master/plans': {
@@ -471,6 +490,7 @@ interface MasterMasterRouteChildren {
   MasterMasterLogsRoute: typeof MasterMasterLogsRoute
   MasterMasterOrganizationsRoute: typeof MasterMasterOrganizationsRoute
   MasterMasterPlansRoute: typeof MasterMasterPlansRoute
+  MasterMasterPlatformRoute: typeof MasterMasterPlatformRoute
   MasterMasterUsersRoute: typeof MasterMasterUsersRoute
 }
 
@@ -478,6 +498,7 @@ const MasterMasterRouteChildren: MasterMasterRouteChildren = {
   MasterMasterLogsRoute: MasterMasterLogsRoute,
   MasterMasterOrganizationsRoute: MasterMasterOrganizationsRoute,
   MasterMasterPlansRoute: MasterMasterPlansRoute,
+  MasterMasterPlatformRoute: MasterMasterPlatformRoute,
   MasterMasterUsersRoute: MasterMasterUsersRoute,
 }
 
@@ -508,13 +529,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
