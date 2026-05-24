@@ -13,6 +13,7 @@ const NAV = [
   { label: "Organizações", to: "/master/organizations" },
   { label: "Usuários", to: "/master/users" },
   { label: "Planos", to: "/master/plans" },
+  { label: "Plataforma", to: "/master/platform" },
   { label: "Logs", to: "/master/logs" },
 ];
 
