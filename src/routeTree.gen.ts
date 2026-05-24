@@ -16,8 +16,8 @@ import { Route as MasterRouteImport } from './routes/_master'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
-import { Route as MasterMasterRouteImport } from './routes/_master.master'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as MasterMasterIndexRouteImport } from './routes/_master.master.index'
 import { Route as AppDashboardIndexRouteImport } from './routes/_app.dashboard.index'
 import { Route as MasterMasterUsersRouteImport } from './routes/_master.master.users'
 import { Route as MasterMasterPlatformRouteImport } from './routes/_master.master.platform'
@@ -65,15 +65,15 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MasterMasterRoute = MasterMasterRouteImport.update({
-  id: '/master',
-  path: '/master',
-  getParentRoute: () => MasterRoute,
-} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AppRoute,
+} as any)
+const MasterMasterIndexRoute = MasterMasterIndexRouteImport.update({
+  id: '/master/',
+  path: '/master/',
+  getParentRoute: () => MasterRoute,
 } as any)
 const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
   id: '/',
@@ -81,30 +81,30 @@ const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
   getParentRoute: () => AppDashboardRoute,
 } as any)
 const MasterMasterUsersRoute = MasterMasterUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => MasterMasterRoute,
+  id: '/master/users',
+  path: '/master/users',
+  getParentRoute: () => MasterRoute,
 } as any)
 const MasterMasterPlatformRoute = MasterMasterPlatformRouteImport.update({
-  id: '/platform',
-  path: '/platform',
-  getParentRoute: () => MasterMasterRoute,
+  id: '/master/platform',
+  path: '/master/platform',
+  getParentRoute: () => MasterRoute,
 } as any)
 const MasterMasterPlansRoute = MasterMasterPlansRouteImport.update({
-  id: '/plans',
-  path: '/plans',
-  getParentRoute: () => MasterMasterRoute,
+  id: '/master/plans',
+  path: '/master/plans',
+  getParentRoute: () => MasterRoute,
 } as any)
 const MasterMasterOrganizationsRoute =
   MasterMasterOrganizationsRouteImport.update({
-    id: '/organizations',
-    path: '/organizations',
-    getParentRoute: () => MasterMasterRoute,
+    id: '/master/organizations',
+    path: '/master/organizations',
+    getParentRoute: () => MasterRoute,
   } as any)
 const MasterMasterLogsRoute = MasterMasterLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => MasterMasterRoute,
+  id: '/master/logs',
+  path: '/master/logs',
+  getParentRoute: () => MasterRoute,
 } as any)
 const AppDashboardSettingsRoute = AppDashboardSettingsRouteImport.update({
   id: '/settings',
@@ -149,7 +149,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRouteWithChildren
-  '/master': typeof MasterMasterRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
   '/dashboard/builder': typeof AppDashboardBuilderRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
@@ -164,13 +163,13 @@ export interface FileRoutesByFullPath {
   '/master/platform': typeof MasterMasterPlatformRoute
   '/master/users': typeof MasterMasterUsersRoute
   '/dashboard/': typeof AppDashboardIndexRoute
+  '/master/': typeof MasterMasterIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/master': typeof MasterMasterRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
   '/dashboard/builder': typeof AppDashboardBuilderRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
@@ -185,6 +184,7 @@ export interface FileRoutesByTo {
   '/master/platform': typeof MasterMasterPlatformRoute
   '/master/users': typeof MasterMasterUsersRoute
   '/dashboard': typeof AppDashboardIndexRoute
+  '/master': typeof MasterMasterIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -195,7 +195,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRouteWithChildren
-  '/_master/master': typeof MasterMasterRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
   '/_app/dashboard/builder': typeof AppDashboardBuilderRoute
   '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
@@ -210,6 +209,7 @@ export interface FileRoutesById {
   '/_master/master/platform': typeof MasterMasterPlatformRoute
   '/_master/master/users': typeof MasterMasterUsersRoute
   '/_app/dashboard/': typeof AppDashboardIndexRoute
+  '/_master/master/': typeof MasterMasterIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -219,7 +219,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/dashboard'
-    | '/master'
     | '/invite/$token'
     | '/dashboard/builder'
     | '/dashboard/campaigns'
@@ -234,13 +233,13 @@ export interface FileRouteTypes {
     | '/master/platform'
     | '/master/users'
     | '/dashboard/'
+    | '/master/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/forgot-password'
     | '/login'
     | '/signup'
-    | '/master'
     | '/invite/$token'
     | '/dashboard/builder'
     | '/dashboard/campaigns'
@@ -255,6 +254,7 @@ export interface FileRouteTypes {
     | '/master/platform'
     | '/master/users'
     | '/dashboard'
+    | '/master'
   id:
     | '__root__'
     | '/'
@@ -264,7 +264,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/_app/dashboard'
-    | '/_master/master'
     | '/invite/$token'
     | '/_app/dashboard/builder'
     | '/_app/dashboard/campaigns'
@@ -279,6 +278,7 @@ export interface FileRouteTypes {
     | '/_master/master/platform'
     | '/_master/master/users'
     | '/_app/dashboard/'
+    | '/_master/master/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -342,19 +342,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_master/master': {
-      id: '/_master/master'
-      path: '/master'
-      fullPath: '/master'
-      preLoaderRoute: typeof MasterMasterRouteImport
-      parentRoute: typeof MasterRoute
-    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_master/master/': {
+      id: '/_master/master/'
+      path: '/master'
+      fullPath: '/master/'
+      preLoaderRoute: typeof MasterMasterIndexRouteImport
+      parentRoute: typeof MasterRoute
     }
     '/_app/dashboard/': {
       id: '/_app/dashboard/'
@@ -365,38 +365,38 @@ declare module '@tanstack/react-router' {
     }
     '/_master/master/users': {
       id: '/_master/master/users'
-      path: '/users'
+      path: '/master/users'
       fullPath: '/master/users'
       preLoaderRoute: typeof MasterMasterUsersRouteImport
-      parentRoute: typeof MasterMasterRoute
+      parentRoute: typeof MasterRoute
     }
     '/_master/master/platform': {
       id: '/_master/master/platform'
-      path: '/platform'
+      path: '/master/platform'
       fullPath: '/master/platform'
       preLoaderRoute: typeof MasterMasterPlatformRouteImport
-      parentRoute: typeof MasterMasterRoute
+      parentRoute: typeof MasterRoute
     }
     '/_master/master/plans': {
       id: '/_master/master/plans'
-      path: '/plans'
+      path: '/master/plans'
       fullPath: '/master/plans'
       preLoaderRoute: typeof MasterMasterPlansRouteImport
-      parentRoute: typeof MasterMasterRoute
+      parentRoute: typeof MasterRoute
     }
     '/_master/master/organizations': {
       id: '/_master/master/organizations'
-      path: '/organizations'
+      path: '/master/organizations'
       fullPath: '/master/organizations'
       preLoaderRoute: typeof MasterMasterOrganizationsRouteImport
-      parentRoute: typeof MasterMasterRoute
+      parentRoute: typeof MasterRoute
     }
     '/_master/master/logs': {
       id: '/_master/master/logs'
-      path: '/logs'
+      path: '/master/logs'
       fullPath: '/master/logs'
       preLoaderRoute: typeof MasterMasterLogsRouteImport
-      parentRoute: typeof MasterMasterRoute
+      parentRoute: typeof MasterRoute
     }
     '/_app/dashboard/settings': {
       id: '/_app/dashboard/settings'
@@ -486,32 +486,22 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
-interface MasterMasterRouteChildren {
+interface MasterRouteChildren {
   MasterMasterLogsRoute: typeof MasterMasterLogsRoute
   MasterMasterOrganizationsRoute: typeof MasterMasterOrganizationsRoute
   MasterMasterPlansRoute: typeof MasterMasterPlansRoute
   MasterMasterPlatformRoute: typeof MasterMasterPlatformRoute
   MasterMasterUsersRoute: typeof MasterMasterUsersRoute
+  MasterMasterIndexRoute: typeof MasterMasterIndexRoute
 }
 
-const MasterMasterRouteChildren: MasterMasterRouteChildren = {
+const MasterRouteChildren: MasterRouteChildren = {
   MasterMasterLogsRoute: MasterMasterLogsRoute,
   MasterMasterOrganizationsRoute: MasterMasterOrganizationsRoute,
   MasterMasterPlansRoute: MasterMasterPlansRoute,
   MasterMasterPlatformRoute: MasterMasterPlatformRoute,
   MasterMasterUsersRoute: MasterMasterUsersRoute,
-}
-
-const MasterMasterRouteWithChildren = MasterMasterRoute._addFileChildren(
-  MasterMasterRouteChildren,
-)
-
-interface MasterRouteChildren {
-  MasterMasterRoute: typeof MasterMasterRouteWithChildren
-}
-
-const MasterRouteChildren: MasterRouteChildren = {
-  MasterMasterRoute: MasterMasterRouteWithChildren,
+  MasterMasterIndexRoute: MasterMasterIndexRoute,
 }
 
 const MasterRouteWithChildren =
@@ -529,3 +519,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
