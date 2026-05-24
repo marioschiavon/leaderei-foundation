@@ -6,7 +6,7 @@ import { Link } from "@tanstack/react-router";
 import { getMasterOverview } from "@/lib/master.functions";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_master/master")({
+export const Route = createFileRoute("/_master/master/")({
   component: MasterOverview,
 });
 
