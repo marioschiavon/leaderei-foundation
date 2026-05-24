@@ -67,10 +67,16 @@ Posso seguir?
 - [x] Página Master → Plataforma (chave, branding, teste, logs)
 - [x] Convites realmente enviam por email via chave global
 - [x] Banner explicativo em Integrações
-- [ ] Form de conexão Resend por-org em Integrações (próxima rodada)
+- [x] Form de conexão Resend por-org em Integrações (dialog com validação contra api.resend.com)
 
-## Falta para fechar Fase 1
+## Rodada — Fechamento Fase 1
 
-1. Builder persistido em `builder_documents` com versão/publish.
-2. Form de conexão Resend por-organização em Integrações (campanhas/inbox).
-3. Auditoria final de empty states e mensagens de erro em todas as telas.
+- [x] Builder persistido em `builder_documents`: list/create/load/save (versão++)/publish/delete
+- [x] Resend per-org persistido em `organization_integrations` + `integration_credentials`
+- [x] Empty states cobertos em Builder (sem fluxos / canvas vazio), Leads, Pipeline, Inbox, Campaigns, Settings
+
+## Falta para próxima fase
+
+- Execução real de campanhas usando a chave Resend per-org (envio em loop + métricas)
+- Webhooks de bounce/delivered do Resend
+- Editor avançado de blocos no Builder (templates de email, condições compostas)
