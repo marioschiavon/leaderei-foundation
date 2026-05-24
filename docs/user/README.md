@@ -154,3 +154,16 @@ Estrutura visual pronta, sem persistência completa.
 - 2026-05-22 — Integrations passaram a exibir estados reais das conexões da organização.
 - 2026-05-22 — Sidebar passou a mostrar organização ativa e papel do usuário.
 - 2026-05-21 — Área Master foi conectada ao backend real.
+
+## Email transacional (modelo híbrido)
+
+O Leaderei envia emails em dois modos:
+
+- **Chave global (Resend)** — gerenciada pelo administrador master em **Master → Plataforma**. É usada para `invitation`, `welcome`, `password_reset` e `system_alert`. Envios automáticos sob o domínio padrão `leaderei@s7cloud.com.br` (ou o que o master configurar).
+- **Chave por organização** — cada org conecta seu próprio Resend em **Integrações** para enviar `campaign` e `inbox_reply` sob o domínio e reputação próprios. **Não há fallback** para a chave global nesses casos (protege reputação).
+
+Todos os envios ficam registrados em `email_send_log`, auditáveis pelo master em **Master → Plataforma → Logs**.
+
+### Histórico
+
+- Adicionado: roteador central de email (`src/lib/email.functions.ts`), tabela `platform_settings` com Vault/pgcrypto, tabela `email_send_log`, página **Master → Plataforma** (chave Resend global, branding/logo, teste de envio, logs), banner explicativo em Integrações.

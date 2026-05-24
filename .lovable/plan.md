@@ -57,3 +57,20 @@ Vou usar **Supabase Vault + pgcrypto** (não pgsodium):
 - **Vault**: requer extensão habilitada. Se a migration falhar nisso, fallback é passphrase em env var `PLATFORM_ENCRYPTION_KEY` (documento qual caminho ficou no commit).
 
 Posso seguir?
+
+## Rodada — Email híbrido (Resend global + per-org)
+
+- [x] `platform_settings` + Vault/pgcrypto para chave global criptografada
+- [x] `email_send_log` (audit master-only)
+- [x] Router `sendEmailInternal` com separação system/org purposes
+- [x] Templates HTML email-safe (`base.ts`, `invitation.ts`)
+- [x] Página Master → Plataforma (chave, branding, teste, logs)
+- [x] Convites realmente enviam por email via chave global
+- [x] Banner explicativo em Integrações
+- [ ] Form de conexão Resend por-org em Integrações (próxima rodada)
+
+## Falta para fechar Fase 1
+
+1. Builder persistido em `builder_documents` com versão/publish.
+2. Form de conexão Resend por-organização em Integrações (campanhas/inbox).
+3. Auditoria final de empty states e mensagens de erro em todas as telas.
