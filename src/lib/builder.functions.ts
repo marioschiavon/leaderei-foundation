@@ -118,18 +118,16 @@ export const saveBuilderDocument = createServerFn({ method: "POST" })
     if (cErr) throw new Error(cErr.message);
     if (!current) throw new Error("Documento não encontrado.");
 
-    const patch: Record<string, unknown> = {
-      schema: data.schema,
-      version: (current.version ?? 1) + 1,
-      updated_by: context.userId,
-      updated_at: new Date().toISOString(),
-    };
-    if (data.name !== undefined) patch.name = data.name;
-    if (data.description !== undefined) patch.description = data.description;
-
     const { data: row, error } = await context.supabase
       .from("builder_documents")
-      .update(patch)
+      .update({
+        schema: data.schema as any,
+        version: (current.version ?? 1) + 1,
+        updated_by: context.userId,
+        updated_at: new Date().toISOString(),
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+      })
       .eq("id", data.id)
       .select()
       .single();
