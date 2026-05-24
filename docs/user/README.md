@@ -10,18 +10,17 @@ Hoje a Fase 1 já entrega estes módulos com dados reais:
 - Dashboard
 - Leads (lista, filtros, criação, edição, arquivamento, **import CSV**)
 - Campaigns (criar, editar, duplicar, iniciar, pausar, arquivar)
-- Integrations
-- Master · Overview
-- Master · Organizations
-- Master · Users
-- Master · Plans
+- Inbox (3 colunas: lista, conversa, painel do lead)
+- **Builder** (criar fluxo, editar blocos, salvar com versão, publicar/despublicar, excluir)
+- Settings (Organização, Membros com convites por email, API keys)
+- Integrations (status real + **conexão Resend per-org** via dialog)
+- Master · Overview, Organizations, Users, Plans, **Platform** (Resend global + branding + logs), Logs
 
-Os módulos abaixo continuam estruturais nesta etapa:
+A Fase 1 está fechada. Restam para próximas fases:
 
-- Inbox
-- Builder
-- Settings
-- Master · Logs
+- Execução real de campanhas (envio em loop usando Resend per-org + métricas)
+- Webhooks de bounce/delivered do Resend
+- Editor avançado de blocos no Builder (templates, condições compostas, ramificações múltiplas)
 
 ## 1. Primeiros passos
 
