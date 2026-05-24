@@ -81,6 +81,19 @@ function IntegrationsPage() {
         description="Status reais dos provedores disponíveis para a organização atual."
       />
 
+      <div className="rounded-xl border border-brand/20 bg-brand/5 p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <Mail className="mt-0.5 h-4 w-4 text-brand" />
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Email transacional — modelo híbrido</p>
+            <p className="text-muted-foreground">
+              Convites, recuperação de senha e alertas do sistema saem pela <strong>chave global</strong> do Leaderei.
+              Para enviar <strong>campanhas</strong> e <strong>respostas do Inbox</strong> com seu próprio domínio e reputação, conecte o Resend abaixo.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-4">
         <SummaryCard label="Disponíveis" value={integrations.length} loading={isLoading} />
         <SummaryCard label="Conectadas" value={connectedCount} loading={isLoading} accent />
