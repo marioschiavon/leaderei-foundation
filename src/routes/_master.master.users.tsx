@@ -8,7 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { listAllMembers } from "@/lib/master.functions";
-import { StatusPill, type CompanyStatus } from "./_master.master";
+import { StatusPill, type CompanyStatus } from "./_master.master.index";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_master/master/users")({
