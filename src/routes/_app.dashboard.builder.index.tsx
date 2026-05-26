@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { listBuilderDocuments } from "@/lib/builder.functions";
 
-export const Route = createFileRoute("/_app/dashboard/builder")({
+export const Route = createFileRoute("/_app/dashboard/builder/")({
   component: BuilderListPage,
 });
 
