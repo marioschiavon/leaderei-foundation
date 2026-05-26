@@ -68,10 +68,14 @@ import {
   deleteBuilderDocument,
 } from "@/lib/builder.functions";
 
-export const Route = createFileRoute("/_app/dashboard/builder/$documentId")({
-  ssr: false,
-  component: BuilderEditorPage,
-});
+export default function BuilderEditorPage({ documentId }: { documentId: string }) {
+  return (
+    <ReactFlowProvider>
+      <BuilderEditorInner documentId={documentId} />
+    </ReactFlowProvider>
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // Types
