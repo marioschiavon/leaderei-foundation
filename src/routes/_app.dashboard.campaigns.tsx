@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { getBuilderDocumentByCampaign } from "@/lib/builder.functions";
+import { Workflow } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -277,7 +279,7 @@ function CampaignCard({
         <Stat label="Resposta" value={`${replyRate}%`} accent />
       </div>
       <div className="flex items-center justify-between gap-2 p-3 text-xs text-muted-foreground">
-        <span>{new Date(c.created_at).toLocaleDateString("pt-BR")}</span>
+        <EditFlowButton campaignId={c.id} status={c.status} />
         <div className="flex items-center gap-1">
           {canStart && (
             <Button
@@ -522,5 +524,41 @@ function CampaignFormSheet({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function EditFlowButton({ campaignId, status }: { campaignId: string; status: string }) {
+  const navigate = useNavigate();
+  const openFn = useServerFn(getBuilderDocumentByCampaign);
+  const [loading, setLoading] = useState(false);
+  const disabled = loading;
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={disabled}
+      title={
+        status === "running" || status === "paused"
+          ? "Edições só se aplicam a novos leads enrolados"
+          : undefined
+      }
+      onClick={async () => {
+        try {
+          setLoading(true);
+          const res: any = await openFn({ data: { campaign_id: campaignId } });
+          navigate({
+            to: "/dashboard/builder/$documentId",
+            params: { documentId: res.document.id },
+          });
+        } catch (e) {
+          toast.error((e as Error).message);
+        } finally {
+          setLoading(false);
+        }
+      }}
+    >
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5" />}
+      Editar fluxo
+    </Button>
   );
 }
