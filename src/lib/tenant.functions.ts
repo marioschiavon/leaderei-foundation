@@ -207,13 +207,46 @@ export const getLeadDetail = createServerFn({ method: "GET" })
 export const listCampaigns = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data: campaigns, error } = await context.supabase
       .from("campaigns")
       .select("id, name, description, status, channel, total_enrolled, total_sent, total_replied, created_at, scheduled_at")
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
-    return data ?? [];
+    const list = campaigns ?? [];
+    if (list.length === 0) return [];
+
+    const campaignIds = list.map((c) => c.id);
+    const { data: docs, error: docsErr } = await context.supabase
+      .from("builder_documents")
+      .select("id, campaign_id, status")
+      .in("campaign_id", campaignIds)
+      .is("archived_at", null);
+    if (docsErr) throw new Error(docsErr.message);
+
+    const docList = docs ?? [];
+    const docIds = docList.map((d) => d.id);
+    const stepCountByDoc = new Map<string, number>();
+    if (docIds.length > 0) {
+      const { data: steps, error: stepsErr } = await context.supabase
+        .from("flow_steps")
+        .select("document_id")
+        .in("document_id", docIds);
+      if (stepsErr) throw new Error(stepsErr.message);
+      for (const s of (steps ?? []) as Array<{ document_id: string }>) {
+        stepCountByDoc.set(s.document_id, (stepCountByDoc.get(s.document_id) ?? 0) + 1);
+      }
+    }
+    const docByCampaign = new Map(docList.map((d) => [d.campaign_id, d]));
+
+    return list.map((c) => {
+      const doc = docByCampaign.get(c.id);
+      return {
+        ...c,
+        flow_step_count: doc ? stepCountByDoc.get(doc.id) ?? 0 : null,
+        flow_status: (doc?.status as string | undefined) ?? null,
+      };
+    });
   });
 
 export const listConversations = createServerFn({ method: "GET" })
