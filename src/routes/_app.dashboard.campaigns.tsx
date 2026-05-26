@@ -103,6 +103,8 @@ type Campaign = {
   total_replied: number;
   created_at: string;
   scheduled_at: string | null;
+  flow_step_count: number | null;
+  flow_status: string | null;
 };
 
 function CampaignsPage() {
