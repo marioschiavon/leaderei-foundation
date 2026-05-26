@@ -277,7 +277,7 @@ function CampaignCard({
         <Stat label="Resposta" value={`${replyRate}%`} accent />
       </div>
       <div className="flex items-center justify-between gap-2 p-3 text-xs text-muted-foreground">
-        <span>{new Date(c.created_at).toLocaleDateString("pt-BR")}</span>
+        <EditFlowButton campaignId={c.id} status={c.status} />
         <div className="flex items-center gap-1">
           {canStart && (
             <Button
