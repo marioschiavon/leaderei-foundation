@@ -526,3 +526,39 @@ function CampaignFormSheet({
     </Sheet>
   );
 }
+
+function EditFlowButton({ campaignId, status }: { campaignId: string; status: string }) {
+  const navigate = useNavigate();
+  const openFn = useServerFn(getBuilderDocumentByCampaign);
+  const [loading, setLoading] = useState(false);
+  const disabled = loading;
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={disabled}
+      title={
+        status === "running" || status === "paused"
+          ? "Edições só se aplicam a novos leads enrolados"
+          : undefined
+      }
+      onClick={async () => {
+        try {
+          setLoading(true);
+          const res: any = await openFn({ data: { campaign_id: campaignId } });
+          navigate({
+            to: "/dashboard/builder/$documentId",
+            params: { documentId: res.document.id },
+          });
+        } catch (e) {
+          toast.error((e as Error).message);
+        } finally {
+          setLoading(false);
+        }
+      }}
+    >
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Workflow className="h-3.5 w-3.5" />}
+      Editar fluxo
+    </Button>
+  );
+}
