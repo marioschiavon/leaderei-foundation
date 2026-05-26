@@ -154,6 +154,7 @@ export type Database = {
       }
       builder_documents: {
         Row: {
+          archived_at: string | null
           campaign_id: string | null
           created_at: string
           created_by: string | null
@@ -162,12 +163,16 @@ export type Database = {
           is_published: boolean
           name: string
           organization_id: string
+          published_at: string | null
+          published_version: number | null
           schema: Json
+          status: string
           updated_at: string
           updated_by: string | null
           version: number
         }
         Insert: {
+          archived_at?: string | null
           campaign_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -176,12 +181,16 @@ export type Database = {
           is_published?: boolean
           name: string
           organization_id: string
+          published_at?: string | null
+          published_version?: number | null
           schema?: Json
+          status?: string
           updated_at?: string
           updated_by?: string | null
           version?: number
         }
         Update: {
+          archived_at?: string | null
           campaign_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -190,7 +199,10 @@ export type Database = {
           is_published?: boolean
           name?: string
           organization_id?: string
+          published_at?: string | null
+          published_version?: number | null
           schema?: Json
+          status?: string
           updated_at?: string
           updated_by?: string | null
           version?: number
@@ -723,6 +735,99 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_steps: {
+        Row: {
+          config: Json
+          created_at: string
+          document_id: string
+          id: string
+          is_entry: boolean
+          position_x: number
+          position_y: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          document_id: string
+          id?: string
+          is_entry?: boolean
+          position_x?: number
+          position_y?: number
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          document_id?: string
+          id?: string
+          is_entry?: boolean
+          position_x?: number
+          position_y?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_steps_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "builder_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_transitions: {
+        Row: {
+          branch: string
+          created_at: string
+          document_id: string
+          from_step_id: string
+          id: string
+          to_step_id: string
+        }
+        Insert: {
+          branch?: string
+          created_at?: string
+          document_id: string
+          from_step_id: string
+          id?: string
+          to_step_id: string
+        }
+        Update: {
+          branch?: string
+          created_at?: string
+          document_id?: string
+          from_step_id?: string
+          id?: string
+          to_step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_transitions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "builder_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_transitions_from_step_id_fkey"
+            columns: ["from_step_id"]
+            isOneToOne: false
+            referencedRelation: "flow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_transitions_to_step_id_fkey"
+            columns: ["to_step_id"]
+            isOneToOne: false
+            referencedRelation: "flow_steps"
             referencedColumns: ["id"]
           },
         ]
