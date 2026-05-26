@@ -103,6 +103,8 @@ type Campaign = {
   total_replied: number;
   created_at: string;
   scheduled_at: string | null;
+  flow_step_count: number | null;
+  flow_status: string | null;
 };
 
 function CampaignsPage() {
@@ -307,6 +309,31 @@ function CampaignCard({
             {c.description}
           </p>
         )}
+        <div className="mt-2 text-xs text-muted-foreground">
+          {c.flow_step_count === null || c.flow_step_count === 0 ? (
+            <span className="inline-flex items-center gap-1">
+              <Workflow className="h-3 w-3" />
+              {c.flow_step_count === null ? "Sem fluxo" : "0 passos"}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              <Workflow className="h-3 w-3" />
+              <span className="font-medium text-foreground">
+                {c.flow_step_count} {c.flow_step_count === 1 ? "passo" : "passos"}
+              </span>
+              <span>·</span>
+              <span
+                className={
+                  c.flow_status === "published"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : ""
+                }
+              >
+                {c.flow_status === "published" ? "Publicado" : "Rascunho"}
+              </span>
+            </span>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-3 divide-x border-b">
         <Stat label="Inscritos" value={c.total_enrolled} />

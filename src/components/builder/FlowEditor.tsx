@@ -287,55 +287,74 @@ function ConditionRepliedNode({ data, selected }: NodeProps<StepNode>) {
     whatsapp: "whatsapp",
     linkedin: "linkedin",
   };
+  const unitLabel: Record<string, string> = {
+    hours: cfg.timeout_value === 1 ? "hora" : "horas",
+    days: cfg.timeout_value === 1 ? "dia" : "dias",
+  };
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={GitBranch} label="Respondeu?" />
-      <div style={{ padding: "10px 12px", fontSize: 11, color: COLORS.muted }}>
-        Em até {cfg.timeout_value ?? 0} {cfg.timeout_unit ?? "dias"} via{" "}
+      <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
+        Em até {cfg.timeout_value ?? 0} {unitLabel[cfg.timeout_unit ?? "days"] ?? "dias"} via{" "}
         {scopeLabel[cfg.scope ?? "any_channel"]}
       </div>
-      <div style={{ display: "flex", borderTop: `1px solid ${COLORS.border}` }}>
+      <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div
           style={{
-            flex: 1,
-            textAlign: "center",
-            padding: "6px 0",
-            fontSize: 11,
-            fontWeight: 600,
-            color: COLORS.yes,
-            borderRight: `1px solid ${COLORS.border}`,
             position: "relative",
+            background: "#ecfdf5",
+            border: "1px solid #a7f3d0",
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#059669",
           }}
         >
           Sim
+          <Handle
+            type="source"
+            id="yes"
+            position={Position.Right}
+            style={{
+              top: "50%",
+              right: -6,
+              background: COLORS.yes,
+              border: "2px solid #fff",
+              width: 12,
+              height: 12,
+            }}
+          />
         </div>
         <div
           style={{
-            flex: 1,
-            textAlign: "center",
-            padding: "6px 0",
-            fontSize: 11,
-            fontWeight: 600,
-            color: COLORS.no,
             position: "relative",
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#dc2626",
           }}
         >
           Não
+          <Handle
+            type="source"
+            id="no"
+            position={Position.Right}
+            style={{
+              top: "50%",
+              right: -6,
+              background: COLORS.no,
+              border: "2px solid #fff",
+              width: 12,
+              height: 12,
+            }}
+          />
         </div>
       </div>
-      <Handle
-        type="source"
-        id="yes"
-        position={Position.Right}
-        style={{ top: "75%", background: COLORS.yes }}
-      />
-      <Handle
-        type="source"
-        id="no"
-        position={Position.Right}
-        style={{ top: "92%", background: COLORS.no }}
-      />
     </NodeShell>
   );
 }
