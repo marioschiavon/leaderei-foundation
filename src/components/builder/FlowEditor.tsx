@@ -350,16 +350,7 @@ const nodeTypes = {
 // Page
 // ---------------------------------------------------------------------------
 
-function BuilderEditorPage() {
-  return (
-    <ReactFlowProvider>
-      <BuilderEditorInner />
-    </ReactFlowProvider>
-  );
-}
-
-function BuilderEditorInner() {
-  const { documentId } = Route.useParams();
+function BuilderEditorInner({ documentId }: { documentId: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchFn = useServerFn(getBuilderDocument);
