@@ -69,6 +69,7 @@ import {
 } from "@/lib/builder.functions";
 
 export const Route = createFileRoute("/_app/dashboard/builder/$documentId")({
+  ssr: false,
   component: BuilderEditorPage,
 });
 
