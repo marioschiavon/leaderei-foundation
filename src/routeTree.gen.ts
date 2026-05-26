@@ -30,7 +30,7 @@ import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.l
 import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dashboard.integrations'
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
-import { Route as AppDashboardBuilderRouteImport } from './routes/_app.dashboard.builder'
+import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
@@ -138,16 +138,17 @@ const AppDashboardCampaignsRoute = AppDashboardCampaignsRouteImport.update({
   path: '/campaigns',
   getParentRoute: () => AppDashboardRoute,
 } as any)
-const AppDashboardBuilderRoute = AppDashboardBuilderRouteImport.update({
-  id: '/builder',
-  path: '/builder',
-  getParentRoute: () => AppDashboardRoute,
-} as any)
+const AppDashboardBuilderIndexRoute =
+  AppDashboardBuilderIndexRouteImport.update({
+    id: '/builder/',
+    path: '/builder/',
+    getParentRoute: () => AppDashboardRoute,
+  } as any)
 const AppDashboardBuilderDocumentIdRoute =
   AppDashboardBuilderDocumentIdRouteImport.update({
-    id: '/$documentId',
-    path: '/$documentId',
-    getParentRoute: () => AppDashboardBuilderRoute,
+    id: '/builder/$documentId',
+    path: '/builder/$documentId',
+    getParentRoute: () => AppDashboardRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -157,7 +158,6 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
-  '/dashboard/builder': typeof AppDashboardBuilderRouteWithChildren
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
@@ -172,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/master/': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -179,7 +180,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/dashboard/builder': typeof AppDashboardBuilderRouteWithChildren
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
@@ -194,6 +194,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/master': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -205,7 +206,6 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
-  '/_app/dashboard/builder': typeof AppDashboardBuilderRouteWithChildren
   '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
   '/_app/dashboard/integrations': typeof AppDashboardIntegrationsRoute
@@ -220,6 +220,7 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_master/master/': typeof MasterMasterIndexRoute
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -230,7 +231,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/invite/$token'
-    | '/dashboard/builder'
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
     | '/dashboard/integrations'
@@ -245,6 +245,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/master/'
     | '/dashboard/builder/$documentId'
+    | '/dashboard/builder/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -252,7 +253,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/invite/$token'
-    | '/dashboard/builder'
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
     | '/dashboard/integrations'
@@ -267,6 +267,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/master'
     | '/dashboard/builder/$documentId'
+    | '/dashboard/builder'
   id:
     | '__root__'
     | '/'
@@ -277,7 +278,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/dashboard'
     | '/invite/$token'
-    | '/_app/dashboard/builder'
     | '/_app/dashboard/campaigns'
     | '/_app/dashboard/inbox'
     | '/_app/dashboard/integrations'
@@ -292,6 +292,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_master/master/'
     | '/_app/dashboard/builder/$documentId'
+    | '/_app/dashboard/builder/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -453,36 +454,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardCampaignsRouteImport
       parentRoute: typeof AppDashboardRoute
     }
-    '/_app/dashboard/builder': {
-      id: '/_app/dashboard/builder'
+    '/_app/dashboard/builder/': {
+      id: '/_app/dashboard/builder/'
       path: '/builder'
-      fullPath: '/dashboard/builder'
-      preLoaderRoute: typeof AppDashboardBuilderRouteImport
+      fullPath: '/dashboard/builder/'
+      preLoaderRoute: typeof AppDashboardBuilderIndexRouteImport
       parentRoute: typeof AppDashboardRoute
     }
     '/_app/dashboard/builder/$documentId': {
       id: '/_app/dashboard/builder/$documentId'
-      path: '/$documentId'
+      path: '/builder/$documentId'
       fullPath: '/dashboard/builder/$documentId'
       preLoaderRoute: typeof AppDashboardBuilderDocumentIdRouteImport
-      parentRoute: typeof AppDashboardBuilderRoute
+      parentRoute: typeof AppDashboardRoute
     }
   }
 }
 
-interface AppDashboardBuilderRouteChildren {
-  AppDashboardBuilderDocumentIdRoute: typeof AppDashboardBuilderDocumentIdRoute
-}
-
-const AppDashboardBuilderRouteChildren: AppDashboardBuilderRouteChildren = {
-  AppDashboardBuilderDocumentIdRoute: AppDashboardBuilderDocumentIdRoute,
-}
-
-const AppDashboardBuilderRouteWithChildren =
-  AppDashboardBuilderRoute._addFileChildren(AppDashboardBuilderRouteChildren)
-
 interface AppDashboardRouteChildren {
-  AppDashboardBuilderRoute: typeof AppDashboardBuilderRouteWithChildren
   AppDashboardCampaignsRoute: typeof AppDashboardCampaignsRoute
   AppDashboardInboxRoute: typeof AppDashboardInboxRoute
   AppDashboardIntegrationsRoute: typeof AppDashboardIntegrationsRoute
@@ -490,10 +479,11 @@ interface AppDashboardRouteChildren {
   AppDashboardPipelineRoute: typeof AppDashboardPipelineRoute
   AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
+  AppDashboardBuilderDocumentIdRoute: typeof AppDashboardBuilderDocumentIdRoute
+  AppDashboardBuilderIndexRoute: typeof AppDashboardBuilderIndexRoute
 }
 
 const AppDashboardRouteChildren: AppDashboardRouteChildren = {
-  AppDashboardBuilderRoute: AppDashboardBuilderRouteWithChildren,
   AppDashboardCampaignsRoute: AppDashboardCampaignsRoute,
   AppDashboardInboxRoute: AppDashboardInboxRoute,
   AppDashboardIntegrationsRoute: AppDashboardIntegrationsRoute,
@@ -501,6 +491,8 @@ const AppDashboardRouteChildren: AppDashboardRouteChildren = {
   AppDashboardPipelineRoute: AppDashboardPipelineRoute,
   AppDashboardSettingsRoute: AppDashboardSettingsRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
+  AppDashboardBuilderDocumentIdRoute: AppDashboardBuilderDocumentIdRoute,
+  AppDashboardBuilderIndexRoute: AppDashboardBuilderIndexRoute,
 }
 
 const AppDashboardRouteWithChildren = AppDashboardRoute._addFileChildren(
@@ -550,3 +542,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
