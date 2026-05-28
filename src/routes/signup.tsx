@@ -40,7 +40,7 @@ function SignupPage() {
   const slug = slugify(orgName);
 
   async function onSubmit(e: React.FormEvent) {
-  async function onSubmit(e: React.FormEvent) {
+
     e.preventDefault();
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
