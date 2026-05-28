@@ -522,8 +522,45 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
       e.preventDefault();
       const type = e.dataTransfer.getData("application/step-type") as StepType;
       if (!type) return;
-      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      const dropPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const id = newId();
+
+      // First node ever → entry, no auto-link
+      if (nodes.length === 0) {
+        const node: StepNode = {
+          id,
+          type,
+          position: dropPos,
+          data: { config: { ...DEFAULT_CONFIG[type] }, is_entry: true },
+        };
+        setNodes([node]);
+        setSelectedId(id);
+        markDirty();
+        return;
+      }
+
+      // Identify last added node (last in sorted array)
+      const last = nodes[nodes.length - 1];
+      const outgoingFromLast = edges.filter((ed) => ed.source === last.id);
+      let autoBranch: "next" | "yes" | "no" | null = null;
+
+      if (last.type === "condition_replied") {
+        const usedBranches = new Set(
+          outgoingFromLast.map((ed) => (ed.sourceHandle as string) ?? "next"),
+        );
+        const yesUsed = usedBranches.has("yes");
+        const noUsed = usedBranches.has("no");
+        if (!yesUsed) autoBranch = "yes";
+        else if (!noUsed) autoBranch = "no";
+        else autoBranch = null; // both occupied
+      } else {
+        autoBranch = outgoingFromLast.length === 0 ? "next" : null;
+      }
+
+      const position = autoBranch
+        ? { x: last.position.x + 280, y: last.position.y }
+        : dropPos;
+
       const node: StepNode = {
         id,
         type,
@@ -531,11 +568,41 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         data: { config: { ...DEFAULT_CONFIG[type] }, is_entry: false },
       };
       setNodes((nds) => [...nds, node]);
+
+      if (autoBranch) {
+        const branch = autoBranch;
+        const newEdge: Edge = {
+          id: newId(),
+          source: last.id,
+          target: id,
+          sourceHandle: branch === "next" ? null : branch,
+          type: "smoothstep",
+          label: branch === "yes" ? "Sim" : branch === "no" ? "Não" : undefined,
+          style: {
+            stroke:
+              branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
+            strokeWidth: 2,
+          },
+          labelStyle: {
+            fill:
+              branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
+            fontWeight: 600,
+          },
+        };
+        setEdges((eds) => [...eds, newEdge]);
+
+        // Fit view on the last node + new node
+        setTimeout(() => {
+          fitView({ nodes: [{ id: last.id }, { id }], duration: 400, padding: 0.4 });
+        }, 50);
+      }
+
       setSelectedId(id);
       markDirty();
     },
-    [screenToFlowPosition, setNodes, markDirty],
+    [screenToFlowPosition, setNodes, setEdges, markDirty, nodes, edges, fitView],
   );
+
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     setSelectedId(node.id);
