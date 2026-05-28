@@ -25,9 +25,16 @@ A Fase 1 está fechada. Restam para próximas fases:
 ## 1. Primeiros passos
 
 1. Crie sua conta em `/signup` ou entre em `/login`.
-2. Depois do login, você cai em `/dashboard`.
-3. Se não houver sessão, o sistema redireciona automaticamente para `/login`.
-4. A área `/master` aparece apenas para usuários com papel `master_admin`.
+2. **Confirmação de email está desabilitada no MVP** — após o signup, o usuário entra direto na plataforma sem precisar clicar em link de verificação. Para reativar futuramente: religar `Confirm email` nas configurações de Auth do Lovable Cloud (Auth → Email) e restaurar a tela de "verifique seu email" no `/signup`.
+3. No primeiro acesso, o usuário é levado para `/onboarding` — uma tela única de boas-vindas com 5 cards (Importar leads, Criar fluxos, Acompanhar painel, IA — em breve, Agendamento — em breve) e um botão "Começar a usar" que marca `profiles.onboarding_completed_at = now()` e leva para `/dashboard`.
+4. Logins subsequentes vão direto para `/dashboard`. A rota `/onboarding` continua acessível manualmente.
+5. Se não houver sessão, o sistema redireciona automaticamente para `/login`.
+6. A área `/master` aparece apenas para usuários com papel `master_admin`.
+
+### Builder — auto-link
+
+No Builder, ao arrastar um novo step (Email, Aguardar, Condição) da paleta para o canvas, o sistema **conecta automaticamente** o novo nó ao último nó adicionado, com `branch = next` (ou na primeira saída livre `yes`/`no` para Condições). O novo nó é posicionado 280px à direita do último. Quando o último nó já tem todas as saídas ocupadas — ou quando é uma Condição com `yes` e `no` ambos ocupados — o novo nó fica solto e o usuário conecta manualmente. A operação ainda exige clicar em "Salvar" para persistir.
+
 
 ## 2. Navegação
 

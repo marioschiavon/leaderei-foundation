@@ -49,3 +49,29 @@ Nenhum código cliente faz `supabase.from('user_roles').insert(...)` diretamente
 ## Escopo
 
 Apenas 1 migração SQL. Sem mudanças em código TypeScript. Os outros findings do painel (tokens de convite, hashes de api_keys, funções SECURITY DEFINER executáveis, bucket público) ficam fora desta rodada — posso tratar em seguida se quiser.
+---
+
+## Rodada — Onboarding + signup sem confirmação + auto-link Builder (28/05/2026)
+
+Critérios fechados:
+
+1. ✅ Signup auto-confirma email e redireciona pra `/onboarding`.
+2. ✅ Tela `/onboarding` com 5 cards (3 ativos + 2 "Em breve") e botão funcional.
+3. ✅ "Começar a usar" seta `onboarding_completed_at = now()` e leva pra `/dashboard`.
+4. ✅ Login subsequente NÃO mostra `/onboarding` (vai direto pra `/dashboard`).
+5. ✅ Rota `/onboarding` acessível manualmente após conclusão.
+6. ✅ Builder auto-conecta novo Email ao último nó.
+7. ✅ Sequência horizontal Email → Wait (position.x = last.x + 280).
+8. ✅ Auto-link em Condição com `yes` ocupado conecta em `no`.
+9. ✅ Condição com `yes` e `no` ocupados → nó solto.
+10. ✅ Save + F5 mantém conexões criadas pelo auto-link (mesmo caminho de save).
+11. ✅ Build passa.
+
+Mudanças:
+- Migration: `profiles.onboarding_completed_at timestamptz`.
+- Auth: `auto_confirm_email = true`.
+- Server fn: `markOnboardingCompleted` + `getMyContext` expõe `profile` e `onboardingCompleted`.
+- Rota nova: `/onboarding`.
+- `_app.tsx` redireciona pra `/onboarding` se `!onboardingCompleted`.
+- `signup.tsx` redireciona pra `/onboarding` quando `data.session` existe (fallback pra `/login` se confirmação for reativada).
+- `FlowEditor.tsx`: hidratação ordena steps por `created_at` ASC; `onDrop` implementa auto-link + `fitView`.

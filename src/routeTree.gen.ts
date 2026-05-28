@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as MasterRouteImport } from './routes/_master'
@@ -36,6 +37,11 @@ import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/invite/$token': typeof InviteTokenRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/_master': typeof MasterRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/signup'
     | '/dashboard'
     | '/invite/$token'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/signup'
     | '/invite/$token'
     | '/dashboard/campaigns'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/_master'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/signup'
     | '/_app/dashboard'
     | '/invite/$token'
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   MasterRoute: typeof MasterRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
 }
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -536,6 +556,7 @@ const rootRouteChildren: RootRouteChildren = {
   MasterRoute: MasterRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
 }
