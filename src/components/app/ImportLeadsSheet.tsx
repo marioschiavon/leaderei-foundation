@@ -455,13 +455,9 @@ export function ImportLeadsSheet({
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
                     Mapeie obrigatoriamente:{" "}
-                    <strong>
-                      {missingRequired
-                        .map((f) => DB_FIELDS.find((d) => d.value === f)?.label)
-                        .join(" e ")}
-                    </strong>
-                    .
+                    <strong>{missingRequired.join(" e ")}</strong>.
                   </span>
+
                 </div>
               )}
 
