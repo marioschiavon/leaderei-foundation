@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Navigate, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user, loading } = useAuthSession();
+  const location = useLocation();
   const fetchContext = useServerFn(getMyContext);
   const { data: ctx, isLoading: ctxLoading } = useQuery({
     enabled: !!user,
@@ -46,6 +47,10 @@ function AppLayout() {
     return <Navigate to="/login" search={{ reason: "inactive" }} replace />;
   }
 
+  if (ctx && !ctx.onboardingCompleted && !location.pathname.startsWith("/onboarding")) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
@@ -60,3 +65,4 @@ function AppLayout() {
     </SidebarProvider>
   );
 }
+
