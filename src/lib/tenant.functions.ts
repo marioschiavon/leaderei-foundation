@@ -512,12 +512,15 @@ export const importLeads = createServerFn({ method: "POST" })
     });
 
     let created = 0;
+    let created = 0;
     if (toInsert.length > 0) {
       const { error, count } = await context.supabase
         .from("leads")
-        .insert(toInsert, { count: "exact" });
+        .insert(toInsert as never, { count: "exact" });
       if (error) throw new Error(error.message);
       created = count ?? toInsert.length;
+    }
+
     }
 
     return {
