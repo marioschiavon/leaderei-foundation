@@ -479,11 +479,10 @@ export function ImportLeadsSheet({
                           <td className="px-3 py-2 align-top text-xs text-muted-foreground">
                             {sampleFor(h) || <span className="italic">—</span>}
                           </td>
-                          <td className="px-3 py-2 align-top">
                             <Select
                               value={current}
                               onValueChange={(v) =>
-                                setMapping((m) => ({ ...m, [h]: v as DbField | typeof IGNORE }))
+                                setMapping((m) => ({ ...m, [h]: v as DbField | typeof IGNORE | typeof OTHER }))
                               }
                             >
                               <SelectTrigger className="h-8">
@@ -491,6 +490,9 @@ export function ImportLeadsSheet({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value={IGNORE}>Ignorar</SelectItem>
+                                <SelectItem value={OTHER}>
+                                  Outro campo (guardar como enriquecimento)
+                                </SelectItem>
                                 {DB_FIELDS.map((f) => {
                                   const taken = usedFields.has(f.value) && current !== f.value;
                                   return (
@@ -502,8 +504,7 @@ export function ImportLeadsSheet({
                                       {f.label}
                                       {f.required ? " *" : ""}
                                       {taken ? " (em uso)" : ""}
-                                    </SelectItem>
-                                  );
+
                                 })}
                               </SelectContent>
                             </Select>
