@@ -393,7 +393,8 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
   const [editingName, setEditingName] = useState(false);
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+
 
   // Hydrate from server
   useEffect(() => {
