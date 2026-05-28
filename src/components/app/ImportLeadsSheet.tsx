@@ -159,7 +159,8 @@ export function ImportLeadsSheet({
   const [headerNotices, setHeaderNotices] = useState<string[]>([]);
   const [encodingError, setEncodingError] = useState(false);
   const [delimiterWarning, setDelimiterWarning] = useState(false);
-  const [mapping, setMapping] = useState<Record<string, DbField | typeof IGNORE>>({});
+  const [mapping, setMapping] = useState<Record<string, DbField | typeof IGNORE | typeof OTHER>>({});
+
   const [sourceId, setSourceId] = useState<string>("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [parsing, setParsing] = useState(false);
