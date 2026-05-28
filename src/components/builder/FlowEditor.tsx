@@ -418,7 +418,7 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
       })) as StepNode[],
     );
 
-    );
+
     setEdges(
       srvTr.map((t) => ({
         id: t.id,
