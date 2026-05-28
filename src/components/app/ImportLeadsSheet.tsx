@@ -43,57 +43,102 @@ type ImportResult = {
 };
 
 const IGNORE = "__ignore" as const;
+const OTHER = "__other" as const;
+
 
 type DbField =
   | "full_name"
+  | "first_name"
+  | "last_name"
   | "email"
+  | "secondary_email"
+  | "personal_email"
   | "phone"
+  | "mobile_phone"
+  | "corporate_phone"
   | "company_name"
   | "job_title"
-  | "linkedin_url"
+  | "seniority"
+  | "department"
+  | "industry"
+  | "employee_count"
   | "website_url"
+  | "linkedin_url"
   | "city"
+  | "state"
   | "country"
   | "tags";
 
 type DbFieldDef = { value: DbField; label: string; required?: boolean };
 const DB_FIELDS: DbFieldDef[] = [
   { value: "full_name", label: "Nome completo", required: true },
+  { value: "first_name", label: "Primeiro nome" },
+  { value: "last_name", label: "Sobrenome" },
   { value: "email", label: "Email", required: true },
+  { value: "secondary_email", label: "Email secundário" },
+  { value: "personal_email", label: "Email pessoal" },
   { value: "phone", label: "Telefone" },
+  { value: "mobile_phone", label: "Celular / mobile" },
+  { value: "corporate_phone", label: "Telefone corporativo" },
   { value: "company_name", label: "Empresa" },
   { value: "job_title", label: "Cargo" },
-  { value: "linkedin_url", label: "LinkedIn" },
+  { value: "seniority", label: "Senioridade" },
+  { value: "department", label: "Departamento" },
+  { value: "industry", label: "Setor / Indústria" },
+  { value: "employee_count", label: "Nº funcionários" },
   { value: "website_url", label: "Website" },
+  { value: "linkedin_url", label: "LinkedIn" },
   { value: "city", label: "Cidade" },
+  { value: "state", label: "Estado" },
   { value: "country", label: "País" },
   { value: "tags", label: "Tags (separadas por , ou ;)" },
 ];
 
-const REQUIRED: DbField[] = ["full_name", "email"];
+// Email-ish row matches one of {full_name, email}; full_name OR (first_name+last_name) satisfies it.
+const REQUIRED_LOGICAL = ["name", "email"] as const;
 
 const norm = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_]+/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+// Specificity-ordered: more specific fields tested first so generic "phone"/"email" don't capture them.
+const FIELD_PATTERNS: Array<{ field: DbField; test: (n: string) => boolean }> = [
+  { field: "first_name", test: (n) => /\b(first name|primeiro nome|firstname)\b/.test(n) },
+  { field: "last_name", test: (n) => /\b(last name|sobrenome|surname|lastname)\b/.test(n) },
+  { field: "secondary_email", test: (n) => /\b(secondary email|email 2|email secundario|alt email|alternative email)\b/.test(n) },
+  { field: "personal_email", test: (n) => /\b(personal email|email pessoal|private email)\b/.test(n) },
+  { field: "mobile_phone", test: (n) => /\b(mobile phone|mobile|cell phone|celular|phone mobile)\b/.test(n) },
+  { field: "corporate_phone", test: (n) => /\b(corporate phone|company phone|office phone|work direct phone|work phone|telefone empresa|direct phone)\b/.test(n) },
+  { field: "employee_count", test: (n) => /(employees|employee count|headcount|company size|tamanho empresa|funcionarios|# employees|num employees|n funcionarios)/.test(n) },
+  { field: "linkedin_url", test: (n) => /linkedin/.test(n) },
+  { field: "website_url", test: (n) => /\b(website|site|url|web|company website|site empresa)\b/.test(n) },
+  { field: "industry", test: (n) => /\b(industry|setor|industria|segmento|segment)\b/.test(n) },
+  { field: "seniority", test: (n) => /\b(seniority|senioridade|seniority level|nivel|seniority lv)\b/.test(n) },
+  { field: "department", test: (n) => /\b(department|departamento|area)\b/.test(n) },
+  { field: "job_title", test: (n) => /\b(cargo|job title|title|posicao|role|position)\b/.test(n) },
+  { field: "company_name", test: (n) => /\b(company name|company|empresa|organization|organizacao|conta|account)\b/.test(n) },
+  { field: "city", test: (n) => /\b(city|cidade|city name)\b/.test(n) },
+  { field: "state", test: (n) => /\b(state|estado|state province|uf)\b/.test(n) },
+  { field: "country", test: (n) => /\b(country|pais)\b/.test(n) },
+  { field: "tags", test: (n) => /\b(tags|tag|etiquetas|labels|label)\b/.test(n) },
+  { field: "email", test: (n) => /(\bemail\b|\bmail\b|email address|email principal|work email|e mail)/.test(n) },
+  { field: "phone", test: (n) => /\b(phone|telefone|phone number|whatsapp|tel)\b/.test(n) },
+  { field: "full_name", test: (n) => /\b(full name|nome completo|contact name|person name|nome|name|contato|contact)\b/.test(n) },
+];
+
 function suggest(header: string): DbField | typeof IGNORE {
   const n = norm(header);
-  if (/\b(nome completo|full name|fullname|nome|name)\b/.test(n)) return "full_name";
-  if (/\b(e ?mail|mail)\b/.test(n)) return "email";
-  if (/\b(telefone|phone|celular|whatsapp|mobile|tel)\b/.test(n)) return "phone";
-  if (/\b(empresa|company|organizacao|organization)\b/.test(n)) return "company_name";
-  if (/\b(cargo|job|titulo|position|role)\b/.test(n)) return "job_title";
-  if (/linkedin/.test(n)) return "linkedin_url";
-  if (/\b(site|website|url|web)\b/.test(n)) return "website_url";
-  if (/\b(cidade|city)\b/.test(n)) return "city";
-  if (/\b(pais|country)\b/.test(n)) return "country";
-  if (/\b(tags?|etiquetas?)\b/.test(n)) return "tags";
+  for (const { field, test } of FIELD_PATTERNS) {
+    if (test(n)) return field;
+  }
   return IGNORE;
 }
+
 
 export function ImportLeadsSheet({
   open,
@@ -114,7 +159,8 @@ export function ImportLeadsSheet({
   const [headerNotices, setHeaderNotices] = useState<string[]>([]);
   const [encodingError, setEncodingError] = useState(false);
   const [delimiterWarning, setDelimiterWarning] = useState(false);
-  const [mapping, setMapping] = useState<Record<string, DbField | typeof IGNORE>>({});
+  const [mapping, setMapping] = useState<Record<string, DbField | typeof IGNORE | typeof OTHER>>({});
+
   const [sourceId, setSourceId] = useState<string>("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -232,14 +278,19 @@ export function ImportLeadsSheet({
     reader.readAsText(file, "utf-8");
   };
 
-
   const usedFields = useMemo(() => {
     const s = new Set<DbField>();
-    Object.values(mapping).forEach((v) => v !== IGNORE && s.add(v));
+    Object.values(mapping).forEach((v) => {
+      if (v !== IGNORE && v !== OTHER) s.add(v as DbField);
+    });
     return s;
   }, [mapping]);
 
-  const missingRequired = REQUIRED.filter((f) => !usedFields.has(f));
+  const hasName = usedFields.has("full_name") || (usedFields.has("first_name") && usedFields.has("last_name"));
+  const hasEmail = usedFields.has("email");
+  const missingRequired: string[] = [];
+  if (!hasName) missingRequired.push("Nome completo (ou Primeiro + Sobrenome)");
+  if (!hasEmail) missingRequired.push("Email");
 
   const normalizedRows = useMemo(() => {
     return rows.map((r) => {
@@ -249,7 +300,11 @@ export function ImportLeadsSheet({
         const raw = r[csvCol];
         const v = raw == null ? "" : String(raw).trim();
         if (!v) continue;
-        if (dbField === "tags") {
+        if (dbField === OTHER) {
+          // Send under normalized header key; server stashes anything unknown into enrichment_data
+          const key = norm(csvCol).replace(/\s+/g, "_") || csvCol;
+          out[key] = v;
+        } else if (dbField === "tags") {
           out[dbField] = v.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
         } else {
           out[dbField] = v;
@@ -258,6 +313,8 @@ export function ImportLeadsSheet({
       return out;
     });
   }, [rows, mapping]);
+
+
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -398,13 +455,9 @@ export function ImportLeadsSheet({
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
                     Mapeie obrigatoriamente:{" "}
-                    <strong>
-                      {missingRequired
-                        .map((f) => DB_FIELDS.find((d) => d.value === f)?.label)
-                        .join(" e ")}
-                    </strong>
-                    .
+                    <strong>{missingRequired.join(" e ")}</strong>.
                   </span>
+
                 </div>
               )}
 
@@ -428,9 +481,10 @@ export function ImportLeadsSheet({
                           </td>
                           <td className="px-3 py-2 align-top">
                             <Select
+
                               value={current}
                               onValueChange={(v) =>
-                                setMapping((m) => ({ ...m, [h]: v as DbField | typeof IGNORE }))
+                                setMapping((m) => ({ ...m, [h]: v as DbField | typeof IGNORE | typeof OTHER }))
                               }
                             >
                               <SelectTrigger className="h-8">
@@ -438,6 +492,9 @@ export function ImportLeadsSheet({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value={IGNORE}>Ignorar</SelectItem>
+                                <SelectItem value={OTHER}>
+                                  Outro campo (guardar como enriquecimento)
+                                </SelectItem>
                                 {DB_FIELDS.map((f) => {
                                   const taken = usedFields.has(f.value) && current !== f.value;
                                   return (
@@ -452,6 +509,7 @@ export function ImportLeadsSheet({
                                     </SelectItem>
                                   );
                                 })}
+
                               </SelectContent>
                             </Select>
                           </td>

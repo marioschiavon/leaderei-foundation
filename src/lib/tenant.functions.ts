@@ -364,28 +364,72 @@ export const archiveLead = createServerFn({ method: "POST" })
   });
 
 // -------- Lead import (CSV) --------
-const ImportLeadRowSchema = z.object({
-  full_name: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(255),
-  phone: z.string().trim().max(40).nullable().optional(),
-  company_name: z.string().trim().max(160).nullable().optional(),
-  job_title: z.string().trim().max(160).nullable().optional(),
-});
+const KNOWN_LEAD_FIELDS = [
+  "full_name",
+  "first_name",
+  "last_name",
+  "email",
+  "secondary_email",
+  "personal_email",
+  "phone",
+  "mobile_phone",
+  "corporate_phone",
+  "company_name",
+  "job_title",
+  "seniority",
+  "department",
+  "industry",
+  "employee_count",
+  "website_url",
+  "linkedin_url",
+  "city",
+  "state",
+  "country",
+  "tags",
+] as const;
+
+type KnownLeadField = (typeof KNOWN_LEAD_FIELDS)[number];
+
+const ImportLeadCellSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()),
+]);
 
 const ImportLeadsSchema = z.object({
-  rows: z.array(z.record(z.string(), z.string().nullable().optional())).min(1).max(2000),
+  rows: z
+    .array(z.record(z.string(), ImportLeadCellSchema.optional()))
+    .min(1)
+    .max(2000),
   source_id: z.string().uuid().nullable().optional(),
 });
 
-function pickCol(
-  row: Record<string, string | null | undefined>,
-  keys: string[],
-): string | null {
-  for (const k of keys) {
-    const v = row[k];
-    if (v != null && String(v).trim() !== "") return String(v).trim();
+function asString(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.join(", ");
+  return String(v).trim();
+}
+
+function normalizeUrl(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  const candidate = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const u = new URL(candidate);
+    if (!u.hostname.includes(".")) return null;
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return null;
   }
-  return null;
+}
+
+function parseEmployeeCount(raw: string): number | null {
+  const m = raw.match(/\d[\d.,]*/);
+  if (!m) return null;
+  const n = parseInt(m[0].replace(/[.,]/g, ""), 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 export const importLeads = createServerFn({ method: "POST" })
@@ -395,52 +439,87 @@ export const importLeads = createServerFn({ method: "POST" })
     const organization_id = await getActiveOrgId(context.supabase, context.userId);
 
     const errors: Array<{ row: number; message: string }> = [];
-    const valid: Array<z.infer<typeof ImportLeadRowSchema>> = [];
+    const toInsert: Array<Record<string, unknown>> = [];
 
     data.rows.forEach((raw, idx) => {
-      const normalized: Record<string, string | null> = {};
-      for (const k of Object.keys(raw)) {
-        normalized[k.toLowerCase().trim()] = (raw[k] ?? null) as string | null;
-      }
-      const candidate = {
-        full_name: pickCol(normalized, ["full_name", "name", "nome", "nome completo"]),
-        email: pickCol(normalized, ["email", "e-mail"]),
-        phone: pickCol(normalized, ["phone", "telefone", "celular"]),
-        company_name: pickCol(normalized, ["company_name", "company", "empresa"]),
-        job_title: pickCol(normalized, ["job_title", "cargo", "title"]),
-      };
-      const parsed = ImportLeadRowSchema.safeParse(candidate);
-      if (!parsed.success) {
-        errors.push({
-          row: idx + 2,
-          message: parsed.error.issues[0]?.message ?? "Linha inválida",
-        });
+      const rowNum = idx + 2;
+      const get = (k: string) => asString(raw[k as keyof typeof raw]);
+
+      // Compose full_name from first/last if needed
+      let full_name = get("full_name");
+      const first = get("first_name");
+      const last = get("last_name");
+      if (!full_name) full_name = [first, last].filter(Boolean).join(" ").trim();
+
+      const email = get("email").toLowerCase();
+      const parsedEmail = z.string().email().safeParse(email);
+      if (!full_name || full_name.length < 1) {
+        errors.push({ row: rowNum, message: "Nome ausente" });
         return;
       }
-      valid.push(parsed.data);
+      if (!parsedEmail.success) {
+        errors.push({ row: rowNum, message: "Email inválido ou ausente" });
+        return;
+      }
+
+      const websiteRaw = get("website_url");
+      const linkedinRaw = get("linkedin_url");
+      const employeeRaw = get("employee_count");
+
+      // tags: accept array or delimited string
+      const tagsRaw = raw["tags" as keyof typeof raw];
+      let tags: string[] = [];
+      if (Array.isArray(tagsRaw)) tags = tagsRaw.map(String).map((t) => t.trim()).filter(Boolean);
+      else if (typeof tagsRaw === "string")
+        tags = tagsRaw.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
+
+      // enrichment_data: any key not in KNOWN_LEAD_FIELDS
+      const enrichment_data: Record<string, unknown> = {};
+      for (const k of Object.keys(raw)) {
+        if ((KNOWN_LEAD_FIELDS as readonly string[]).includes(k)) continue;
+        const v = raw[k as keyof typeof raw];
+        if (v == null || v === "") continue;
+        enrichment_data[k] = v;
+      }
+
+      const row: Record<string, unknown> = {
+        organization_id,
+        full_name: full_name.slice(0, 120),
+        email: email.slice(0, 255),
+        phone: get("phone") || null,
+        mobile_phone: get("mobile_phone") || null,
+        corporate_phone: get("corporate_phone") || null,
+        secondary_email: get("secondary_email").toLowerCase() || null,
+        personal_email: get("personal_email").toLowerCase() || null,
+        company_name: get("company_name") || null,
+        job_title: get("job_title") || null,
+        seniority: get("seniority") || null,
+        department: get("department") || null,
+        industry: get("industry") || null,
+        employee_count: employeeRaw ? parseEmployeeCount(employeeRaw) : null,
+        website_url: websiteRaw ? normalizeUrl(websiteRaw) : null,
+        linkedin_url: linkedinRaw ? normalizeUrl(linkedinRaw) : null,
+        city: get("city") || null,
+        state: get("state") || null,
+        country: get("country") || null,
+        tags,
+        enrichment_data,
+        source_id: data.source_id ?? null,
+        status: "new" as const,
+        created_by: context.userId,
+      };
+      toInsert.push(row);
     });
 
     let created = 0;
-    if (valid.length > 0) {
+    if (toInsert.length > 0) {
       const { error, count } = await context.supabase
         .from("leads")
-        .insert(
-          valid.map((v) => ({
-            organization_id,
-            full_name: v.full_name,
-            email: v.email,
-            phone: v.phone ?? null,
-            company_name: v.company_name ?? null,
-            job_title: v.job_title ?? null,
-            source_id: data.source_id ?? null,
-            status: "new" as const,
-            created_by: context.userId,
-          })),
-          { count: "exact" },
-        );
+        .insert(toInsert as never, { count: "exact" });
       if (error) throw new Error(error.message);
-      created = count ?? valid.length;
+      created = count ?? toInsert.length;
     }
+
 
     return {
       received: data.rows.length,
@@ -449,6 +528,10 @@ export const importLeads = createServerFn({ method: "POST" })
       errors: errors.slice(0, 25),
     };
   });
+
+// Re-export type so the importer UI can stay in sync.
+export type ImportableLeadField = KnownLeadField;
+
 
 // -------- Campaigns CRUD --------
 const CAMPAIGN_CHANNELS = ["email", "whatsapp", "linkedin", "sms", "multi"] as const;
