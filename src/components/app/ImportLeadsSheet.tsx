@@ -479,7 +479,9 @@ export function ImportLeadsSheet({
                           <td className="px-3 py-2 align-top text-xs text-muted-foreground">
                             {sampleFor(h) || <span className="italic">—</span>}
                           </td>
+                          <td className="px-3 py-2 align-top">
                             <Select
+
                               value={current}
                               onValueChange={(v) =>
                                 setMapping((m) => ({ ...m, [h]: v as DbField | typeof IGNORE | typeof OTHER }))
