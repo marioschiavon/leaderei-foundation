@@ -504,8 +504,10 @@ export function ImportLeadsSheet({
                                       {f.label}
                                       {f.required ? " *" : ""}
                                       {taken ? " (em uso)" : ""}
-
+                                    </SelectItem>
+                                  );
                                 })}
+
                               </SelectContent>
                             </Select>
                           </td>
