@@ -40,9 +40,10 @@ function SignupPage() {
   const slug = slugify(orgName);
 
   async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -55,8 +56,14 @@ function SignupPage() {
       toast.error(error.message);
       return;
     }
-    toast.success("Conta criada. Confirme seu email para entrar.");
-    navigate({ to: "/login" });
+    if (data.session) {
+      toast.success("Conta criada!");
+      navigate({ to: "/onboarding" });
+    } else {
+      // Fallback: if confirmation is ever re-enabled
+      toast.success("Conta criada. Confirme seu email para entrar.");
+      navigate({ to: "/login" });
+    }
   }
 
   return (
