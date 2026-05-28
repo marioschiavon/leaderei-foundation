@@ -953,9 +953,19 @@ function formatRelative(d: Date) {
 const EMAIL_VARS = [
   "{{ lead.full_name }}",
   "{{ lead.first_name }}",
+  "{{ lead.email }}",
   "{{ lead.company_name }}",
+  "{{ lead.job_title }}",
+  "{{ lead.industry }}",
+  "{{ lead.seniority }}",
+  "{{ lead.department }}",
+  "{{ lead.website_url }}",
+  "{{ lead.linkedin_url }}",
+  "{{ lead.city }}",
+  "{{ lead.country }}",
   "{{ org.name }}",
 ];
+
 
 function ConfigPanel({
   node,
