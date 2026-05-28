@@ -404,14 +404,20 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
     const srvTr = (data as any).transitions as any[];
     setDocName(doc.name);
     setStatus(doc.status);
-    setLastSavedAt(new Date(doc.updated_at));
+    const sortedSteps = [...srvSteps].sort((a, b) => {
+      const ta = new Date(a.created_at ?? 0).getTime();
+      const tb = new Date(b.created_at ?? 0).getTime();
+      return ta - tb;
+    });
     setNodes(
-      srvSteps.map((s) => ({
+      sortedSteps.map((s) => ({
         id: s.id,
         type: s.type,
         position: { x: s.position_x, y: s.position_y },
         data: { config: s.config ?? {}, is_entry: !!s.is_entry },
       })) as StepNode[],
+    );
+
     );
     setEdges(
       srvTr.map((t) => ({
