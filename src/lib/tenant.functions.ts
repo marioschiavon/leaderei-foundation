@@ -512,7 +512,6 @@ export const importLeads = createServerFn({ method: "POST" })
     });
 
     let created = 0;
-    let created = 0;
     if (toInsert.length > 0) {
       const { error, count } = await context.supabase
         .from("leads")
@@ -521,7 +520,6 @@ export const importLeads = createServerFn({ method: "POST" })
       created = count ?? toInsert.length;
     }
 
-    }
 
     return {
       received: data.rows.length,
