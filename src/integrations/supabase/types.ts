@@ -1190,24 +1190,34 @@ export type Database = {
           archived_at: string | null
           city: string | null
           company_name: string | null
+          corporate_phone: string | null
           country: string | null
           created_at: string
           created_by: string | null
           currency: string
           custom_fields: Json
+          department: string | null
           email: string | null
+          employee_count: number | null
+          enrichment_data: Json
           estimated_value: number | null
           full_name: string
           id: string
+          industry: string | null
           job_title: string | null
           last_contact_at: string | null
           linkedin_url: string | null
+          mobile_phone: string | null
           next_followup_at: string | null
           organization_id: string
           owner_user_id: string | null
+          personal_email: string | null
           phone: string | null
           score: number
+          secondary_email: string | null
+          seniority: string | null
           source_id: string | null
+          state: string | null
           status: Database["public"]["Enums"]["lead_status"]
           tags: string[]
           temperature: Database["public"]["Enums"]["lead_temperature"]
@@ -1218,24 +1228,34 @@ export type Database = {
           archived_at?: string | null
           city?: string | null
           company_name?: string | null
+          corporate_phone?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           custom_fields?: Json
+          department?: string | null
           email?: string | null
+          employee_count?: number | null
+          enrichment_data?: Json
           estimated_value?: number | null
           full_name: string
           id?: string
+          industry?: string | null
           job_title?: string | null
           last_contact_at?: string | null
           linkedin_url?: string | null
+          mobile_phone?: string | null
           next_followup_at?: string | null
           organization_id: string
           owner_user_id?: string | null
+          personal_email?: string | null
           phone?: string | null
           score?: number
+          secondary_email?: string | null
+          seniority?: string | null
           source_id?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           tags?: string[]
           temperature?: Database["public"]["Enums"]["lead_temperature"]
@@ -1246,24 +1266,34 @@ export type Database = {
           archived_at?: string | null
           city?: string | null
           company_name?: string | null
+          corporate_phone?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           custom_fields?: Json
+          department?: string | null
           email?: string | null
+          employee_count?: number | null
+          enrichment_data?: Json
           estimated_value?: number | null
           full_name?: string
           id?: string
+          industry?: string | null
           job_title?: string | null
           last_contact_at?: string | null
           linkedin_url?: string | null
+          mobile_phone?: string | null
           next_followup_at?: string | null
           organization_id?: string
           owner_user_id?: string | null
+          personal_email?: string | null
           phone?: string | null
           score?: number
+          secondary_email?: string | null
+          seniority?: string | null
           source_id?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           tags?: string[]
           temperature?: Database["public"]["Enums"]["lead_temperature"]
