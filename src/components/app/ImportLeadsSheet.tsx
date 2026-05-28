@@ -278,14 +278,19 @@ export function ImportLeadsSheet({
     reader.readAsText(file, "utf-8");
   };
 
-
   const usedFields = useMemo(() => {
     const s = new Set<DbField>();
-    Object.values(mapping).forEach((v) => v !== IGNORE && s.add(v));
+    Object.values(mapping).forEach((v) => {
+      if (v !== IGNORE && v !== OTHER) s.add(v as DbField);
+    });
     return s;
   }, [mapping]);
 
-  const missingRequired = REQUIRED.filter((f) => !usedFields.has(f));
+  const hasName = usedFields.has("full_name") || (usedFields.has("first_name") && usedFields.has("last_name"));
+  const hasEmail = usedFields.has("email");
+  const missingRequired: string[] = [];
+  if (!hasName) missingRequired.push("Nome completo (ou Primeiro + Sobrenome)");
+  if (!hasEmail) missingRequired.push("Email");
 
   const normalizedRows = useMemo(() => {
     return rows.map((r) => {
@@ -295,7 +300,11 @@ export function ImportLeadsSheet({
         const raw = r[csvCol];
         const v = raw == null ? "" : String(raw).trim();
         if (!v) continue;
-        if (dbField === "tags") {
+        if (dbField === OTHER) {
+          // Send under normalized header key; server stashes anything unknown into enrichment_data
+          const key = norm(csvCol).replace(/\s+/g, "_") || csvCol;
+          out[key] = v;
+        } else if (dbField === "tags") {
           out[dbField] = v.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
         } else {
           out[dbField] = v;
@@ -303,6 +312,8 @@ export function ImportLeadsSheet({
       }
       return out;
     });
+  }, [rows, mapping]);
+
   }, [rows, mapping]);
 
   const mutation = useMutation({
