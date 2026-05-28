@@ -314,7 +314,7 @@ export function ImportLeadsSheet({
     });
   }, [rows, mapping]);
 
-  }, [rows, mapping]);
+
 
   const mutation = useMutation({
     mutationFn: () =>
