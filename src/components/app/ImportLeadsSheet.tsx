@@ -38,8 +38,13 @@ type ParsedRow = Record<string, string | null | undefined>;
 type ImportResult = {
   received: number;
   created: number;
+  skipped: number;
+  errors: Array<{ row: number; message: string }>;
+};
+
 const IGNORE = "__ignore" as const;
 const OTHER = "__other" as const;
+
 
 type DbField =
   | "full_name"
