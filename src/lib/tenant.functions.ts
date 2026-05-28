@@ -49,7 +49,7 @@ export const getMyContext = createServerFn({ method: "GET" })
       .limit(1)
       .maybeSingle();
 
-    const [orgRes, rolesRes] = await Promise.all([
+    const [orgRes, rolesRes, profileRes] = await Promise.all([
       membership
         ? supabase
             .from("organizations")
@@ -58,6 +58,11 @@ export const getMyContext = createServerFn({ method: "GET" })
             .maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("user_roles").select("role").eq("user_id", userId),
+      supabase
+        .from("profiles")
+        .select("full_name, onboarding_completed_at")
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
 
     return {
@@ -65,8 +70,23 @@ export const getMyContext = createServerFn({ method: "GET" })
       organization: orgRes.data ?? null,
       role: membership?.role ?? null,
       isMaster: (rolesRes.data ?? []).some((r) => r.role === "master_admin"),
+      profile: profileRes.data ?? null,
+      onboardingCompleted: !!profileRes.data?.onboarding_completed_at,
     };
   });
+
+export const markOnboardingCompleted = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ onboarding_completed_at: new Date().toISOString() })
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
 export const getDashboardSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
