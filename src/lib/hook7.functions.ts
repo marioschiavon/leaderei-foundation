@@ -295,6 +295,9 @@ export const createHook7Instance = createServerFn({ method: "POST" })
     const ext_name = created?.data?.name ?? external_name;
     const token = created?.data?.token ?? suggestedToken;
     if (!ext_id || !token) throw new Error("Resposta inesperada do Hook7 ao criar instância.");
+    if (ext_name !== external_name) {
+      console.warn(`[hook7] external_name mismatch sent=${external_name} got=${ext_name} — using server truth`);
+    }
 
     // Resolve owner depending on mode
     let owner_user_id: string | null = null;
@@ -363,6 +366,7 @@ async function loadInstanceForAction(supabase: any, userId: string, instance_id:
   if (!token) throw new Error("Token da instância indisponível.");
   return { inst, token: token as string };
 }
+
 
 const IdSchema = z.object({ instance_id: z.string().uuid() });
 
