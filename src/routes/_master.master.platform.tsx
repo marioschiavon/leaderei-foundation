@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Send, Save, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Loader2, Send, Save, ShieldCheck, ShieldAlert, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,9 @@ import {
   getPlatformSettings, setPlatformResendKey, setPlatformPlain,
   sendTestEmail, listEmailSendLogs, uploadLogoFromDataUrl,
 } from "@/lib/platform.functions";
+import {
+  getHook7PlatformConfig, setHook7GlobalApiKey, setHook7BaseUrl,
+} from "@/lib/hook7.functions";
 import { useAuthSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/_master/master/platform")({
@@ -32,9 +35,82 @@ function PlatformPage() {
       </div>
 
       <ResendSection settings={settings} onSaved={() => { refetch(); qc.invalidateQueries({ queryKey: ["platform-settings"] }); }} defaultEmail={user?.email ?? ""} />
+      <Hook7Section />
       <BrandingSection settings={settings} onSaved={() => refetch()} />
       <LogsSection />
     </div>
+  );
+}
+
+function Hook7Section() {
+  const qc = useQueryClient();
+  const fetchCfg = useServerFn(getHook7PlatformConfig);
+  const saveKey = useServerFn(setHook7GlobalApiKey);
+  const saveUrl = useServerFn(setHook7BaseUrl);
+  const { data: cfg, isLoading } = useQuery({ queryKey: ["hook7-platform"], queryFn: () => fetchCfg() });
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+
+  const hasKey = !!cfg?.has_apikey;
+
+  const keyMut = useMutation({
+    mutationFn: (k: string) => saveKey({ data: { apiKey: k } }),
+    onSuccess: () => { toast.success("Chave Hook7 validada e salva."); setApiKey(""); qc.invalidateQueries({ queryKey: ["hook7-platform"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const urlMut = useMutation({
+    mutationFn: (u: string) => saveUrl({ data: { baseUrl: u } }),
+    onSuccess: () => { toast.success("URL base do Hook7 salva."); qc.invalidateQueries({ queryKey: ["hook7-platform"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <section className="rounded-xl border bg-surface p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display text-lg font-semibold flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" /> WhatsApp via Hook7
+          </h2>
+          <p className="text-sm text-muted-foreground">Chave global e endpoint usados por todas as organizações para criar e conectar instâncias.</p>
+        </div>
+        <Badge variant="secondary" className={hasKey ? "bg-emerald-500/10 text-emerald-700" : "bg-destructive/10 text-destructive"}>
+          {hasKey ? (<><ShieldCheck className="mr-1 h-3 w-3" />Configurado</>) : (<><ShieldAlert className="mr-1 h-3 w-3" />Não configurado</>)}
+        </Badge>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>URL base do Hook7</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder={cfg?.base_url ?? "https://api.hook7.com.br"}
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+            />
+            <Button disabled={!baseUrl || urlMut.isPending} onClick={() => urlMut.mutate(baseUrl)}>
+              {urlMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Atual: <span className="font-mono">{isLoading ? "…" : cfg?.base_url}</span></p>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Chave global (apikey)</Label>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder={hasKey ? "•••••••• (configurada)" : "Cole a apikey global do Hook7"}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            <Button disabled={!apiKey || keyMut.isPending} onClick={() => keyMut.mutate(apiKey)}>
+              {keyMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Ao salvar, validamos criando uma instância de teste e removendo em seguida.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 

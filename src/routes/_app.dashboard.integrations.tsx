@@ -20,6 +20,7 @@ import { listIntegrations } from "@/lib/tenant.functions";
 import {
   getOrgResendConnection, saveOrgResendConnection, disconnectOrgResend,
 } from "@/lib/integrations.functions";
+import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
 
 export const Route = createFileRoute("/_app/dashboard/integrations")({
   component: IntegrationsPage,
@@ -55,6 +56,7 @@ function IntegrationsPage() {
   const errorCount = integrations.filter((p) => p.connection?.status === "error").length;
 
   const [resendOpen, setResendOpen] = useState(false);
+  const [whatsAppOpen, setWhatsAppOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -102,6 +104,8 @@ function IntegrationsPage() {
                   ? new Date(provider.connection.last_synced_at).toLocaleString("pt-BR")
                   : null;
                 const isResend = provider.slug === "resend";
+                const isWhatsApp = provider.slug === "whatsapp";
+                const isInteractive = isResend || isWhatsApp;
 
                 return (
                   <div key={provider.id} className="flex flex-col rounded-xl border bg-surface p-5">
@@ -154,12 +158,15 @@ function IntegrationsPage() {
                       variant={status === "connected" ? "outline" : "default"}
                       size="sm"
                       className="w-full"
-                      disabled={!isResend && status !== "connected"}
-                      onClick={() => isResend && setResendOpen(true)}
-                      title={!isResend ? "Conexão guiada chega nas próximas fases." : undefined}
+                      disabled={!isInteractive && status !== "connected"}
+                      onClick={() => {
+                        if (isResend) setResendOpen(true);
+                        else if (isWhatsApp) setWhatsAppOpen(true);
+                      }}
+                      title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
-                      {status === "connected" ? "Gerenciar" : "Configurar"}
-                      {status !== "connected" && <ArrowRight className="h-3.5 w-3.5" />}
+                      {isWhatsApp ? "Gerenciar instâncias" : status === "connected" ? "Gerenciar" : "Configurar"}
+                      {!isWhatsApp && status !== "connected" && <ArrowRight className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
                 );
@@ -168,6 +175,7 @@ function IntegrationsPage() {
       )}
 
       <ResendConnectionDialog open={resendOpen} onOpenChange={setResendOpen} />
+      <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
     </div>
   );
 }

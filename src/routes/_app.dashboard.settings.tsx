@@ -33,6 +33,7 @@ import {
   inviteMember, sendInvitationEmail, updateMemberRole, removeMember, revokeInvitation,
   listApiKeys, createApiKey, revokeApiKey,
 } from "@/lib/settings.functions";
+import { getWhatsAppMode, updateWhatsAppMode } from "@/lib/hook7.functions";
 
 export const Route = createFileRoute("/_app/dashboard/settings")({
   component: SettingsPage,
@@ -50,6 +51,7 @@ function SettingsPage() {
         <TabsList>
           <TabsTrigger value="org">Organização</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           <TabsTrigger value="api">API keys</TabsTrigger>
           <TabsTrigger value="billing">Faturamento</TabsTrigger>
           <TabsTrigger value="prefs">Preferências</TabsTrigger>
@@ -57,6 +59,7 @@ function SettingsPage() {
 
         <TabsContent value="org" className="mt-6"><OrgTab isAdmin={!!isAdmin} /></TabsContent>
         <TabsContent value="members" className="mt-6"><MembersTab isAdmin={!!isAdmin} /></TabsContent>
+        <TabsContent value="whatsapp" className="mt-6"><WhatsAppTab isAdmin={!!isAdmin} /></TabsContent>
         <TabsContent value="api" className="mt-6"><ApiKeysTab isAdmin={!!isAdmin} /></TabsContent>
 
         <TabsContent value="billing" className="mt-6">
@@ -594,6 +597,69 @@ function ApiKeysTab({ isAdmin }: { isAdmin: boolean }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ============================ WHATSAPP TAB ============================
+function WhatsAppTab({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const fetchMode = useServerFn(getWhatsAppMode);
+  const saveMode = useServerFn(updateWhatsAppMode);
+  const { data, isLoading } = useQuery({ queryKey: ["whatsapp-mode"], queryFn: () => fetchMode() });
+  const [mode, setMode] = useState<"shared" | "per_user">("shared");
+  useEffect(() => { if (data?.mode) setMode(data.mode); }, [data]);
+
+  const mut = useMutation({
+    mutationFn: (m: "shared" | "per_user") => saveMode({ data: { mode: m } }),
+    onSuccess: () => { toast.success("Modo de WhatsApp atualizado."); qc.invalidateQueries({ queryKey: ["whatsapp-mode"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const dirty = !!data && data.mode !== mode;
+
+  if (isLoading) {
+    return <div className="rounded-xl border bg-surface p-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
+  }
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div className="rounded-xl border bg-surface p-6 space-y-5">
+        <div>
+          <h3 className="font-display text-lg font-semibold">Modo de uso do WhatsApp</h3>
+          <p className="text-sm text-muted-foreground">
+            Define se as instâncias do Hook7 são compartilhadas pela organização ou pertencem a cada usuário individualmente.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className={`cursor-pointer rounded-xl border p-4 transition ${mode === "shared" ? "border-brand bg-brand/5" : "bg-background"} ${!isAdmin ? "opacity-60" : ""}`}>
+            <input type="radio" name="wa-mode" className="sr-only" disabled={!isAdmin}
+              checked={mode === "shared"} onChange={() => setMode("shared")} />
+            <div className="font-medium">Compartilhado</div>
+            <p className="mt-1 text-xs text-muted-foreground">Todas as instâncias ficam disponíveis para qualquer membro da organização.</p>
+          </label>
+          <label className={`cursor-pointer rounded-xl border p-4 transition ${mode === "per_user" ? "border-brand bg-brand/5" : "bg-background"} ${!isAdmin ? "opacity-60" : ""}`}>
+            <input type="radio" name="wa-mode" className="sr-only" disabled={!isAdmin}
+              checked={mode === "per_user"} onChange={() => setMode("per_user")} />
+            <div className="font-medium">Por usuário</div>
+            <p className="mt-1 text-xs text-muted-foreground">Cada instância pertence a um usuário específico (definido na criação).</p>
+          </label>
+        </div>
+
+        <div className="flex justify-end">
+          <Button disabled={!isAdmin || !dirty || mut.isPending} onClick={() => mut.mutate(mode)}>
+            {mut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar modo
+          </Button>
+        </div>
+
+        {!isAdmin && <p className="text-xs text-muted-foreground">Apenas administradores podem alterar este modo.</p>}
+      </div>
+
+      <div className="rounded-xl border bg-surface p-6 text-sm text-muted-foreground">
+        Para criar e conectar instâncias do WhatsApp, abra a aba <span className="font-medium text-foreground">Integrações → WhatsApp → Gerenciar instâncias</span>.
+      </div>
     </div>
   );
 }
