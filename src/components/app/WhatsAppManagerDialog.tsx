@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -240,11 +240,16 @@ function ConnectFlowDialog({
   const [phone, setPhone] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number>(0);
   const [busy, setBusy] = useState(false);
+  // Guards against the polling interval firing after the user cancels (which
+  // archives the instance) — without this, the next status poll resolves to
+  // "Instância arquivada" and surfaces as a runtime error.
+  const cancelledRef = useRef(false);
 
   // Reset on open close
   useEffect(() => {
     if (open) {
       const reuse = reuseInstanceId;
+      cancelledRef.current = false;
       setDisplayName("");
       setOwnerId("");
       setQrBase64(null);
@@ -273,12 +278,14 @@ function ConnectFlowDialog({
   useEffect(() => {
     if (!open || step !== 2 || !instanceId) return;
     const t = setInterval(async () => {
+      if (cancelledRef.current) { clearInterval(t); return; }
       try {
         const r: any = await getStatus({ data: { instance_id: instanceId } });
+        if (cancelledRef.current) { clearInterval(t); return; }
         setStatus(r.status);
         if (r.phone_number) setPhone(r.phone_number);
         if (r.status === "connected") clearInterval(t);
-      } catch { /* ignore */ }
+      } catch { /* ignore — instance may have been archived during cancel */ }
     }, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,6 +297,7 @@ function ConnectFlowDialog({
   async function handleNext() {
     if (!displayName.trim()) { toast.error("Informe um nome."); return; }
     setBusy(true);
+    let id: string | null = null;
     try {
       const created: any = await create({
         data: {
@@ -297,14 +305,24 @@ function ConnectFlowDialog({
           owner_user_id: mode === "per_user" ? (ownerId || ctx?.userId || null) : null,
         },
       });
-      const id = created.instance.id as string;
-      setInstanceId(id);
-      setStep(2);
+      id = created?.instance?.id ?? null;
+      if (!id || typeof id !== "string") {
+        throw new Error("Servidor não retornou ID da instância.");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao criar instância.");
+      setBusy(false);
+      return; // do not advance to step 2 / do not start polling
+    }
+    // Only now: id is guaranteed valid — store it, advance, start polling.
+    setInstanceId(id);
+    setStep(2);
+    try {
       await connect({ data: { instance_id: id } });
       setStartedAt(Date.now());
       await loadQR(id);
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao criar instância.");
+      toast.error(e?.message ?? "Falha ao conectar instância.");
     } finally {
       setBusy(false);
     }
@@ -315,13 +333,14 @@ function ConnectFlowDialog({
     try {
       // try a few times — QR may take a moment after connect
       for (let i = 0; i < 8; i++) {
+        if (cancelledRef.current) return;
         const r: any = await getQR({ data: { instance_id: id } });
         if (r.qrcode_base64) { setQrBase64(r.qrcode_base64); break; }
         await new Promise((res) => setTimeout(res, 1500));
       }
       if (startedAt === 0) setStartedAt(Date.now());
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao obter QR.");
+      if (!cancelledRef.current) toast.error(e?.message ?? "Falha ao obter QR.");
     } finally {
       setBusy(false);
     }
@@ -341,11 +360,14 @@ function ConnectFlowDialog({
   }
 
   async function handleCancel() {
-    // Rollback if not connected
-    if (instanceId && status !== "connected" && !reuseInstanceId) {
-      try { await del({ data: { instance_id: instanceId } }); } catch { /* ignore */ }
-    }
+    // Stop polling FIRST so the next interval tick doesn't race the archive
+    // and end up calling getStatus on a row that's already gone/archived.
+    cancelledRef.current = true;
+    const idToRollback = instanceId && status !== "connected" && !reuseInstanceId ? instanceId : null;
     onOpenChange(false);
+    if (idToRollback) {
+      try { await del({ data: { instance_id: idToRollback } }); } catch { /* ignore */ }
+    }
   }
 
   const members = (membersData as any)?.members ?? membersData ?? [];
