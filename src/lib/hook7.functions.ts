@@ -285,7 +285,7 @@ export const createHook7Instance = createServerFn({ method: "POST" })
     const external_name = buildExternalName(org.slug, data.display_name);
     const suggestedToken = uuidv4();
 
-    const apikey = await getHook7GlobalApiKey();
+    const apikey = getHook7GlobalApiKey();
     const created: any = await hook7Fetch("/instance/create", {
       method: "POST",
       apikey,
@@ -480,7 +480,7 @@ export const deleteHook7Instance = createServerFn({ method: "POST" })
     if (!inst) throw new Error("Instância não encontrada.");
     await requireOrgAdmin(supabase, userId, inst.organization_id);
 
-    const apikey = await getHook7GlobalApiKey();
+    const apikey = getHook7GlobalApiKey();
     try {
       await hook7Fetch(`/instance/${encodeURIComponent(inst.external_name)}`, {
         method: "DELETE", apikey, timeoutMs: 10000,
