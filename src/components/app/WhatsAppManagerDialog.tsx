@@ -187,7 +187,6 @@ export function WhatsAppManagerDialog({
 
 }
 
-}
 
 function RenameMenuItem({ instance, onDone }: { instance: any; onDone: () => void }) {
   const rename = useServerFn(renameHook7Instance);
