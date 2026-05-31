@@ -185,14 +185,8 @@ export function WhatsAppManagerDialog({
     </Dialog>
   );
 
-  function setReuseId(v: string | null) {
-    (window as any).__hook7_reuse = v;
-  }
 }
 
-// State carrier hack (avoid prop drilling between sibling dialogs)
-function useReuseId(): string | null {
-  return ((typeof window !== "undefined" && (window as any).__hook7_reuse) || null) as string | null;
 }
 
 function RenameMenuItem({ instance, onDone }: { instance: any; onDone: () => void }) {
