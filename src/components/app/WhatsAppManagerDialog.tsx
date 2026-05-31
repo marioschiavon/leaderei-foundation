@@ -64,6 +64,7 @@ export function WhatsAppManagerDialog({
   const mode = data?.whatsapp_mode ?? "shared";
 
   const [connectOpen, setConnectOpen] = useState(false);
+  const [reuseId, setReuseId] = useState<string | null>(null);
 
   const reconnectMut = useMutation({
     mutationFn: (id: string) => (useServerFn(reconnectHook7Instance))({ data: { instance_id: id } }),
