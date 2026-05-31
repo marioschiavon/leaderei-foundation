@@ -490,19 +490,33 @@ export const reconnectHook7Instance = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const DeleteSchema = z.object({
+  instance_id: z.string().uuid(),
+  reason: z.enum(["user_delete", "cancel", "timeout"]).optional(),
+});
+
 export const deleteHook7Instance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => IdSchema.parse(i))
+  .inputValidator((i: unknown) => DeleteSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: inst, error } = await supabase
       .from("hook7_instances")
-      .select("id, organization_id, external_name")
+      .select("id, organization_id, external_name, status, archived_at")
       .eq("id", data.instance_id)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!inst) throw new Error("Instância não encontrada.");
     await requireOrgAdmin(supabase, userId, inst.organization_id);
+    if (inst.archived_at) return { ok: true, skipped: "already_archived" };
+
+    const reason = data.reason ?? "user_delete";
+    // Cancel/timeout rollback: only archive if NOT connected. Defense in depth
+    // so a stray cancel never nukes a freshly-connected instance.
+    if ((reason === "cancel" || reason === "timeout") && inst.status === "connected") {
+      console.warn(`[hook7] skip archive (reason=${reason}) — instance connected (instance_id=${inst.id}, user_id=${userId})`);
+      return { ok: true, skipped: "connected" };
+    }
 
     const apikey = getHook7GlobalApiKey();
     try {
@@ -516,8 +530,12 @@ export const deleteHook7Instance = createServerFn({ method: "POST" })
       .from("hook7_instances")
       .update({ archived_at: new Date().toISOString(), status: "disconnected", updated_at: new Date().toISOString() })
       .eq("id", inst.id);
+    if (reason !== "user_delete") {
+      console.warn(`[hook7] instance archived via ${reason}: instance_id=${inst.id}, last_status=${inst.status}, user_id=${userId}`);
+    }
     return { ok: true };
   });
+
 
 const RenameSchema = z.object({
   instance_id: z.string().uuid(),
