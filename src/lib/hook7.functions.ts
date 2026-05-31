@@ -421,7 +421,7 @@ export const getHook7InstanceStatus = createServerFn({ method: "POST" })
       patch.last_connected_at = new Date().toISOString();
       if (phone_number !== undefined) patch.phone_number = phone_number;
     }
-    await supabase.from("hook7_instances").update(patch).eq("id", inst.id);
+    await supabase.from("hook7_instances").update(patch as any).eq("id", inst.id);
     return { status: nextStatus, phone_number: phone_number ?? undefined };
   });
 
