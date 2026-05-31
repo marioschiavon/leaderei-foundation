@@ -360,16 +360,18 @@ function ConnectFlowDialog({
     } finally { setBusy(false); }
   }
 
-  async function handleCancel() {
+  async function handleCancel(reason: "cancel" | "timeout" = "cancel") {
     // Stop polling FIRST so the next interval tick doesn't race the archive
     // and end up calling getStatus on a row that's already gone/archived.
     cancelledRef.current = true;
+    // Only rollback fresh (non-reused) instances that never reached connected.
     const idToRollback = instanceId && status !== "connected" && !reuseInstanceId ? instanceId : null;
     onOpenChange(false);
     if (idToRollback) {
-      try { await del({ data: { instance_id: idToRollback } }); } catch { /* ignore */ }
+      try { await del({ data: { instance_id: idToRollback, reason } }); } catch { /* ignore */ }
     }
   }
+
 
   const members = (membersData as any)?.members ?? membersData ?? [];
 
