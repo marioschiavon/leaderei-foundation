@@ -124,10 +124,15 @@ export function WhatsAppManagerDialog({
                         </Badge>
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {inst.phone_number ? `+${inst.phone_number}` : "Aguardando pareamento"}
+                        {inst.phone_number
+                          ? `+${inst.phone_number}`
+                          : inst.status === "connected"
+                            ? (inst.connected_profile_name ? `WhatsApp: ${inst.connected_profile_name}` : "Conectado")
+                            : "Aguardando pareamento"}
                         {" · "}
                         Última conexão: {relTime(inst.last_connected_at)}
                       </div>
+
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
