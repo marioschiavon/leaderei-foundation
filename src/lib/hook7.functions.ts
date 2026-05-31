@@ -407,23 +407,31 @@ export const getHook7InstanceStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
-    const r: any = await hook7Fetch("/instance/status", { method: "GET", apikey: token });
-    const d = r?.data ?? r ?? {};
-    const isConnected: boolean = !!d.connected;
-    const jid: string | undefined = d.jid ?? d.wid ?? d.phone ?? undefined;
-    const phoneFromJid = jid ? String(jid).split("@")[0] : undefined;
-    const disconnectReason: string | undefined = d.disconnect_reason ?? d.disconnectReason ?? undefined;
+    let r: any;
+    try {
+      r = await hook7Fetch("/instance/status", { method: "GET", apikey: token });
+    } catch (e: any) {
+      console.warn(`[hook7] status fetch failed (instance_id=${inst.id}): ${e?.message ?? "unknown"}`);
+      const patch = {
+        status: "error",
+        last_status_check_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from("hook7_instances").update(patch as any).eq("id", inst.id);
+      return { status: "error", connected_profile_name: null };
+    }
+    // Hook7 returns { data: { Connected: bool, LoggedIn: bool, Name: "..." } }
+    const d = r?.data ?? {};
+    const Connected: boolean = d.Connected === true;
+    const LoggedIn: boolean = d.LoggedIn === true;
+    const Name: string | null = typeof d.Name === "string" && d.Name.length > 0 ? d.Name : null;
+
     let nextStatus: string;
-    let phone_number: string | null | undefined = undefined;
-    if (isConnected) {
+    if (Connected && LoggedIn) {
       nextStatus = "connected";
-      phone_number = phoneFromJid ?? null;
-    } else if (d.banned === true || /ban/i.test(disconnectReason ?? "")) {
-      nextStatus = "banned";
-    } else if (!disconnectReason) {
-      nextStatus = "qr_ready";
     } else {
-      nextStatus = "error";
+      // Keep waiting on QR; never auto-flip to disconnected here.
+      nextStatus = inst.status === "connected" ? "connected" : "qr_ready";
     }
 
     const patch: Record<string, any> = {
@@ -433,11 +441,14 @@ export const getHook7InstanceStatus = createServerFn({ method: "POST" })
     };
     if (nextStatus === "connected") {
       patch.last_connected_at = new Date().toISOString();
-      if (phone_number !== undefined) patch.phone_number = phone_number;
+      if (Name) patch.connected_profile_name = Name;
+      // phone_number stays NULL until webhook (rodada 1B) delivers it.
     }
     await supabase.from("hook7_instances").update(patch as any).eq("id", inst.id);
-    return { status: nextStatus, phone_number: phone_number ?? undefined };
+    return { status: nextStatus, connected_profile_name: Name };
   });
+
+
 
 export const disconnectHook7Instance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
