@@ -85,3 +85,14 @@ Mudanças:
 - Master → Plataforma: seção "WhatsApp via Hook7" para salvar apikey global e base URL.
 - Configurações: nova aba **WhatsApp** para alternar `shared` ↔ `per_user`.
 - Docs: seção "WhatsApp via Hook7" em `docs/user/README.md`.
+
+## Rodada 1A-fix — Chave global Hook7 sai do banco e vai para env var
+
+- Migration: `DELETE FROM platform_settings WHERE key = 'hook7_global_apikey'` (entrada removida, `hook7_base_url` permanece).
+- `src/lib/hook7.functions.ts`: `getHook7GlobalApiKey()` agora é síncrona e lê apenas `process.env.HOOK7_GLOBAL_APIKEY`. Server fn `setHook7GlobalApiKey` removida. Adicionadas `getHook7GlobalApiKeyStatus` (retorna `{ configured }`) e `testHook7Connection` (cria+deleta instância de healthcheck).
+- Master → Plataforma → "WhatsApp · Hook7": apenas leitura (status da apikey + URL base editável + prefixo read-only + botão "Testar conexão" + aviso explicando que a chave é segredo de infra).
+- `.env.example`: documenta `HOOK7_GLOBAL_APIKEY` e `HOOK7_INSTANCE_PREFIX`.
+- Docs: `docs/user/README.md` atualizado.
+
+### Dívida técnica registrada
+- Migrar `resend_global_api_key` de `platform_settings` para variável de ambiente, alinhando padrão de chaves de infraestrutura (mesma motivação de separação de responsabilidades entre operação e infraestrutura).
