@@ -473,7 +473,7 @@ function ConnectFlowDialog({
               {status === "connected" ? (
                 <Button onClick={() => onOpenChange(false)}>Concluir</Button>
               ) : (
-                <Button variant="ghost" onClick={handleCancel}>Cancelar</Button>
+                <Button variant="ghost" onClick={() => void handleCancel("cancel")}>Cancelar</Button>
               )}
             </DialogFooter>
           </>
