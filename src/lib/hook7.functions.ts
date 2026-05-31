@@ -337,15 +337,27 @@ export const createHook7Instance = createServerFn({ method: "POST" })
   });
 
 async function loadInstanceForAction(supabase: any, userId: string, instance_id: string) {
-  const { data: inst, error } = await supabase
+  // Use admin client to distinguish "row missing" vs "no permission" vs "archived".
+  const { data: inst, error } = await supabaseAdmin
     .from("hook7_instances")
-    .select("id, organization_id, external_name, status")
+    .select("id, organization_id, external_name, status, archived_at")
     .eq("id", instance_id)
-    .is("archived_at", null)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!inst) throw new Error("Instância não encontrada.");
-  await requireOrgAdmin(supabase, userId, inst.organization_id);
+  if (!inst) {
+    console.warn(`[hook7] loadInstanceForAction: not found (instance_id=${instance_id}, user_id=${userId})`);
+    throw new Error(`Instância não encontrada (ID: ${instance_id}).`);
+  }
+  if (inst.archived_at) {
+    console.warn(`[hook7] loadInstanceForAction: archived (instance_id=${instance_id}, user_id=${userId})`);
+    throw new Error("Instância arquivada.");
+  }
+  try {
+    await requireOrgAdmin(supabase, userId, inst.organization_id);
+  } catch {
+    console.warn(`[hook7] loadInstanceForAction: forbidden (instance_id=${instance_id}, user_id=${userId})`);
+    throw new Error("Acesso negado à instância.");
+  }
   const { data: token, error: tErr } = await supabase.rpc("get_hook7_instance_token", { _instance_id: inst.id });
   if (tErr) throw new Error(tErr.message);
   if (!token) throw new Error("Token da instância indisponível.");
