@@ -898,7 +898,7 @@ export type Database = {
           owner_user_id: string | null
           phone_number: string | null
           status: string
-          token_encrypted: string
+          token_encrypted: string | null
           updated_at: string
         }
         Insert: {
@@ -918,7 +918,7 @@ export type Database = {
           owner_user_id?: string | null
           phone_number?: string | null
           status?: string
-          token_encrypted: string
+          token_encrypted?: string | null
           updated_at?: string
         }
         Update: {
@@ -938,7 +938,7 @@ export type Database = {
           owner_user_id?: string | null
           phone_number?: string | null
           status?: string
-          token_encrypted?: string
+          token_encrypted?: string | null
           updated_at?: string
         }
         Relationships: [

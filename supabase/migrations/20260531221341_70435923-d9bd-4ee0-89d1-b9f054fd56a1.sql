@@ -1,0 +1,1 @@
+ALTER TABLE public.hook7_instances ALTER COLUMN token_encrypted DROP NOT NULL;
