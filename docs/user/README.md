@@ -119,6 +119,17 @@ A tela também mostra:
 - último sync
 - erro mais recente, se houver
 
+### WhatsApp via Hook7
+
+O provider **WhatsApp** usa o Hook7 (API própria da S7) para conectar números reais via QR Code.
+
+- O administrador master configura uma única vez a **chave global** e a **URL base** em **Master → Plataforma → WhatsApp via Hook7**. Ao salvar, validamos a chave criando e removendo uma instância de teste.
+- Em cada organização, o `company_admin` abre **Integrações → WhatsApp → Gerenciar instâncias** para criar uma instância, gerar o QR Code e escaneá-lo no app WhatsApp do celular. O status é atualizado a cada 3 segundos e expira em 2 minutos se ninguém parear.
+- O modo de uso (compartilhado pela organização ou por usuário) é definido em **Configurações → WhatsApp**. Em modo "por usuário", cada instância pertence a um membro específico.
+- Tokens de instância são armazenados criptografados (pgp_sym_encrypt) e só são acessíveis via função SECURITY DEFINER para administradores da organização ou pelo service role.
+
+
+
 ## 6. Área Master
 
 Para usuários `master_admin`, o painel Master já permite:
