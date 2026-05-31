@@ -124,10 +124,15 @@ export function WhatsAppManagerDialog({
                         </Badge>
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {inst.phone_number ? `+${inst.phone_number}` : "Aguardando pareamento"}
+                        {inst.phone_number
+                          ? `+${inst.phone_number}`
+                          : inst.status === "connected"
+                            ? (inst.connected_profile_name ? `WhatsApp: ${inst.connected_profile_name}` : "Conectado")
+                            : "Aguardando pareamento"}
                         {" · "}
                         Última conexão: {relTime(inst.last_connected_at)}
                       </div>
+
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -237,7 +242,7 @@ function ConnectFlowDialog({
   const [instanceId, setInstanceId] = useState<string | null>(null);
   const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("pending_qr");
-  const [phone, setPhone] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   // Guards against the polling interval firing after the user cancels (which
@@ -253,7 +258,7 @@ function ConnectFlowDialog({
       setDisplayName("");
       setOwnerId("");
       setQrBase64(null);
-      setPhone(null);
+      setProfileName(null);
       setStatus("pending_qr");
       setStartedAt(0);
       if (reuse) {
@@ -283,7 +288,7 @@ function ConnectFlowDialog({
         const r: any = await getStatus({ data: { instance_id: instanceId } });
         if (cancelledRef.current) { clearInterval(t); return; }
         setStatus(r.status);
-        if (r.phone_number) setPhone(r.phone_number);
+        if (r.connected_profile_name) setProfileName(r.connected_profile_name);
         if (r.status === "connected") clearInterval(t);
       } catch { /* ignore — instance may have been archived during cancel */ }
     }, 3000);
@@ -291,8 +296,18 @@ function ConnectFlowDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, step, instanceId]);
 
+
   const elapsedSec = startedAt > 0 ? Math.floor((Date.now() - startedAt) / 1000) : 0;
   const timedOut = startedAt > 0 && elapsedSec > 120 && status !== "connected";
+
+  // Auto-archive on timeout (2min, qr_ready) — close modal + rollback (Opção A).
+  useEffect(() => {
+    if (timedOut && !cancelledRef.current && !reuseInstanceId) {
+      void handleCancel("timeout");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timedOut]);
+
 
   async function handleNext() {
     if (!displayName.trim()) { toast.error("Informe um nome."); return; }
@@ -359,16 +374,18 @@ function ConnectFlowDialog({
     } finally { setBusy(false); }
   }
 
-  async function handleCancel() {
+  async function handleCancel(reason: "cancel" | "timeout" = "cancel") {
     // Stop polling FIRST so the next interval tick doesn't race the archive
     // and end up calling getStatus on a row that's already gone/archived.
     cancelledRef.current = true;
+    // Only rollback fresh (non-reused) instances that never reached connected.
     const idToRollback = instanceId && status !== "connected" && !reuseInstanceId ? instanceId : null;
     onOpenChange(false);
     if (idToRollback) {
-      try { await del({ data: { instance_id: idToRollback } }); } catch { /* ignore */ }
+      try { await del({ data: { instance_id: idToRollback, reason } }); } catch { /* ignore */ }
     }
   }
+
 
   const members = (membersData as any)?.members ?? membersData ?? [];
 
@@ -431,8 +448,12 @@ function ConnectFlowDialog({
                   <div className="grid h-16 w-16 place-items-center rounded-full bg-emerald-500/10">
                     <CheckCircle2 className="h-8 w-8 text-emerald-600" />
                   </div>
-                  <p className="font-medium">Conectado{phone ? ` · +${phone}` : ""}</p>
+                  <p className="font-medium">
+                    {profileName ? `Conectado como ${profileName}` : "Conectado"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">O número será detectado em breve.</p>
                 </div>
+
               ) : timedOut ? (
                 <div className="grid place-items-center gap-3 py-8 text-center">
                   <p className="text-sm text-muted-foreground">Tempo esgotado sem conexão.</p>
@@ -466,7 +487,7 @@ function ConnectFlowDialog({
               {status === "connected" ? (
                 <Button onClick={() => onOpenChange(false)}>Concluir</Button>
               ) : (
-                <Button variant="ghost" onClick={handleCancel}>Cancelar</Button>
+                <Button variant="ghost" onClick={() => void handleCancel("cancel")}>Cancelar</Button>
               )}
             </DialogFooter>
           </>

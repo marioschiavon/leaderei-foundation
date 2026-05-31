@@ -261,7 +261,7 @@ export const listHook7Instances = createServerFn({ method: "GET" })
     const org = await getCallerOrg(supabase, userId);
     const { data, error } = await supabase
       .from("hook7_instances")
-      .select("id, display_name, external_name, status, phone_number, owner_user_id, last_connected_at, last_qr_at, created_at")
+      .select("id, display_name, external_name, status, phone_number, connected_profile_name, owner_user_id, last_connected_at, last_qr_at, created_at")
       .eq("organization_id", org.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false });
@@ -295,6 +295,9 @@ export const createHook7Instance = createServerFn({ method: "POST" })
     const ext_name = created?.data?.name ?? external_name;
     const token = created?.data?.token ?? suggestedToken;
     if (!ext_id || !token) throw new Error("Resposta inesperada do Hook7 ao criar instância.");
+    if (ext_name !== external_name) {
+      console.warn(`[hook7] external_name mismatch sent=${external_name} got=${ext_name} — using server truth`);
+    }
 
     // Resolve owner depending on mode
     let owner_user_id: string | null = null;
@@ -364,6 +367,7 @@ async function loadInstanceForAction(supabase: any, userId: string, instance_id:
   return { inst, token: token as string };
 }
 
+
 const IdSchema = z.object({ instance_id: z.string().uuid() });
 
 export const connectHook7Instance = createServerFn({ method: "POST" })
@@ -403,23 +407,31 @@ export const getHook7InstanceStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
-    const r: any = await hook7Fetch("/instance/status", { method: "GET", apikey: token });
-    const d = r?.data ?? r ?? {};
-    const isConnected: boolean = !!d.connected;
-    const jid: string | undefined = d.jid ?? d.wid ?? d.phone ?? undefined;
-    const phoneFromJid = jid ? String(jid).split("@")[0] : undefined;
-    const disconnectReason: string | undefined = d.disconnect_reason ?? d.disconnectReason ?? undefined;
+    let r: any;
+    try {
+      r = await hook7Fetch("/instance/status", { method: "GET", apikey: token });
+    } catch (e: any) {
+      console.warn(`[hook7] status fetch failed (instance_id=${inst.id}): ${e?.message ?? "unknown"}`);
+      const patch = {
+        status: "error",
+        last_status_check_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from("hook7_instances").update(patch as any).eq("id", inst.id);
+      return { status: "error", connected_profile_name: null };
+    }
+    // Hook7 returns { data: { Connected: bool, LoggedIn: bool, Name: "..." } }
+    const d = r?.data ?? {};
+    const Connected: boolean = d.Connected === true;
+    const LoggedIn: boolean = d.LoggedIn === true;
+    const Name: string | null = typeof d.Name === "string" && d.Name.length > 0 ? d.Name : null;
+
     let nextStatus: string;
-    let phone_number: string | null | undefined = undefined;
-    if (isConnected) {
+    if (Connected && LoggedIn) {
       nextStatus = "connected";
-      phone_number = phoneFromJid ?? null;
-    } else if (d.banned === true || /ban/i.test(disconnectReason ?? "")) {
-      nextStatus = "banned";
-    } else if (!disconnectReason) {
-      nextStatus = "qr_ready";
     } else {
-      nextStatus = "error";
+      // Keep waiting on QR; never auto-flip to disconnected here.
+      nextStatus = inst.status === "connected" ? "connected" : "qr_ready";
     }
 
     const patch: Record<string, any> = {
@@ -429,11 +441,14 @@ export const getHook7InstanceStatus = createServerFn({ method: "POST" })
     };
     if (nextStatus === "connected") {
       patch.last_connected_at = new Date().toISOString();
-      if (phone_number !== undefined) patch.phone_number = phone_number;
+      if (Name) patch.connected_profile_name = Name;
+      // phone_number stays NULL until webhook (rodada 1B) delivers it.
     }
     await supabase.from("hook7_instances").update(patch as any).eq("id", inst.id);
-    return { status: nextStatus, phone_number: phone_number ?? undefined };
+    return { status: nextStatus, connected_profile_name: Name };
   });
+
+
 
 export const disconnectHook7Instance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -475,19 +490,33 @@ export const reconnectHook7Instance = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const DeleteSchema = z.object({
+  instance_id: z.string().uuid(),
+  reason: z.enum(["user_delete", "cancel", "timeout"]).optional(),
+});
+
 export const deleteHook7Instance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => IdSchema.parse(i))
+  .inputValidator((i: unknown) => DeleteSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: inst, error } = await supabase
       .from("hook7_instances")
-      .select("id, organization_id, external_name")
+      .select("id, organization_id, external_name, status, archived_at")
       .eq("id", data.instance_id)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!inst) throw new Error("Instância não encontrada.");
     await requireOrgAdmin(supabase, userId, inst.organization_id);
+    if (inst.archived_at) return { ok: true, skipped: "already_archived" };
+
+    const reason = data.reason ?? "user_delete";
+    // Cancel/timeout rollback: only archive if NOT connected. Defense in depth
+    // so a stray cancel never nukes a freshly-connected instance.
+    if ((reason === "cancel" || reason === "timeout") && inst.status === "connected") {
+      console.warn(`[hook7] skip archive (reason=${reason}) — instance connected (instance_id=${inst.id}, user_id=${userId})`);
+      return { ok: true, skipped: "connected" };
+    }
 
     const apikey = getHook7GlobalApiKey();
     try {
@@ -501,8 +530,12 @@ export const deleteHook7Instance = createServerFn({ method: "POST" })
       .from("hook7_instances")
       .update({ archived_at: new Date().toISOString(), status: "disconnected", updated_at: new Date().toISOString() })
       .eq("id", inst.id);
+    if (reason !== "user_delete") {
+      console.warn(`[hook7] instance archived via ${reason}: instance_id=${inst.id}, last_status=${inst.status}, user_id=${userId}`);
+    }
     return { ok: true };
   });
+
 
 const RenameSchema = z.object({
   instance_id: z.string().uuid(),
