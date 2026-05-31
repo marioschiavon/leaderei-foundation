@@ -432,8 +432,12 @@ function ConnectFlowDialog({
                   <div className="grid h-16 w-16 place-items-center rounded-full bg-emerald-500/10">
                     <CheckCircle2 className="h-8 w-8 text-emerald-600" />
                   </div>
-                  <p className="font-medium">Conectado{phone ? ` · +${phone}` : ""}</p>
+                  <p className="font-medium">
+                    {profileName ? `Conectado como ${profileName}` : "Conectado"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">O número será detectado em breve.</p>
                 </div>
+
               ) : timedOut ? (
                 <div className="grid place-items-center gap-3 py-8 text-center">
                   <p className="text-sm text-muted-foreground">Tempo esgotado sem conexão.</p>
