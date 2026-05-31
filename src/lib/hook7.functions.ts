@@ -142,68 +142,71 @@ async function getCallerOrg(supabase: any, userId: string): Promise<{ id: string
 // Master: platform-level config
 // ---------------------------------------------------------------------------
 
+async function assertMasterAdmin(supabase: any, userId: string) {
+  const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (!(roles ?? []).some((r: any) => r.role === "master_admin")) {
+    throw new Error("Apenas administradores master podem executar esta ação.");
+  }
+}
+
 export const getHook7PlatformConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    if (!(roles ?? []).some((r: any) => r.role === "master_admin")) {
-      throw new Error("Apenas administradores master podem ver esta configuração.");
-    }
-    const { data: rows } = await supabaseAdmin
+    await assertMasterAdmin(supabase, userId);
+    const { data: row } = await supabaseAdmin
       .from("platform_settings")
-      .select("key, is_secret, value_plain, value_encrypted")
-      .in("key", ["hook7_global_apikey", "hook7_base_url"]);
-    const map: Record<string, any> = {};
-    for (const r of rows ?? []) map[r.key] = r;
+      .select("value_plain")
+      .eq("key", "hook7_base_url")
+      .maybeSingle();
+    const base_url = typeof row?.value_plain === "string" ? row.value_plain : DEFAULT_BASE_URL;
+    const has_apikey = !!(process.env.HOOK7_GLOBAL_APIKEY ?? "").trim();
     return {
-      has_apikey: !!map.hook7_global_apikey?.value_encrypted,
-      base_url: (typeof map.hook7_base_url?.value_plain === "string" ? map.hook7_base_url.value_plain : DEFAULT_BASE_URL),
+      has_apikey,
+      base_url,
+      instance_prefix: INSTANCE_PREFIX,
     };
   });
 
-export const setHook7GlobalApiKey = createServerFn({ method: "POST" })
+export const getHook7GlobalApiKeyStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ apiKey: z.string().trim().min(10).max(400) }).parse(i))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    if (!(roles ?? []).some((r: any) => r.role === "master_admin")) {
-      throw new Error("Apenas administradores master podem configurar isto.");
-    }
+    await assertMasterAdmin(supabase, userId);
+    return { configured: !!(process.env.HOOK7_GLOBAL_APIKEY ?? "").trim() };
+  });
 
-    // Validate by creating a throwaway instance, then delete it.
-    const validationName = `${INSTANCE_PREFIX}-validation-${Date.now()}-${shortId(4)}`;
+export const testHook7Connection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await assertMasterAdmin(supabase, userId);
+    let apikey: string;
+    try {
+      apikey = getHook7GlobalApiKey();
+    } catch (e: any) {
+      return { ok: false, message: "Chave global do Hook7 não configurada no servidor." };
+    }
+    // Validation: create a throwaway instance, then delete.
+    const validationName = `${INSTANCE_PREFIX}-healthcheck-${Date.now()}-${shortId(4)}`;
     const validationToken = uuidv4();
-    let createdName: string | null = null;
     try {
       const created: any = await hook7Fetch("/instance/create", {
         method: "POST",
-        apikey: data.apiKey,
+        apikey,
         body: { name: validationName, token: validationToken },
-        timeoutMs: 15000,
+        timeoutMs: 12000,
       });
-      createdName = created?.data?.name ?? validationName;
-    } catch (e: any) {
-      throw new Error(`Chave inválida ou Hook7 inacessível: ${e?.message ?? e}`);
-    }
-    // Cleanup: try delete by name with global apikey
-    try {
-      await hook7Fetch(`/instance/${encodeURIComponent(createdName!)}`, {
-        method: "DELETE",
-        apikey: data.apiKey,
-        timeoutMs: 10000,
-      });
+      const createdName = created?.data?.name ?? validationName;
+      try {
+        await hook7Fetch(`/instance/${encodeURIComponent(createdName)}`, {
+          method: "DELETE", apikey, timeoutMs: 8000,
+        });
+      } catch { /* non-fatal */ }
+      return { ok: true, message: "Conexão OK." };
     } catch {
-      // non-fatal: cleanup failure shouldn't block saving the valid key
+      return { ok: false, message: "Não foi possível conectar — verifique a chave e a URL base." };
     }
-
-    const { error } = await context.supabase.rpc("set_platform_secret", {
-      _key: "hook7_global_apikey",
-      _value: data.apiKey,
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true };
   });
 
 export const setHook7BaseUrl = createServerFn({ method: "POST" })
@@ -211,10 +214,7 @@ export const setHook7BaseUrl = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ baseUrl: z.string().trim().url().max(255) }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    if (!(roles ?? []).some((r: any) => r.role === "master_admin")) {
-      throw new Error("Apenas administradores master podem configurar isto.");
-    }
+    await assertMasterAdmin(supabase, userId);
     const { error } = await context.supabase.rpc("set_platform_plain", {
       _key: "hook7_base_url",
       _value: data.baseUrl.replace(/\/+$/, "") as any,
