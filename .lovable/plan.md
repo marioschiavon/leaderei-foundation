@@ -96,3 +96,12 @@ Mudanças:
 
 ### Dívida técnica registrada
 - Migrar `resend_global_api_key` de `platform_settings` para variável de ambiente, alinhando padrão de chaves de infraestrutura (mesma motivação de separação de responsabilidades entre operação e infraestrutura).
+
+## Rodada 1A-fix2 — Mapeamento Hook7 (Connected/Qrcode/Name) + cancelamento seguro
+
+- Migration: `hook7_instances.connected_profile_name text`.
+- `getHook7InstanceQR`: lê `data.Qrcode` (capitalização exata).
+- `getHook7InstanceStatus`: lê `data.Connected`/`LoggedIn`/`Name`; só vira `connected` quando ambos `true`; nunca regride automaticamente para `disconnected`; grava `connected_profile_name` e `last_connected_at`. Erro de fetch → status `error`.
+- `createHook7Instance`: audita o mapeamento `data.id → external_id`, `data.name → external_name`, `data.token → token_encrypted`; warning se o nome devolvido divergir do enviado.
+- `deleteHook7Instance`: aceita `reason` (`user_delete`/`cancel`/`timeout`). Defensivo: nunca arquiva uma instância `connected` em rollback de cancel/timeout.
+- `WhatsAppManagerDialog`: `handleCancel(reason)` propaga motivo; auto-arquiva no timeout 2min; passo 2 mostra "Conectado como {Name}" + nota "O número será detectado em breve"; lista usa `connected_profile_name` como fallback quando `phone_number` é NULL.
