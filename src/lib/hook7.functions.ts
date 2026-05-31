@@ -309,10 +309,9 @@ export const createHook7Instance = createServerFn({ method: "POST" })
         display_name: data.display_name,
         external_id: ext_id,
         external_name: ext_name,
-        token_encrypted: Buffer.from([]).toString() as any, // placeholder; will be set by RPC
         status: "pending_qr",
         created_by: userId,
-      } as any)
+      })
       .select("id, display_name, external_name, status")
       .single();
     if (insErr) {
