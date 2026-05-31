@@ -300,6 +300,15 @@ function ConnectFlowDialog({
   const elapsedSec = startedAt > 0 ? Math.floor((Date.now() - startedAt) / 1000) : 0;
   const timedOut = startedAt > 0 && elapsedSec > 120 && status !== "connected";
 
+  // Auto-archive on timeout (2min, qr_ready) — close modal + rollback (Opção A).
+  useEffect(() => {
+    if (timedOut && !cancelledRef.current && !reuseInstanceId) {
+      void handleCancel("timeout");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timedOut]);
+
+
   async function handleNext() {
     if (!displayName.trim()) { toast.error("Informe um nome."); return; }
     setBusy(true);
