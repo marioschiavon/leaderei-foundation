@@ -237,7 +237,7 @@ function ConnectFlowDialog({
   const [instanceId, setInstanceId] = useState<string | null>(null);
   const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("pending_qr");
-  const [phone, setPhone] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   // Guards against the polling interval firing after the user cancels (which
@@ -253,7 +253,7 @@ function ConnectFlowDialog({
       setDisplayName("");
       setOwnerId("");
       setQrBase64(null);
-      setPhone(null);
+      setProfileName(null);
       setStatus("pending_qr");
       setStartedAt(0);
       if (reuse) {
@@ -283,13 +283,14 @@ function ConnectFlowDialog({
         const r: any = await getStatus({ data: { instance_id: instanceId } });
         if (cancelledRef.current) { clearInterval(t); return; }
         setStatus(r.status);
-        if (r.phone_number) setPhone(r.phone_number);
+        if (r.connected_profile_name) setProfileName(r.connected_profile_name);
         if (r.status === "connected") clearInterval(t);
       } catch { /* ignore — instance may have been archived during cancel */ }
     }, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, step, instanceId]);
+
 
   const elapsedSec = startedAt > 0 ? Math.floor((Date.now() - startedAt) / 1000) : 0;
   const timedOut = startedAt > 0 && elapsedSec > 120 && status !== "connected";
