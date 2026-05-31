@@ -261,7 +261,7 @@ export const listHook7Instances = createServerFn({ method: "GET" })
     const org = await getCallerOrg(supabase, userId);
     const { data, error } = await supabase
       .from("hook7_instances")
-      .select("id, display_name, external_name, status, phone_number, owner_user_id, last_connected_at, last_qr_at, created_at")
+      .select("id, display_name, external_name, status, phone_number, connected_profile_name, owner_user_id, last_connected_at, last_qr_at, created_at")
       .eq("organization_id", org.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false });
