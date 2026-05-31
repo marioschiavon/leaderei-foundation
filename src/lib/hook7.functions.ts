@@ -391,12 +391,9 @@ export const getHook7InstanceQR = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { token } = await loadInstanceForAction(supabase, userId, data.instance_id);
     const r: any = await hook7Fetch("/instance/qr", { method: "GET", apikey: token });
-    const raw = r?.data?.qrcode ?? r?.qrcode ?? r?.data?.qr ?? null;
-    let qrcode_base64: string | null = null;
-    if (typeof raw === "string" && raw.length > 0) {
-      // Strip optional data: prefix
-      qrcode_base64 = raw.replace(/^data:image\/[a-z+]+;base64,/i, "");
-    }
+    // Hook7 returns { data: { Qrcode: "data:image/png;base64,...", Code: "..." } }
+    const raw = r?.data?.Qrcode ?? r?.data?.qrcode ?? r?.qrcode ?? null;
+    const qrcode_base64: string | null = typeof raw === "string" && raw.length > 0 ? raw : null;
     return { qrcode_base64 };
   });
 
