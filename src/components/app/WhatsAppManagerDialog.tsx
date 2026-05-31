@@ -240,11 +240,16 @@ function ConnectFlowDialog({
   const [phone, setPhone] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number>(0);
   const [busy, setBusy] = useState(false);
+  // Guards against the polling interval firing after the user cancels (which
+  // archives the instance) — without this, the next status poll resolves to
+  // "Instância arquivada" and surfaces as a runtime error.
+  const cancelledRef = useRef(false);
 
   // Reset on open close
   useEffect(() => {
     if (open) {
       const reuse = reuseInstanceId;
+      cancelledRef.current = false;
       setDisplayName("");
       setOwnerId("");
       setQrBase64(null);
@@ -273,12 +278,14 @@ function ConnectFlowDialog({
   useEffect(() => {
     if (!open || step !== 2 || !instanceId) return;
     const t = setInterval(async () => {
+      if (cancelledRef.current) { clearInterval(t); return; }
       try {
         const r: any = await getStatus({ data: { instance_id: instanceId } });
+        if (cancelledRef.current) { clearInterval(t); return; }
         setStatus(r.status);
         if (r.phone_number) setPhone(r.phone_number);
         if (r.status === "connected") clearInterval(t);
-      } catch { /* ignore */ }
+      } catch { /* ignore — instance may have been archived during cancel */ }
     }, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
