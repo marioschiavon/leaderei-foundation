@@ -884,6 +884,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           config: Json
+          connected_profile_name: string | null
           created_at: string
           created_by: string
           display_name: string
@@ -904,6 +905,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           config?: Json
+          connected_profile_name?: string | null
           created_at?: string
           created_by: string
           display_name: string
@@ -924,6 +926,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           config?: Json
+          connected_profile_name?: string | null
           created_at?: string
           created_by?: string
           display_name?: string
