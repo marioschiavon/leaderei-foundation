@@ -880,6 +880,77 @@ export type Database = {
           },
         ]
       }
+      hook7_instances: {
+        Row: {
+          archived_at: string | null
+          config: Json
+          created_at: string
+          created_by: string
+          display_name: string
+          external_id: string
+          external_name: string
+          id: string
+          last_connected_at: string | null
+          last_disconnected_at: string | null
+          last_qr_at: string | null
+          last_status_check_at: string | null
+          organization_id: string
+          owner_user_id: string | null
+          phone_number: string | null
+          status: string
+          token_encrypted: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by: string
+          display_name: string
+          external_id: string
+          external_name: string
+          id?: string
+          last_connected_at?: string | null
+          last_disconnected_at?: string | null
+          last_qr_at?: string | null
+          last_status_check_at?: string | null
+          organization_id: string
+          owner_user_id?: string | null
+          phone_number?: string | null
+          status?: string
+          token_encrypted?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string
+          display_name?: string
+          external_id?: string
+          external_name?: string
+          id?: string
+          last_connected_at?: string | null
+          last_disconnected_at?: string | null
+          last_qr_at?: string | null
+          last_status_check_at?: string | null
+          organization_id?: string
+          owner_user_id?: string | null
+          phone_number?: string | null
+          status?: string
+          token_encrypted?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hook7_instances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_credentials: {
         Row: {
           created_at: string
@@ -1572,6 +1643,7 @@ export type Database = {
           timezone: string
           trial_ends_at: string | null
           updated_at: string
+          whatsapp_mode: string
         }
         Insert: {
           billing_email?: string | null
@@ -1591,6 +1663,7 @@ export type Database = {
           timezone?: string
           trial_ends_at?: string | null
           updated_at?: string
+          whatsapp_mode?: string
         }
         Update: {
           billing_email?: string | null
@@ -1610,6 +1683,7 @@ export type Database = {
           timezone?: string
           trial_ends_at?: string | null
           updated_at?: string
+          whatsapp_mode?: string
         }
         Relationships: []
       }
@@ -1944,6 +2018,10 @@ export type Database = {
     Functions: {
       _platform_passphrase: { Args: never; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: string }
+      get_hook7_instance_token: {
+        Args: { _instance_id: string }
+        Returns: string
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
@@ -2002,6 +2080,10 @@ export type Database = {
           _user_id: string
         }
         Returns: string
+      }
+      set_hook7_instance_token: {
+        Args: { _instance_id: string; _token: string }
+        Returns: undefined
       }
       set_platform_plain: {
         Args: { _key: string; _value: Json }
