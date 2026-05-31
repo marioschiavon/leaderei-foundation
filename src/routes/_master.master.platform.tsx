@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Send, Save, ShieldCheck, ShieldAlert, MessageCircle } from "lucide-react";
+import { Loader2, Send, Save, ShieldCheck, ShieldAlert, MessageCircle, Plug, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
   sendTestEmail, listEmailSendLogs, uploadLogoFromDataUrl,
 } from "@/lib/platform.functions";
 import {
-  getHook7PlatformConfig, setHook7GlobalApiKey, setHook7BaseUrl,
+  getHook7PlatformConfig, setHook7BaseUrl, getHook7GlobalApiKeyStatus, testHook7Connection,
 } from "@/lib/hook7.functions";
 import { useAuthSession } from "@/lib/auth";
 
@@ -45,24 +45,31 @@ function PlatformPage() {
 function Hook7Section() {
   const qc = useQueryClient();
   const fetchCfg = useServerFn(getHook7PlatformConfig);
-  const saveKey = useServerFn(setHook7GlobalApiKey);
+  const fetchStatus = useServerFn(getHook7GlobalApiKeyStatus);
   const saveUrl = useServerFn(setHook7BaseUrl);
+  const testConn = useServerFn(testHook7Connection);
   const { data: cfg, isLoading } = useQuery({ queryKey: ["hook7-platform"], queryFn: () => fetchCfg() });
-  const [apiKey, setApiKey] = useState("");
+  const { data: status } = useQuery({ queryKey: ["hook7-status"], queryFn: () => fetchStatus() });
   const [baseUrl, setBaseUrl] = useState("");
+  const [editingUrl, setEditingUrl] = useState(false);
 
-  const hasKey = !!cfg?.has_apikey;
-
-  const keyMut = useMutation({
-    mutationFn: (k: string) => saveKey({ data: { apiKey: k } }),
-    onSuccess: () => { toast.success("Chave Hook7 validada e salva."); setApiKey(""); qc.invalidateQueries({ queryKey: ["hook7-platform"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const configured = !!status?.configured;
 
   const urlMut = useMutation({
     mutationFn: (u: string) => saveUrl({ data: { baseUrl: u } }),
-    onSuccess: () => { toast.success("URL base do Hook7 salva."); qc.invalidateQueries({ queryKey: ["hook7-platform"] }); },
+    onSuccess: () => {
+      toast.success("URL base do Hook7 salva.");
+      setEditingUrl(false);
+      setBaseUrl("");
+      qc.invalidateQueries({ queryKey: ["hook7-platform"] });
+    },
     onError: (e: any) => toast.error(e.message),
+  });
+
+  const testMut = useMutation({
+    mutationFn: () => testConn({ data: {} as any }),
+    onSuccess: (r: any) => r?.ok ? toast.success(r.message ?? "Conexão OK.") : toast.error(r?.message ?? "Falha na conexão."),
+    onError: () => toast.error("Não foi possível conectar — verifique a chave e a URL base."),
   });
 
   return (
@@ -70,44 +77,70 @@ function Hook7Section() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" /> WhatsApp via Hook7
+            <MessageCircle className="h-4 w-4" /> WhatsApp · Hook7
           </h2>
-          <p className="text-sm text-muted-foreground">Chave global e endpoint usados por todas as organizações para criar e conectar instâncias.</p>
+          <p className="text-sm text-muted-foreground">Conexão de infraestrutura usada por todas as organizações.</p>
         </div>
-        <Badge variant="secondary" className={hasKey ? "bg-emerald-500/10 text-emerald-700" : "bg-destructive/10 text-destructive"}>
-          {hasKey ? (<><ShieldCheck className="mr-1 h-3 w-3" />Configurado</>) : (<><ShieldAlert className="mr-1 h-3 w-3" />Não configurado</>)}
+        <Badge variant="secondary" className={configured ? "bg-emerald-500/10 text-emerald-700" : "bg-destructive/10 text-destructive"}>
+          {configured ? (<><ShieldCheck className="mr-1 h-3 w-3" />Configurada</>) : (<><ShieldAlert className="mr-1 h-3 w-3" />Não configurada</>)}
         </Badge>
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>URL base do Hook7</Label>
-          <div className="flex gap-2">
-            <Input
-              placeholder={cfg?.base_url ?? "https://api.hook7.com.br"}
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-            />
-            <Button disabled={!baseUrl || urlMut.isPending} onClick={() => urlMut.mutate(baseUrl)}>
-              {urlMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            </Button>
+      <div className="mt-5 space-y-4">
+        <div className="rounded-lg border bg-background p-4">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Apikey global</Label>
+          <div className="mt-1.5 text-sm">
+            {configured ? (
+              <span className="inline-flex items-center gap-2 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" /> Configurada via variável de ambiente
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-destructive">
+                <ShieldAlert className="h-4 w-4" /> Não configurada — defina <code className="rounded bg-muted px-1 font-mono text-xs">HOOK7_GLOBAL_APIKEY</code> no painel de deploy
+              </span>
+            )}
           </div>
-          <p className="text-xs text-muted-foreground">Atual: <span className="font-mono">{isLoading ? "…" : cfg?.base_url}</span></p>
         </div>
-        <div className="space-y-1.5">
-          <Label>Chave global (apikey)</Label>
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder={hasKey ? "•••••••• (configurada)" : "Cole a apikey global do Hook7"}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <Button disabled={!apiKey || keyMut.isPending} onClick={() => keyMut.mutate(apiKey)}>
-              {keyMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            </Button>
+
+        <div className="rounded-lg border bg-background p-4">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">URL base</Label>
+          {!editingUrl ? (
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <span className="font-mono text-sm">{isLoading ? "…" : cfg?.base_url}</span>
+              <Button variant="outline" size="sm" onClick={() => { setBaseUrl(cfg?.base_url ?? ""); setEditingUrl(true); }}>Editar</Button>
+            </div>
+          ) : (
+            <div className="mt-1.5 flex gap-2">
+              <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.hook7.com.br" />
+              <Button disabled={!baseUrl || urlMut.isPending} onClick={() => urlMut.mutate(baseUrl)}>
+                {urlMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              </Button>
+              <Button variant="ghost" onClick={() => { setEditingUrl(false); setBaseUrl(""); }}>Cancelar</Button>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border bg-background p-4">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Prefixo de instância</Label>
+          <div className="mt-1.5 text-sm">
+            <span className="font-mono">{cfg?.instance_prefix ?? "lead"}</span>
+            <span className="ml-2 text-xs text-muted-foreground">configurável via env var <code className="rounded bg-muted px-1 font-mono">HOOK7_INSTANCE_PREFIX</code></span>
           </div>
-          <p className="text-xs text-muted-foreground">Ao salvar, validamos criando uma instância de teste e removendo em seguida.</p>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <Button onClick={() => testMut.mutate()} disabled={testMut.isPending || !configured} variant="outline">
+            {testMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
+            Testar conexão
+          </Button>
+        </div>
+
+        <div className="flex gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>
+            A chave global do Hook7 é segredo da infraestrutura da plataforma e não pode ser visualizada ou alterada pela interface.
+            Para alterá-la, atualize a variável de ambiente <code className="rounded bg-muted px-1 font-mono">HOOK7_GLOBAL_APIKEY</code> no painel de deploy.
+          </span>
         </div>
       </div>
     </section>
