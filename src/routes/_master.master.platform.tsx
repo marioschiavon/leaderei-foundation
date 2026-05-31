@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Send, Save, ShieldCheck, ShieldAlert, MessageCircle } from "lucide-react";
+import { Loader2, Send, Save, ShieldCheck, ShieldAlert, MessageCircle, Plug, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
   sendTestEmail, listEmailSendLogs, uploadLogoFromDataUrl,
 } from "@/lib/platform.functions";
 import {
-  getHook7PlatformConfig, setHook7GlobalApiKey, setHook7BaseUrl,
+  getHook7PlatformConfig, setHook7BaseUrl, getHook7GlobalApiKeyStatus, testHook7Connection,
 } from "@/lib/hook7.functions";
 import { useAuthSession } from "@/lib/auth";
 
