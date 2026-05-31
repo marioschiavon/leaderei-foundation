@@ -75,3 +75,13 @@ Mudanças:
 - `_app.tsx` redireciona pra `/onboarding` se `!onboardingCompleted`.
 - `signup.tsx` redireciona pra `/onboarding` quando `data.session` existe (fallback pra `/login` se confirmação for reativada).
 - `FlowEditor.tsx`: hidratação ordena steps por `created_at` ASC; `onDrop` implementa auto-link + `fitView`.
+
+## Rodada 1A — WhatsApp via Hook7 (criar + conectar instâncias)
+
+- Migrations: `hook7_instances` (org, owner_user_id, external_id/name, status, token criptografado), `organizations.whatsapp_mode`, `platform_settings.hook7_*`.
+- RPCs: `set_hook7_instance_token` / `get_hook7_instance_token` (pgp_sym_encrypt, SECURITY DEFINER).
+- `src/lib/hook7.functions.ts`: helper `hook7Fetch`, master config (apikey global + base_url), mode org-level, CRUD de instâncias (create, connect, qr, status, disconnect, reconnect, delete, rename).
+- UI: `WhatsAppManagerDialog` com fluxo QR (polling 3s, timeout 2min), wired em **Integrações** (card WhatsApp → "Gerenciar instâncias").
+- Master → Plataforma: seção "WhatsApp via Hook7" para salvar apikey global e base URL.
+- Configurações: nova aba **WhatsApp** para alternar `shared` ↔ `per_user`.
+- Docs: seção "WhatsApp via Hook7" em `docs/user/README.md`.
