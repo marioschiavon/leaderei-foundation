@@ -51,11 +51,12 @@ async function getHook7BaseUrl(): Promise<string> {
   return (v || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
-async function getHook7GlobalApiKey(): Promise<string> {
-  const { data, error } = await supabaseAdmin.rpc("get_platform_secret", { _key: "hook7_global_apikey" });
-  if (error) throw new Error(error.message);
-  if (!data || typeof data !== "string") throw new Error("Hook7 não está configurado pelo administrador da plataforma.");
-  return data;
+function getHook7GlobalApiKey(): string {
+  const key = (process.env.HOOK7_GLOBAL_APIKEY ?? "").trim();
+  if (!key) {
+    throw new Error("HOOK7_GLOBAL_APIKEY não configurada. Configure no painel de deploy.");
+  }
+  return key;
 }
 
 type Hook7FetchOpts = {
