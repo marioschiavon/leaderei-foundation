@@ -1,0 +1,1 @@
+DELETE FROM public.platform_settings WHERE key = 'hook7_global_apikey';
