@@ -37,7 +37,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import { signOut, useAuthSession, useIsMaster } from "@/lib/auth";
-import { getMyContext } from "@/lib/tenant.functions";
+import { getMyContext, getLeadsNeedingReviewCount } from "@/lib/tenant.functions";
 
 type NavItem = {
   title: string;
