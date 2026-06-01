@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Mail, MessageCircle, Linkedin, Inbox as InboxIcon, Bot, Search, Send,
   PanelRightClose, PanelRightOpen, MoreHorizontal, X, ExternalLink,
-  CheckCheck, Check, Clock, AlertCircle, type LucideIcon,
+  CheckCheck, Check, Clock, AlertCircle, AlertTriangle, Loader2, type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
@@ -17,8 +18,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { listConversations } from "@/lib/tenant.functions";
+import { listConversations, getMyContext, acceptLead, archiveLead } from "@/lib/tenant.functions";
 import { getConversationMessages } from "@/lib/inbox.functions";
+import { sendWhatsAppMessage } from "@/lib/hook7.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/inbox")({
@@ -48,13 +51,21 @@ function timeAgo(iso: string) {
 }
 
 function InboxPage() {
-  const fetch = useServerFn(listConversations);
-  const { data, isLoading, error } = useQuery({ queryKey: ["conversations"], queryFn: () => fetch() });
+  const fetchConvs = useServerFn(listConversations);
+  const fetchCtx = useServerFn(getMyContext);
+  const queryClient = useQueryClient();
+
+  const { data: ctx } = useQuery({ queryKey: ["tenant", "context"], queryFn: () => fetchCtx() });
+  const organizationId = ctx?.organization?.id ?? null;
+
+  const { data, isLoading, error } = useQuery({ queryKey: ["conversations"], queryFn: () => fetchConvs() });
   const [query, setQuery] = useState("");
+  const [channelFilter, setChannelFilter] = useState<"all" | "email" | "whatsapp">("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(true);
 
-  const items = (data ?? []).filter((c) => {
+  const items = (data ?? []).filter((c: any) => {
+    if (channelFilter !== "all" && c.channel !== channelFilter) return false;
     if (!query) return true;
     const q = query.toLowerCase();
     const lead = Array.isArray(c.leads) ? c.leads[0] : c.leads;
@@ -66,7 +77,41 @@ function InboxPage() {
     );
   });
 
-  const active = items.find((i) => i.id === activeId) ?? items[0] ?? null;
+  const active = items.find((i: any) => i.id === activeId) ?? items[0] ?? null;
+  const currentConversationId = active?.id ?? null;
+
+  // Realtime: subscribe to messages INSERT/UPDATE scoped to org
+  useEffect(() => {
+    if (!organizationId) return;
+    const channel = supabase
+      .channel(`inbox-${organizationId}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "messages",
+        filter: `organization_id=eq.${organizationId}`,
+      }, (payload: any) => {
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        if (payload.new?.conversation_id) {
+          queryClient.invalidateQueries({ queryKey: ["conv-messages", payload.new.conversation_id] });
+        }
+      })
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "messages",
+        filter: `organization_id=eq.${organizationId}`,
+      }, (payload: any) => {
+        if (payload.new?.conversation_id) {
+          queryClient.invalidateQueries({ queryKey: ["conv-messages", payload.new.conversation_id] });
+        }
+      })
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "leads",
+        filter: `organization_id=eq.${organizationId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+        queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [organizationId, queryClient]);
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -81,7 +126,7 @@ function InboxPage() {
           <div className="space-y-2 rounded-xl border bg-surface p-4">
             {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded bg-surface-muted/50" />)}
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && channelFilter === "all" && !query ? (
           <EmptyState
             icon={InboxIcon}
             title="Inbox vazia"
@@ -96,7 +141,7 @@ function InboxPage() {
           )}>
             {/* Column 1: List */}
             <div className="overflow-hidden rounded-xl border bg-surface">
-              <div className="border-b p-3">
+              <div className="space-y-2 border-b p-3">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -106,9 +151,31 @@ function InboxPage() {
                     className="h-9 pl-8"
                   />
                 </div>
+                <div className="flex gap-1">
+                  {([
+                    { v: "all", label: "Todas" },
+                    { v: "email", label: "📧 Email" },
+                    { v: "whatsapp", label: "💬 WhatsApp" },
+                  ] as const).map((f) => (
+                    <button
+                      key={f.v}
+                      onClick={() => setChannelFilter(f.v)}
+                      className={cn(
+                        "flex-1 rounded-md px-2 py-1 text-[11px] transition-colors",
+                        channelFilter === f.v
+                          ? "bg-foreground text-background"
+                          : "bg-surface-muted/40 text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <ul className="divide-y max-h-[calc(100vh-220px)] overflow-y-auto">
-                {items.map((c) => {
+              <ul className="divide-y max-h-[calc(100vh-260px)] overflow-y-auto">
+                {items.length === 0 ? (
+                  <li className="p-6 text-center text-xs text-muted-foreground">Nenhuma conversa nesse filtro.</li>
+                ) : items.map((c: any) => {
                   const lead = Array.isArray(c.leads) ? c.leads[0] : c.leads;
                   const ch = CHANNEL_META[c.channel] ?? CHANNEL_META.email;
                   const st = STATUS_META[c.status] ?? STATUS_META.open;
@@ -125,12 +192,13 @@ function InboxPage() {
                       >
                         {isActive && <span className="absolute inset-y-0 left-0 w-0.5 bg-brand" />}
                         <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-semibold">
+                          <span className="truncate text-sm font-semibold flex items-center gap-1.5">
+                            <ChIcon className={cn("h-3 w-3 shrink-0", ch.tone)} />
                             {lead?.full_name ?? c.subject ?? "Conversa sem assunto"}
                           </span>
                           {c.last_message_at && (
                             <span className="shrink-0 text-[0.7rem] text-muted-foreground">
-                              {new Date(c.last_message_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                              {timeAgo(c.last_message_at)}
                             </span>
                           )}
                         </div>
@@ -141,12 +209,14 @@ function InboxPage() {
                           {c.last_message_preview ?? "Sem mensagens"}
                         </p>
                         <div className="mt-1 flex items-center gap-1.5 text-[0.65rem] text-muted-foreground">
-                          <span className={cn("inline-flex items-center gap-1 rounded-full border bg-background px-1.5 py-0.5", ch.tone)}>
-                            <ChIcon className="h-2.5 w-2.5" />{ch.label}
-                          </span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5">
                             <span className={cn("h-1 w-1 rounded-full", st.dot)} />{st.label}
                           </span>
+                          {lead?.needs_review && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-700">
+                              <AlertTriangle className="h-2.5 w-2.5" /> Revisar
+                            </span>
+                          )}
                           {c.ai_enabled && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-1.5 py-0.5 text-brand">
                               <Bot className="h-2.5 w-2.5" /> IA
@@ -201,10 +271,10 @@ function ConversationThread({
   convId: string; fallbackChannel: string;
   detailsOpen: boolean; onToggleDetails: () => void;
 }) {
-  const fetch = useServerFn(getConversationMessages);
+  const fetchMsgs = useServerFn(getConversationMessages);
   const { data, isLoading } = useQuery({
     queryKey: ["conv-messages", convId],
-    queryFn: () => fetch({ data: { conversation_id: convId } }),
+    queryFn: () => fetchMsgs({ data: { conversation_id: convId } }),
   });
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [data?.messages?.length]);
@@ -214,10 +284,7 @@ function ConversationThread({
   const channel = conv?.channel ?? fallbackChannel;
   const ch = CHANNEL_META[channel] ?? CHANNEL_META.email;
   const ChIcon = ch.icon;
-  const composerHint =
-    channel === "email" ? "Conecte um canal de e-mail em Integrações para enviar mensagens."
-    : channel === "whatsapp" ? "Conecte o WhatsApp em Integrações para enviar mensagens."
-    : "Conecte um canal em Integrações para enviar mensagens.";
+  const isWhatsApp = channel === "whatsapp";
 
   return (
     <>
@@ -250,7 +317,10 @@ function ConversationThread({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[calc(100vh-360px)]">
+      <div className={cn(
+        "flex-1 overflow-y-auto p-4 space-y-2 max-h-[calc(100vh-360px)]",
+        isWhatsApp && "bg-[#ece5dd]/40",
+      )}>
         {isLoading ? (
           <div className="space-y-2">
             {[0,1,2].map(i => <div key={i} className="h-12 animate-pulse rounded bg-surface-muted/50" />)}
@@ -260,37 +330,53 @@ function ConversationThread({
             Esta conversa ainda não tem mensagens registradas.
           </div>
         ) : (
-          data.messages.map((m: any) => <MessageBubble key={m.id} m={m} />)
+          data.messages.map((m: any) => <MessageBubble key={m.id} m={m} isWhatsApp={isWhatsApp || m.source_channel === "whatsapp"} />)
         )}
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t p-3 space-y-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <Textarea disabled rows={2} placeholder="Escreva uma resposta…" className="resize-none" />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>{composerHint}</TooltipContent>
-        </Tooltip>
-        <div className="flex justify-end">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button disabled size="sm"><Send className="mr-1.5 h-4 w-4" />Enviar</Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{composerHint}</TooltipContent>
-          </Tooltip>
+      {isWhatsApp && lead ? (
+        <WhatsAppComposer leadId={lead.id} conversationId={convId} />
+      ) : (
+        <div className="border-t p-3">
+          <div className="text-xs text-muted-foreground text-center">
+            {channel === "email"
+              ? "Resposta por e-mail estará disponível em breve."
+              : "Selecione uma conversa de WhatsApp para responder."}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
 
-function MessageBubble({ m }: { m: any }) {
+function MessageBubble({ m, isWhatsApp }: { m: any; isWhatsApp: boolean }) {
   const outbound = m.direction === "outbound";
+
+  if (isWhatsApp) {
+    const status = m.whatsapp_status ?? m.status;
+    return (
+      <div className={cn("flex", outbound ? "justify-end" : "justify-start")}>
+        <div
+          className={cn(
+            "max-w-[78%] rounded-lg px-3 py-2 text-sm shadow-sm",
+            outbound ? "bg-[#dcf8c6] text-foreground" : "bg-white text-foreground border border-black/5",
+          )}
+        >
+          <div className="whitespace-pre-wrap break-words">
+            {m.body ?? <span className="italic text-muted-foreground">(sem corpo)</span>}
+          </div>
+          <div className="mt-1 flex items-center justify-end gap-1 text-[0.65rem] text-muted-foreground">
+            {m.sent_by_ai && <span className="rounded bg-brand/10 px-1 text-brand">IA</span>}
+            <span>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+            {outbound && <WhatsAppStatus status={status} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default (email/other) bubbles
   const StatusIcon =
     m.status === "read" ? CheckCheck :
     m.status === "delivered" ? CheckCheck :
@@ -313,16 +399,102 @@ function MessageBubble({ m }: { m: any }) {
   );
 }
 
+function WhatsAppStatus({ status }: { status: string | null | undefined }) {
+  if (status === "failed") return <AlertCircle className="h-3 w-3 text-destructive" />;
+  if (status === "read") return <CheckCheck className="h-3 w-3 text-[#34b7f1]" />;
+  if (status === "delivered") return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
+  if (status === "sent") return <Check className="h-3 w-3 text-muted-foreground" />;
+  return <Clock className="h-3 w-3 text-muted-foreground" />;
+}
+
+function WhatsAppComposer({ leadId, conversationId }: { leadId: string; conversationId: string }) {
+  const sendFn = useServerFn(sendWhatsAppMessage);
+  const queryClient = useQueryClient();
+  const [text, setText] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: () => sendFn({ data: { lead_id: leadId, text: text.trim() } }),
+    onSuccess: (res: any) => {
+      if (res?.ok === false) {
+        toast.error(res.error ?? "Falha ao enviar.");
+      } else {
+        setText("");
+      }
+      queryClient.invalidateQueries({ queryKey: ["conv-messages", conversationId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function handleSend() {
+    if (!text.trim() || mutation.isPending) return;
+    mutation.mutate();
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  return (
+    <div className="border-t p-3 space-y-2 bg-background">
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={onKeyDown}
+        rows={2}
+        placeholder="Escreva uma resposta…  (Cmd/Ctrl + Enter envia)"
+        disabled={mutation.isPending}
+        className="resize-none"
+      />
+      <div className="flex justify-end">
+        <Button size="sm" onClick={handleSend} disabled={!text.trim() || mutation.isPending}>
+          {mutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
+          Enviar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function LeadDetails({ convId, onClose }: { convId: string; onClose: () => void }) {
-  const fetch = useServerFn(getConversationMessages);
+  const fetchMsgs = useServerFn(getConversationMessages);
+  const acceptFn = useServerFn(acceptLead);
+  const archiveFn = useServerFn(archiveLead);
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["conv-messages", convId],
-    queryFn: () => fetch({ data: { conversation_id: convId } }),
+    queryFn: () => fetchMsgs({ data: { conversation_id: convId } }),
   });
   const conv: any = data?.conversation;
   const lead = conv && (Array.isArray(conv.leads) ? conv.leads[0] : conv.leads);
   const initials = lead?.full_name?.split(" ").slice(0, 2).map((s: string) => s[0]).join("") ?? "?";
   const src = lead?.lead_sources && (Array.isArray(lead.lead_sources) ? lead.lead_sources[0] : lead.lead_sources);
+
+  const acceptMut = useMutation({
+    mutationFn: () => acceptFn({ data: { id: lead.id } }),
+    onSuccess: () => {
+      toast.success("Lead aceito.");
+      queryClient.invalidateQueries({ queryKey: ["conv-messages", convId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const discardMut = useMutation({
+    mutationFn: () => archiveFn({ data: { id: lead.id } }),
+    onSuccess: () => {
+      toast.success("Lead descartado.");
+      queryClient.invalidateQueries({ queryKey: ["conv-messages", convId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <aside className="rounded-xl border bg-surface">
@@ -333,15 +505,27 @@ function LeadDetails({ convId, onClose }: { convId: string; onClose: () => void 
       {!lead ? (
         <div className="p-6 space-y-3 text-sm">
           <div className="text-muted-foreground">Esta conversa não está vinculada a um lead.</div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild><span><Button disabled size="sm" variant="outline">Vincular lead</Button></span></TooltipTrigger>
-              <TooltipContent>Em breve</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
       ) : (
         <div className="p-4 space-y-4 text-sm">
+          {lead.needs_review && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  Lead criado automaticamente via WhatsApp. Revise os dados antes de prosseguir.
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" className="h-7" onClick={() => acceptMut.mutate()} disabled={acceptMut.isPending}>
+                  Aceitar lead
+                </Button>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => discardMut.mutate()} disabled={discardMut.isPending}>
+                  Descartar
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-full bg-brand/10 text-brand font-semibold">
               {initials.toUpperCase()}
