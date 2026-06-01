@@ -9,35 +9,31 @@ import {
 } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
-  SiResend, SiLinkedin, SiWhatsapp, SiHubspot, SiPipedrive, SiGooglecalendar,
+  SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar,
 } from "react-icons/si";
-import { PageHeader } from "@/components/app/PageHeader";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import { listIntegrations } from "@/lib/tenant.functions";
-import {
-  getOrgResendConnection, saveOrgResendConnection, disconnectOrgResend,
-} from "@/lib/integrations.functions";
-import { listHook7Instances } from "@/lib/hook7.functions";
-import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
+import { FaLinkedin } from "react-icons/fa";
 
-export const Route = createFileRoute("/_app/dashboard/integrations")({
-  component: IntegrationsPage,
-});
+// Inline brand marks for vendors not covered by react-icons.
+const PipedriveIcon: IconType = (props: any) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M14.32 0C9.92 0 7.04 2.24 7.04 5.76c0 2.4 1.6 4.16 4.32 4.16 1.12 0 2.08-.32 2.72-.8v.16c0 2.4-1.6 3.84-4.32 3.84-1.6 0-3.04-.48-4-1.12L4.8 15.84C6.08 16.96 8.32 17.76 10.88 17.76c5.12 0 8.16-2.88 8.16-7.52V6.4C19.04 2.4 17.12 0 14.32 0zm-.48 6.72c-.48.32-1.12.48-1.76.48-1.28 0-2.08-.8-2.08-1.92 0-1.28.96-2.08 2.4-2.08 1.28 0 2.08.96 2.08 2.4 0 .48-.16.8-.64 1.12zM4.96 18.24v5.28L9.6 24v-5.12c-1.6-.16-3.2-.32-4.64-.64z"/>
+  </svg>
+);
+const ApolloIcon: IconType = (props: any) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm-1.392 4.704h2.736l5.4 14.592h-2.928l-1.128-3.216H8.928l3.072-2.376h2.832l-2.4-6.84-4.92 12.432H4.656l5.952-14.592z"/>
+  </svg>
+);
 
-const SLUG_ICON: Record<string, LucideIcon> = {
-  resend: Mail,
-  linkedin: MessageCircle,
-  whatsapp: MessageCircle,
-  hubspot: Building2,
-  pipedrive: Briefcase,
-  apollo: Users,
-  "google-calendar": Calendar,
+type Brand = { Icon: IconType; tint: string };
+const SLUG_BRAND: Record<string, Brand> = {
+  resend:            { Icon: SiResend,          tint: "text-foreground" },
+  linkedin:          { Icon: FaLinkedin,        tint: "text-[#0A66C2]" },
+  whatsapp:          { Icon: SiWhatsapp,        tint: "text-[#25D366]" },
+  hubspot:           { Icon: SiHubspot,         tint: "text-[#FF7A59]" },
+  pipedrive:         { Icon: PipedriveIcon,     tint: "text-[#1A1A1A] dark:text-foreground" },
+  apollo:            { Icon: ApolloIcon,        tint: "text-[#1B116E]" },
+  "google-calendar": { Icon: SiGooglecalendar,  tint: "text-[#4285F4]" },
 };
 
 const STATUS_META: Record<string, { label: string; icon: LucideIcon; className: string; helper: string }> = {
