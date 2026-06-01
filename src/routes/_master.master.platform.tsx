@@ -14,6 +14,7 @@ import {
 } from "@/lib/platform.functions";
 import {
   getHook7PlatformConfig, setHook7BaseUrl, getHook7GlobalApiKeyStatus, testHook7Connection,
+  getHook7WebhookStatus,
 } from "@/lib/hook7.functions";
 import { useAuthSession } from "@/lib/auth";
 
