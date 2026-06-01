@@ -28,6 +28,7 @@ import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.lo
 import { Route as AppDashboardSettingsRouteImport } from './routes/_app.dashboard.settings'
 import { Route as AppDashboardPipelineRouteImport } from './routes/_app.dashboard.pipeline'
 import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.leads'
+import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dashboard.integrations'
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
@@ -127,6 +128,12 @@ const AppDashboardLeadsRoute = AppDashboardLeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => AppDashboardRoute,
 } as any)
+const AppDashboardIntegrationsRoute =
+  AppDashboardIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AppDashboardRoute,
+  } as any)
 const AppDashboardInboxRoute = AppDashboardInboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
@@ -160,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
+  '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/dashboard/leads': typeof AppDashboardLeadsRoute
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
@@ -182,6 +190,7 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
+  '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/dashboard/leads': typeof AppDashboardLeadsRoute
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
@@ -208,6 +217,7 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
+  '/_app/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/_app/dashboard/leads': typeof AppDashboardLeadsRoute
   '/_app/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
+    | '/dashboard/integrations'
     | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
+    | '/dashboard/integrations'
     | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
@@ -280,6 +292,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/_app/dashboard/campaigns'
     | '/_app/dashboard/inbox'
+    | '/_app/dashboard/integrations'
     | '/_app/dashboard/leads'
     | '/_app/dashboard/pipeline'
     | '/_app/dashboard/settings'
@@ -440,6 +453,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardLeadsRouteImport
       parentRoute: typeof AppDashboardRoute
     }
+    '/_app/dashboard/integrations': {
+      id: '/_app/dashboard/integrations'
+      path: '/integrations'
+      fullPath: '/dashboard/integrations'
+      preLoaderRoute: typeof AppDashboardIntegrationsRouteImport
+      parentRoute: typeof AppDashboardRoute
+    }
     '/_app/dashboard/inbox': {
       id: '/_app/dashboard/inbox'
       path: '/inbox'
@@ -474,6 +494,7 @@ declare module '@tanstack/react-router' {
 interface AppDashboardRouteChildren {
   AppDashboardCampaignsRoute: typeof AppDashboardCampaignsRoute
   AppDashboardInboxRoute: typeof AppDashboardInboxRoute
+  AppDashboardIntegrationsRoute: typeof AppDashboardIntegrationsRoute
   AppDashboardLeadsRoute: typeof AppDashboardLeadsRoute
   AppDashboardPipelineRoute: typeof AppDashboardPipelineRoute
   AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
@@ -485,6 +506,7 @@ interface AppDashboardRouteChildren {
 const AppDashboardRouteChildren: AppDashboardRouteChildren = {
   AppDashboardCampaignsRoute: AppDashboardCampaignsRoute,
   AppDashboardInboxRoute: AppDashboardInboxRoute,
+  AppDashboardIntegrationsRoute: AppDashboardIntegrationsRoute,
   AppDashboardLeadsRoute: AppDashboardLeadsRoute,
   AppDashboardPipelineRoute: AppDashboardPipelineRoute,
   AppDashboardSettingsRoute: AppDashboardSettingsRoute,
