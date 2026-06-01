@@ -44,12 +44,39 @@ const STATUS_META: Record<string, { label: string; icon: LucideIcon; className: 
   disconnected: { label: "Desconectado", icon: Circle,        className: "bg-muted text-muted-foreground",       helper: "Provider disponível, sem conexão ativa." },
 };
 
+function relTime(iso?: string | null): string {
+  if (!iso) return "Ainda não sincronizado";
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return `há ${d} d`;
+}
+
 function IntegrationsPage() {
   const fetchList = useServerFn(listIntegrations);
+  const fetchHook7 = useServerFn(listHook7Instances);
   const { data, isLoading, error } = useQuery({
     queryKey: ["integrations"],
     queryFn: () => fetchList(),
   });
+  const { data: hook7Data } = useQuery({
+    queryKey: ["hook7-instances"],
+    queryFn: () => fetchHook7(),
+  });
+
+  const hook7Instances = (hook7Data?.instances ?? []) as any[];
+  const hook7Connected = hook7Instances.filter((i) => i.status === "connected").length;
+  const hook7Total = hook7Instances.length;
+  const hook7HasError = hook7Instances.some((i) => i.status === "error" || i.status === "banned");
+  const hook7LastSync = hook7Instances
+    .map((i) => i.last_connected_at)
+    .filter(Boolean)
+    .sort()
+    .reverse()[0] ?? null;
 
   const integrations = data ?? [];
   const connectedCount = integrations.filter((p) => p.connection?.status === "connected").length;
