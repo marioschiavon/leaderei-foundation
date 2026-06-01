@@ -131,6 +131,27 @@ function Hook7Section() {
           </div>
         </div>
 
+        <div className="rounded-lg border bg-background p-4">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Webhook URL</Label>
+          <div className="mt-1.5 text-sm">
+            {webhook?.configured ? (
+              <span className="inline-flex items-center gap-2 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
+                <code className="rounded bg-muted px-1 font-mono text-xs break-all">{webhook.urlMasked}</code>
+              </span>
+            ) : (
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-2 text-destructive">
+                  <ShieldAlert className="h-4 w-4" /> Não configurado — defina <code className="rounded bg-muted px-1 font-mono text-xs">HOOK7_WEBHOOK_SECRET</code> no painel de deploy
+                </span>
+                <p className="text-xs text-amber-700">
+                  Sem o webhook configurado, as instâncias conectarão mas o Leaderei não receberá mensagens.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center justify-between gap-3 pt-1">
           <Button onClick={() => testMut.mutate()} disabled={testMut.isPending || !configured} variant="outline">
             {testMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
