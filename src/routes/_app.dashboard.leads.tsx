@@ -156,6 +156,42 @@ function LeadsPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [tab, setTab] = useState<"all" | "review">("all");
+
+  const fetchReview = useServerFn(listLeadsNeedingReview);
+  const fetchReviewCount = useServerFn(getLeadsNeedingReviewCount);
+  const acceptFn = useServerFn(acceptLead);
+  const archiveFnReview = useServerFn(archiveLead);
+  const queryClient = useQueryClient();
+  const { data: reviewLeads } = useQuery({
+    queryKey: ["leads-needing-review"],
+    queryFn: () => fetchReview(),
+  });
+  const { data: reviewCount } = useQuery({
+    queryKey: ["leads-needing-review-count"],
+    queryFn: () => fetchReviewCount(),
+  });
+
+  const acceptMut = useMutation({
+    mutationFn: (id: string) => acceptFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Lead aceito.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const discardMut = useMutation({
+    mutationFn: (id: string) => archiveFnReview({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Lead descartado.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const filtered = useMemo(() => {
     return (leads ?? []).filter((lead) => {
