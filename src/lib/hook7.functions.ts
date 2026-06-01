@@ -195,6 +195,20 @@ export const getHook7GlobalApiKeyStatus = createServerFn({ method: "GET" })
     return { configured: !!(process.env.HOOK7_GLOBAL_APIKEY ?? "").trim() };
   });
 
+export const getHook7WebhookStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await assertMasterAdmin(supabase, userId);
+    const secret = (process.env.HOOK7_WEBHOOK_SECRET ?? "").trim();
+    const supaUrl = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+    const configured = !!secret && !!supaUrl;
+    const urlMasked = configured
+      ? `${supaUrl}/functions/v1/hook7-webhook/****/{org-slug}`
+      : null;
+    return { configured, urlMasked };
+  });
+
 export const testHook7Connection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
