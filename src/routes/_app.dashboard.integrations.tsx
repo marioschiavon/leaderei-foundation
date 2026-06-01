@@ -12,6 +12,26 @@ import {
   SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar,
 } from "react-icons/si";
 import { FaLinkedin } from "react-icons/fa";
+import { PageHeader } from "@/components/app/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { listIntegrations } from "@/lib/tenant.functions";
+import {
+  getOrgResendConnection, saveOrgResendConnection, disconnectOrgResend,
+} from "@/lib/integrations.functions";
+import { listHook7Instances } from "@/lib/hook7.functions";
+import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
+
+export const Route = createFileRoute("/_app/dashboard/integrations")({
+  component: IntegrationsPage,
+});
+
+
 
 // Inline brand marks for vendors not covered by react-icons.
 const PipedriveIcon: IconType = (props: any) => (
