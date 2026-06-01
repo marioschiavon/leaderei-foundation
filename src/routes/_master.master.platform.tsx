@@ -47,10 +47,12 @@ function Hook7Section() {
   const qc = useQueryClient();
   const fetchCfg = useServerFn(getHook7PlatformConfig);
   const fetchStatus = useServerFn(getHook7GlobalApiKeyStatus);
+  const fetchWebhook = useServerFn(getHook7WebhookStatus);
   const saveUrl = useServerFn(setHook7BaseUrl);
   const testConn = useServerFn(testHook7Connection);
   const { data: cfg, isLoading } = useQuery({ queryKey: ["hook7-platform"], queryFn: () => fetchCfg() });
   const { data: status } = useQuery({ queryKey: ["hook7-status"], queryFn: () => fetchStatus() });
+  const { data: webhook } = useQuery({ queryKey: ["hook7-webhook"], queryFn: () => fetchWebhook() });
   const [baseUrl, setBaseUrl] = useState("");
   const [editingUrl, setEditingUrl] = useState(false);
 
