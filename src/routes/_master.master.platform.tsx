@@ -14,6 +14,7 @@ import {
 } from "@/lib/platform.functions";
 import {
   getHook7PlatformConfig, setHook7BaseUrl, getHook7GlobalApiKeyStatus, testHook7Connection,
+  getHook7WebhookStatus,
 } from "@/lib/hook7.functions";
 import { useAuthSession } from "@/lib/auth";
 
@@ -46,10 +47,12 @@ function Hook7Section() {
   const qc = useQueryClient();
   const fetchCfg = useServerFn(getHook7PlatformConfig);
   const fetchStatus = useServerFn(getHook7GlobalApiKeyStatus);
+  const fetchWebhook = useServerFn(getHook7WebhookStatus);
   const saveUrl = useServerFn(setHook7BaseUrl);
   const testConn = useServerFn(testHook7Connection);
   const { data: cfg, isLoading } = useQuery({ queryKey: ["hook7-platform"], queryFn: () => fetchCfg() });
   const { data: status } = useQuery({ queryKey: ["hook7-status"], queryFn: () => fetchStatus() });
+  const { data: webhook } = useQuery({ queryKey: ["hook7-webhook"], queryFn: () => fetchWebhook() });
   const [baseUrl, setBaseUrl] = useState("");
   const [editingUrl, setEditingUrl] = useState(false);
 
@@ -125,6 +128,27 @@ function Hook7Section() {
           <div className="mt-1.5 text-sm">
             <span className="font-mono">{cfg?.instance_prefix ?? "lead"}</span>
             <span className="ml-2 text-xs text-muted-foreground">configurável via env var <code className="rounded bg-muted px-1 font-mono">HOOK7_INSTANCE_PREFIX</code></span>
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-background p-4">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Webhook URL</Label>
+          <div className="mt-1.5 text-sm">
+            {webhook?.configured ? (
+              <span className="inline-flex items-center gap-2 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
+                <code className="rounded bg-muted px-1 font-mono text-xs break-all">{webhook.urlMasked}</code>
+              </span>
+            ) : (
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-2 text-destructive">
+                  <ShieldAlert className="h-4 w-4" /> Não configurado — defina <code className="rounded bg-muted px-1 font-mono text-xs">HOOK7_WEBHOOK_SECRET</code> no painel de deploy
+                </span>
+                <p className="text-xs text-amber-700">
+                  Sem o webhook configurado, as instâncias conectarão mas o Leaderei não receberá mensagens.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

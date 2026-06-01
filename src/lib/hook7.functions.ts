@@ -138,6 +138,25 @@ async function getCallerOrg(supabase: any, userId: string): Promise<{ id: string
   return { id: org.id, slug: org.slug, whatsapp_mode: (org as any).whatsapp_mode ?? "shared" };
 }
 
+const HOOK7_SUBSCRIBE_EVENTS = ["Message", "Receipt", "Connected", "LoggedOut", "ChatPresence"];
+
+function buildHook7WebhookUrl(orgSlug: string): string {
+  const secret = (process.env.HOOK7_WEBHOOK_SECRET ?? "").trim();
+  const supaUrl = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+  if (!secret || !supaUrl) return "";
+  return `${supaUrl}/functions/v1/hook7-webhook/${secret}/${encodeURIComponent(orgSlug)}`;
+}
+
+async function getOrgSlug(organization_id: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("organizations")
+    .select("slug")
+    .eq("id", organization_id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.slug ?? "") as string;
+}
+
 // ---------------------------------------------------------------------------
 // Master: platform-level config
 // ---------------------------------------------------------------------------
@@ -174,6 +193,20 @@ export const getHook7GlobalApiKeyStatus = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     await assertMasterAdmin(supabase, userId);
     return { configured: !!(process.env.HOOK7_GLOBAL_APIKEY ?? "").trim() };
+  });
+
+export const getHook7WebhookStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await assertMasterAdmin(supabase, userId);
+    const secret = (process.env.HOOK7_WEBHOOK_SECRET ?? "").trim();
+    const supaUrl = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+    const configured = !!secret && !!supaUrl;
+    const urlMasked = configured
+      ? `${supaUrl}/functions/v1/hook7-webhook/****/{org-slug}`
+      : null;
+    return { configured, urlMasked };
   });
 
 export const testHook7Connection = createServerFn({ method: "POST" })
@@ -376,10 +409,15 @@ export const connectHook7Instance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
+    const orgSlug = await getOrgSlug(inst.organization_id);
+    const webhookUrl = buildHook7WebhookUrl(orgSlug);
+    if (!webhookUrl) {
+      console.warn(`[hook7] HOOK7_WEBHOOK_SECRET ausente — conectando sem webhook (instance_id=${inst.id})`);
+    }
     await hook7Fetch("/instance/connect", {
       method: "POST",
       apikey: token,
-      body: { immediate: true, webhookUrl: "", subscribe: [] },
+      body: { immediate: true, webhookUrl, subscribe: HOOK7_SUBSCRIBE_EVENTS },
     });
     await supabase
       .from("hook7_instances")
@@ -474,13 +512,15 @@ export const reconnectHook7Instance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
+    const orgSlug = await getOrgSlug(inst.organization_id);
+    const webhookUrl = buildHook7WebhookUrl(orgSlug);
     try {
       await hook7Fetch("/instance/reconnect", { method: "POST", apikey: token, body: {} });
     } catch {
       // fallback to connect
       await hook7Fetch("/instance/connect", {
         method: "POST", apikey: token,
-        body: { immediate: true, webhookUrl: "", subscribe: [] },
+        body: { immediate: true, webhookUrl, subscribe: HOOK7_SUBSCRIBE_EVENTS },
       });
     }
     await supabase

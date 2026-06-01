@@ -1282,11 +1282,13 @@ export type Database = {
           last_contact_at: string | null
           linkedin_url: string | null
           mobile_phone: string | null
+          needs_review: boolean
           next_followup_at: string | null
           organization_id: string
           owner_user_id: string | null
           personal_email: string | null
           phone: string | null
+          review_reason: string | null
           score: number
           secondary_email: string | null
           seniority: string | null
@@ -1320,11 +1322,13 @@ export type Database = {
           last_contact_at?: string | null
           linkedin_url?: string | null
           mobile_phone?: string | null
+          needs_review?: boolean
           next_followup_at?: string | null
           organization_id: string
           owner_user_id?: string | null
           personal_email?: string | null
           phone?: string | null
+          review_reason?: string | null
           score?: number
           secondary_email?: string | null
           seniority?: string | null
@@ -1358,11 +1362,13 @@ export type Database = {
           last_contact_at?: string | null
           linkedin_url?: string | null
           mobile_phone?: string | null
+          needs_review?: boolean
           next_followup_at?: string | null
           organization_id?: string
           owner_user_id?: string | null
           personal_email?: string | null
           phone?: string | null
+          review_reason?: string | null
           score?: number
           secondary_email?: string | null
           seniority?: string | null
@@ -1409,7 +1415,10 @@ export type Database = {
           sender_user_id: string | null
           sent_at: string | null
           sent_by_ai: boolean
+          source_channel: string
           status: Database["public"]["Enums"]["message_status"]
+          whatsapp_status: string | null
+          whatsapp_status_at: string | null
         }
         Insert: {
           attachments?: Json
@@ -1428,7 +1437,10 @@ export type Database = {
           sender_user_id?: string | null
           sent_at?: string | null
           sent_by_ai?: boolean
+          source_channel?: string
           status?: Database["public"]["Enums"]["message_status"]
+          whatsapp_status?: string | null
+          whatsapp_status_at?: string | null
         }
         Update: {
           attachments?: Json
@@ -1447,7 +1459,10 @@ export type Database = {
           sender_user_id?: string | null
           sent_at?: string | null
           sent_by_ai?: boolean
+          source_channel?: string
           status?: Database["public"]["Enums"]["message_status"]
+          whatsapp_status?: string | null
+          whatsapp_status_at?: string | null
         }
         Relationships: [
           {

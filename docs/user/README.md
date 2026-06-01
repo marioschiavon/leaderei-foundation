@@ -185,3 +185,11 @@ Todos os envios ficam registrados em `email_send_log`, auditáveis pelo master e
 ### Histórico
 
 - Adicionado: roteador central de email (`src/lib/email.functions.ts`), tabela `platform_settings` com Vault/pgcrypto, tabela `email_send_log`, página **Master → Plataforma** (chave Resend global, branding/logo, teste de envio, logs), banner explicativo em Integrações.
+
+## Webhook Hook7 / Recebimento de mensagens
+
+A infraestrutura WhatsApp (Hook7) entrega cada mensagem recebida no número conectado para uma Edge Function do Leaderei (`hook7-webhook`), que grava as mensagens na tabela `messages` e cria automaticamente um **lead órfão** (`needs_review = true`, motivo `inbound_from_unknown_whatsapp`) quando o número remetente ainda não existe na organização.
+
+A URL do webhook tem o formato `https://<projeto>.supabase.co/functions/v1/hook7-webhook/{secret}/{org-slug}` e é registrada automaticamente no Hook7 toda vez que uma instância é conectada ou reconectada. Mensagens de grupo, eventos de presença e tipos desconhecidos são descartados (200 + nada). A idempotência usa `Info.ID` (campo `external_message_id`), então reentregas do mesmo evento nunca duplicam linhas.
+
+**Configuração:** defina `HOOK7_WEBHOOK_SECRET` no painel de deploy (UUID v4 gerado uma única vez — **nunca rotacionar**, rotacionar invalida todos os webhooks já registrados nas instâncias existentes). Sem essa variável as instâncias ainda conectam, mas o Leaderei não recebe mensagens — o status aparece em **Master → Plataforma → WhatsApp · Hook7 → Webhook URL**.
