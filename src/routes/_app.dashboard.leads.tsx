@@ -494,6 +494,9 @@ function LeadsPage() {
           )}
         </aside>
       </div>
+      )}
+
+
 
       <NewLeadSheet
         open={newLeadOpen}
