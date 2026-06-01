@@ -67,11 +67,19 @@ export function AppSidebar() {
   const { user } = useAuthSession();
   const { data: isMaster } = useIsMaster(user?.id);
   const fetchContext = useServerFn(getMyContext);
+  const fetchReviewCount = useServerFn(getLeadsNeedingReviewCount);
   const { data: tenantContext } = useQuery({
     enabled: !!user,
     queryKey: ["tenant", "context"],
     queryFn: () => fetchContext(),
   });
+  const { data: reviewCount } = useQuery({
+    enabled: !!user,
+    queryKey: ["leads-needing-review-count"],
+    queryFn: () => fetchReviewCount(),
+    refetchInterval: 60_000,
+  });
+  const reviewBadge = reviewCount?.count && reviewCount.count > 0 ? String(reviewCount.count) : null;
 
   const isActive = (url: string) =>
     url === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(url);
