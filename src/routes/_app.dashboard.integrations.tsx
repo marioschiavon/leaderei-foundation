@@ -4,10 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  AlertTriangle, ArrowRight, Briefcase, Building2, Calendar,
-  CheckCircle2, Circle, Clock3, Mail, MessageCircle, Plug,
-  Loader2, type LucideIcon, Users,
+  AlertTriangle, ArrowRight, CheckCircle2, Circle, Clock3, Mail, Plug,
+  Loader2, type LucideIcon,
 } from "lucide-react";
+import type { IconType } from "react-icons";
+import {
+  SiResend, SiLinkedin, SiWhatsapp, SiHubspot, SiPipedrive, SiGooglecalendar,
+} from "react-icons/si";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
