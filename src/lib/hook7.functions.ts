@@ -409,10 +409,15 @@ export const connectHook7Instance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
+    const orgSlug = await getOrgSlug(inst.organization_id);
+    const webhookUrl = buildHook7WebhookUrl(orgSlug);
+    if (!webhookUrl) {
+      console.warn(`[hook7] HOOK7_WEBHOOK_SECRET ausente — conectando sem webhook (instance_id=${inst.id})`);
+    }
     await hook7Fetch("/instance/connect", {
       method: "POST",
       apikey: token,
-      body: { immediate: true, webhookUrl: "", subscribe: [] },
+      body: { immediate: true, webhookUrl, subscribe: HOOK7_SUBSCRIBE_EVENTS },
     });
     await supabase
       .from("hook7_instances")
