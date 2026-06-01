@@ -105,3 +105,16 @@ Mudanças:
 - `createHook7Instance`: audita o mapeamento `data.id → external_id`, `data.name → external_name`, `data.token → token_encrypted`; warning se o nome devolvido divergir do enviado.
 - `deleteHook7Instance`: aceita `reason` (`user_delete`/`cancel`/`timeout`). Defensivo: nunca arquiva uma instância `connected` em rollback de cancel/timeout.
 - `WhatsAppManagerDialog`: `handleCancel(reason)` propaga motivo; auto-arquiva no timeout 2min; passo 2 mostra "Conectado como {Name}" + nota "O número será detectado em breve"; lista usa `connected_profile_name` como fallback quando `phone_number` é NULL.
+
+---
+
+## Rodada 1B — Webhook Hook7 (FECHADA)
+
+- Migration: campos `external_message_id`, `source_channel`, `whatsapp_status`, `whatsapp_status_at` em `messages`; `needs_review`/`review_reason` em `leads`; índice único parcial em `external_message_id`; realtime habilitado em `messages`.
+- Edge Function `hook7-webhook` (Deno, service_role) recebe eventos Hook7, valida secret de path + `instanceToken`, e roteia `Message` / `Receipt` / `Connected` / `LoggedOut`. Sempre retorna 200.
+- `connectHook7Instance` / `reconnectHook7Instance` agora registram o `webhookUrl` automaticamente no Hook7 (graceful degradation se `HOOK7_WEBHOOK_SECRET` ausente).
+- Master → Plataforma → WhatsApp · Hook7 mostra status do webhook (URL com secret mascarado).
+
+### Próxima — Rodada 1B.2
+
+UI do Inbox consumindo `messages` em tempo real (canal realtime client-side) + filtro de leads `needs_review = true` ("Caixa de entrada órfã").
