@@ -143,7 +143,9 @@ function IntegrationsPage() {
                 <div key={i} className="h-48 animate-pulse rounded-xl bg-surface-muted/40" />
               ))
             : integrations.map((provider) => {
-                const Icon = SLUG_ICON[provider.slug] ?? Plug;
+                const brand = SLUG_BRAND[provider.slug];
+                const Icon: IconType | LucideIcon = brand?.Icon ?? Plug;
+                const iconTint = brand?.tint ?? "text-muted-foreground";
                 let status = provider.connection?.status ?? "disconnected";
                 const isResend = provider.slug === "resend";
                 const isWhatsApp = provider.slug === "whatsapp";
