@@ -125,15 +125,46 @@ function IntegrationsPage() {
               ))
             : integrations.map((provider) => {
                 const Icon = SLUG_ICON[provider.slug] ?? Plug;
-                const status = provider.connection?.status ?? "disconnected";
-                const meta = STATUS_META[status] ?? STATUS_META.disconnected;
-                const StatusIcon = meta.icon;
-                const syncLabel = provider.connection?.last_synced_at
-                  ? new Date(provider.connection.last_synced_at).toLocaleString("pt-BR")
-                  : null;
+                let status = provider.connection?.status ?? "disconnected";
                 const isResend = provider.slug === "resend";
                 const isWhatsApp = provider.slug === "whatsapp";
                 const isInteractive = isResend || isWhatsApp;
+
+                // Hook7-aware override for the WhatsApp card.
+                let operationalLabel: string;
+                let readinessLabel: string;
+                let syncLabel: string | null;
+                if (isWhatsApp) {
+                  if (hook7HasError) status = "error";
+                  else if (hook7Connected > 0) status = "connected";
+                  else if (hook7Total > 0) status = "pending";
+                  else status = "disconnected";
+
+                  if (hook7HasError) {
+                    operationalLabel = "Instância com problema";
+                    readinessLabel = "Verificar";
+                  } else if (hook7Connected > 0) {
+                    operationalLabel = `${hook7Connected} de ${hook7Total} ativas`;
+                    readinessLabel = "Pronto pra enviar";
+                  } else if (hook7Total > 0) {
+                    operationalLabel = "Sem conexão ativa";
+                    readinessLabel = "Pronto pra reconectar";
+                  } else {
+                    operationalLabel = "Não configurado";
+                    readinessLabel = "Aguardando setup";
+                  }
+                  syncLabel = hook7LastSync ? relTime(hook7LastSync) : null;
+                } else {
+                  syncLabel = provider.connection?.last_synced_at
+                    ? new Date(provider.connection.last_synced_at).toLocaleString("pt-BR")
+                    : null;
+                  const m = STATUS_META[status] ?? STATUS_META.disconnected;
+                  operationalLabel = m.label;
+                  readinessLabel = provider.connection ? "Configuração iniciada" : "Aguardando setup";
+                }
+
+                const meta = STATUS_META[status] ?? STATUS_META.disconnected;
+                const StatusIcon = meta.icon;
 
                 return (
                   <div key={provider.id} className="flex flex-col rounded-xl border bg-surface p-5">
@@ -162,7 +193,7 @@ function IntegrationsPage() {
                     <div className="mt-4 space-y-2 rounded-lg border bg-background p-3 text-xs text-muted-foreground">
                       <div className="flex items-center justify-between gap-3">
                         <span>Status operacional</span>
-                        <span className="font-medium text-foreground">{meta.label}</span>
+                        <span className="font-medium text-foreground">{operationalLabel}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>Último sync</span>
@@ -170,9 +201,10 @@ function IntegrationsPage() {
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>Readiness</span>
-                        <span>{provider.connection ? "Configuração iniciada" : "Aguardando setup"}</span>
+                        <span>{readinessLabel}</span>
                       </div>
                     </div>
+
 
                     {provider.connection?.last_error && (
                       <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
