@@ -45,15 +45,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  acceptLead,
   archiveLead,
   createLead,
   getLeadDetail,
+  getLeadsNeedingReviewCount,
   listLeads,
+  listLeadsNeedingReview,
   listLeadSources,
   updateLead,
 } from "@/lib/tenant.functions";
 import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, Check } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard/leads")({
   component: LeadsPage,
