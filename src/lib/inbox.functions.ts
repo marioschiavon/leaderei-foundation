@@ -15,14 +15,14 @@ export const getConversationMessages = createServerFn({ method: "POST" })
         .select(
           `id, subject, channel, status, ai_enabled, lead_id,
            leads(id, full_name, company_name, job_title, email, phone, linkedin_url,
-                 status, temperature, score, next_followup_at,
+                 status, temperature, score, next_followup_at, needs_review, review_reason,
                  lead_sources(id, name, color))`,
         )
         .eq("id", data.conversation_id)
         .maybeSingle(),
       supabase
         .from("messages")
-        .select("id, body, direction, status, sent_by_ai, created_at, sent_at, delivered_at, read_at")
+        .select("id, body, direction, status, sent_by_ai, created_at, sent_at, delivered_at, read_at, source_channel, whatsapp_status, whatsapp_status_at, external_message_id")
         .eq("conversation_id", data.conversation_id)
         .order("created_at", { ascending: true })
         .limit(500),
