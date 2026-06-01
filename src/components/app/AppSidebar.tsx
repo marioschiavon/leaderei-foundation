@@ -124,24 +124,30 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {WORKSPACE.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      <span className="flex-1">{item.title}</span>
-                      {item.badge && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-auto bg-muted text-muted-foreground border-transparent text-[0.6rem] px-1.5 py-0 font-medium"
-                        >
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {WORKSPACE.map((item) => {
+                const badge = item.url === "/dashboard/leads" && reviewBadge ? reviewBadge : item.badge;
+                const badgeTone = item.url === "/dashboard/leads" && reviewBadge
+                  ? "bg-amber-500/15 text-amber-700"
+                  : "bg-muted text-muted-foreground";
+                return (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <Link to={item.url} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span className="flex-1">{item.title}</span>
+                        {badge && (
+                          <Badge
+                            variant="secondary"
+                            className={cn("ml-auto border-transparent text-[0.6rem] px-1.5 py-0 font-medium", badgeTone)}
+                          >
+                            {badge}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
