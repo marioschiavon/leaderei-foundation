@@ -191,8 +191,8 @@ function IntegrationsPage() {
                   <div key={provider.id} className="flex flex-col rounded-xl border bg-surface p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="grid h-10 w-10 place-items-center rounded-md border bg-background text-foreground">
-                          <Icon className="h-4 w-4" />
+                        <div className={`grid h-10 w-10 place-items-center rounded-md border bg-background ${iconTint}`}>
+                          <Icon className="h-5 w-5" />
                         </div>
                         <div>
                           <h3 className="font-display text-base font-semibold leading-tight">{provider.name}</h3>
