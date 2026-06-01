@@ -20,6 +20,7 @@ import { listIntegrations } from "@/lib/tenant.functions";
 import {
   getOrgResendConnection, saveOrgResendConnection, disconnectOrgResend,
 } from "@/lib/integrations.functions";
+import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
 
 export const Route = createFileRoute("/_app/dashboard/integrations")({
