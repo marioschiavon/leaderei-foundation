@@ -107,8 +107,14 @@ serve(async (req: Request) => {
         case "ChatPresence":
           // discard
           break;
+        case "SendMessage":
+          // discard — o evento Message com IsFromMe:true já cobre o caso
+          console.log("[hook7-webhook] SendMessage event ignored (handled via Message)", {
+            instanceId: body.instanceId,
+          });
+          break;
         default:
-          console.log("[hook7-webhook] unknown event", { event, instanceId });
+          console.log("[hook7-webhook] unknown event", { event, instanceId: body.instanceId });
       }
     } catch (err) {
       console.error("[hook7-webhook] handler error", {

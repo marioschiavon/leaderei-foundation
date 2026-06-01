@@ -138,7 +138,16 @@ async function getCallerOrg(supabase: any, userId: string): Promise<{ id: string
   return { id: org.id, slug: org.slug, whatsapp_mode: (org as any).whatsapp_mode ?? "shared" };
 }
 
-const HOOK7_SUBSCRIBE_EVENTS = ["Message", "Receipt", "Connected", "LoggedOut", "ChatPresence"];
+// Eventos do Hook7 que o Leaderei processa.
+// Valores válidos do Hook7 (UPPER_SNAKE_CASE): MESSAGE, SEND_MESSAGE, READ_RECEIPT,
+// PRESENCE, HISTORY_SYNC, CHAT_PRESENCE, CALL, CONNECTION, LABEL, CONTACT, GROUP,
+// NEWSLETTER, QRCODE, BUTTON_CLICK.
+const HOOK7_SUBSCRIBE_EVENTS = [
+  "MESSAGE",        // Mensagens recebidas (IsFromMe:false) e enviadas (IsFromMe:true)
+  "SEND_MESSAGE",   // Confirmação de envio (descartamos — MESSAGE outbound cobre)
+  "READ_RECEIPT",   // delivered + read
+  "CONNECTION",     // Connected / LoggedOut / Disconnected
+] as const;
 
 function buildHook7WebhookUrl(orgSlug: string): string {
   const secret = (process.env.HOOK7_WEBHOOK_SECRET ?? "").trim();
