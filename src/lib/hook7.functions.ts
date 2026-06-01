@@ -512,13 +512,15 @@ export const reconnectHook7Instance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
+    const orgSlug = await getOrgSlug(inst.organization_id);
+    const webhookUrl = buildHook7WebhookUrl(orgSlug);
     try {
       await hook7Fetch("/instance/reconnect", { method: "POST", apikey: token, body: {} });
     } catch {
       // fallback to connect
       await hook7Fetch("/instance/connect", {
         method: "POST", apikey: token,
-        body: { immediate: true, webhookUrl: "", subscribe: [] },
+        body: { immediate: true, webhookUrl, subscribe: HOOK7_SUBSCRIBE_EVENTS },
       });
     }
     await supabase
