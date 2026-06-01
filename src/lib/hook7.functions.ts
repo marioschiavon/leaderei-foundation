@@ -138,6 +138,25 @@ async function getCallerOrg(supabase: any, userId: string): Promise<{ id: string
   return { id: org.id, slug: org.slug, whatsapp_mode: (org as any).whatsapp_mode ?? "shared" };
 }
 
+const HOOK7_SUBSCRIBE_EVENTS = ["Message", "Receipt", "Connected", "LoggedOut", "ChatPresence"];
+
+function buildHook7WebhookUrl(orgSlug: string): string {
+  const secret = (process.env.HOOK7_WEBHOOK_SECRET ?? "").trim();
+  const supaUrl = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+  if (!secret || !supaUrl) return "";
+  return `${supaUrl}/functions/v1/hook7-webhook/${secret}/${encodeURIComponent(orgSlug)}`;
+}
+
+async function getOrgSlug(organization_id: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("organizations")
+    .select("slug")
+    .eq("id", organization_id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.slug ?? "") as string;
+}
+
 // ---------------------------------------------------------------------------
 // Master: platform-level config
 // ---------------------------------------------------------------------------
