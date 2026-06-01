@@ -37,7 +37,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import { signOut, useAuthSession, useIsMaster } from "@/lib/auth";
-import { getMyContext } from "@/lib/tenant.functions";
+import { getMyContext, getLeadsNeedingReviewCount } from "@/lib/tenant.functions";
+import { cn } from "@/lib/utils";
 
 type NavItem = {
   title: string;
@@ -67,11 +68,19 @@ export function AppSidebar() {
   const { user } = useAuthSession();
   const { data: isMaster } = useIsMaster(user?.id);
   const fetchContext = useServerFn(getMyContext);
+  const fetchReviewCount = useServerFn(getLeadsNeedingReviewCount);
   const { data: tenantContext } = useQuery({
     enabled: !!user,
     queryKey: ["tenant", "context"],
     queryFn: () => fetchContext(),
   });
+  const { data: reviewCount } = useQuery({
+    enabled: !!user,
+    queryKey: ["leads-needing-review-count"],
+    queryFn: () => fetchReviewCount(),
+    refetchInterval: 60_000,
+  });
+  const reviewBadge = reviewCount?.count && reviewCount.count > 0 ? String(reviewCount.count) : null;
 
   const isActive = (url: string) =>
     url === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(url);
@@ -116,24 +125,30 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {WORKSPACE.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      <span className="flex-1">{item.title}</span>
-                      {item.badge && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-auto bg-muted text-muted-foreground border-transparent text-[0.6rem] px-1.5 py-0 font-medium"
-                        >
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {WORKSPACE.map((item) => {
+                const badge = item.url === "/dashboard/leads" && reviewBadge ? reviewBadge : item.badge;
+                const badgeTone = item.url === "/dashboard/leads" && reviewBadge
+                  ? "bg-amber-500/15 text-amber-700"
+                  : "bg-muted text-muted-foreground";
+                return (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <Link to={item.url} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span className="flex-1">{item.title}</span>
+                        {badge && (
+                          <Badge
+                            variant="secondary"
+                            className={cn("ml-auto border-transparent text-[0.6rem] px-1.5 py-0 font-medium", badgeTone)}
+                          >
+                            {badge}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -598,3 +598,155 @@ export const renameHook7Instance = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------------------------------------------------------------------------
+// Send WhatsApp message (used by Inbox composer; reusable by Builder later)
+// ---------------------------------------------------------------------------
+
+const SendSchema = z.object({
+  lead_id: z.string().uuid(),
+  text: z.string().trim().min(1).max(4096),
+  instance_id: z.string().uuid().optional(),
+});
+
+function normalizePhone(raw: string): string {
+  return (raw || "").replace(/\D+/g, "");
+}
+
+export const sendWhatsAppMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => SendSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const org = await getCallerOrg(supabase, userId);
+
+    // 1. Load lead, validate org + phone
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("id, organization_id, phone, full_name")
+      .eq("id", data.lead_id)
+      .maybeSingle();
+    if (leadErr) throw new Error(leadErr.message);
+    if (!lead || lead.organization_id !== org.id) {
+      throw new Error("Lead não encontrado nesta organização.");
+    }
+    const phone = normalizePhone(lead.phone ?? "");
+    if (!phone) throw new Error("Lead não tem WhatsApp cadastrado.");
+
+    // 2. Pick instance
+    let instanceQuery = supabaseAdmin
+      .from("hook7_instances")
+      .select("id, organization_id, owner_user_id, status, archived_at")
+      .eq("organization_id", org.id)
+      .is("archived_at", null)
+      .eq("status", "connected");
+    if (data.instance_id) {
+      instanceQuery = instanceQuery.eq("id", data.instance_id);
+    } else if (org.whatsapp_mode === "per_user") {
+      instanceQuery = instanceQuery.eq("owner_user_id", userId);
+    }
+    const { data: instances, error: instErr } = await instanceQuery
+      .order("last_connected_at", { ascending: false })
+      .limit(1);
+    if (instErr) throw new Error(instErr.message);
+    const inst = instances?.[0];
+    if (!inst) throw new Error("Nenhuma instância WhatsApp conectada.");
+
+    // 3. Get token
+    const { data: token, error: tokErr } = await supabase.rpc("get_hook7_instance_token", {
+      _instance_id: inst.id,
+    });
+    if (tokErr) throw new Error(tokErr.message);
+    if (!token) throw new Error("Token da instância indisponível.");
+
+    // 4. Resolve / create conversation
+    let conv: { id: string } | null = null;
+    {
+      const { data: existing } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("organization_id", org.id)
+        .eq("lead_id", lead.id)
+        .eq("channel", "whatsapp")
+        .maybeSingle();
+      if (existing) conv = existing;
+    }
+    if (!conv) {
+      const { data: newConv, error: cErr } = await supabase
+        .from("conversations")
+        .insert({ organization_id: org.id, lead_id: lead.id, channel: "whatsapp" })
+        .select("id")
+        .single();
+      if (cErr) throw new Error(cErr.message);
+      conv = newConv;
+    }
+
+    // 5. Call Hook7 /send/text
+    let sendRes: any;
+    try {
+      sendRes = await hook7Fetch("/send/text", {
+        method: "POST",
+        apikey: token as string,
+        body: { number: phone, text: data.text },
+        timeoutMs: 15000,
+      });
+    } catch (e: any) {
+      // Record failed message
+      const { data: failedMsg } = await supabase
+        .from("messages")
+        .insert({
+          organization_id: org.id,
+          conversation_id: conv.id,
+          channel: "whatsapp",
+          direction: "outbound",
+          body: data.text,
+          source_channel: "whatsapp",
+          whatsapp_status: "failed",
+          status: "failed",
+          sender_user_id: userId,
+          failed_reason: String(e?.message ?? "send_failed").slice(0, 500),
+        })
+        .select("id")
+        .single();
+      return { ok: false, error: e?.message ?? "Falha ao enviar.", message_id: failedMsg?.id ?? null };
+    }
+
+    const info = sendRes?.data?.Info ?? {};
+    const externalId: string | null = typeof info.ID === "string" ? info.ID : null;
+    const ts: string = typeof info.Timestamp === "string" ? info.Timestamp : new Date().toISOString();
+
+    // 6. Insert outbound row (idempotent via unique partial index on external_message_id)
+    const { data: msg, error: mErr } = await supabase
+      .from("messages")
+      .insert({
+        organization_id: org.id,
+        conversation_id: conv.id,
+        channel: "whatsapp",
+        direction: "outbound",
+        body: data.text,
+        source_channel: "whatsapp",
+        whatsapp_status: "sent",
+        status: "sent",
+        sent_at: ts,
+        created_at: ts,
+        external_message_id: externalId,
+        sender_user_id: userId,
+      })
+      .select("id")
+      .single();
+    if (mErr && !String(mErr.message).toLowerCase().includes("duplicate")) {
+      throw new Error(mErr.message);
+    }
+
+    // Update conversation preview
+    await supabase
+      .from("conversations")
+      .update({
+        last_message_at: ts,
+        last_message_preview: data.text.slice(0, 140),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conv.id);
+
+    return { ok: true, message_id: msg?.id ?? null, external_message_id: externalId };
+  });

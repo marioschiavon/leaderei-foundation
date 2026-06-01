@@ -274,11 +274,65 @@ export const listConversations = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("conversations")
-      .select("id, subject, channel, status, last_message_preview, last_message_at, unread_count, ai_enabled, leads(full_name, company_name)")
+      .select("id, subject, channel, status, last_message_preview, last_message_at, unread_count, ai_enabled, lead_id, leads(id, full_name, company_name, phone, needs_review)")
+      .in("channel", ["email", "whatsapp"])
       .order("last_message_at", { ascending: false, nullsFirst: false })
-      .limit(100);
+      .limit(200);
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const listLeadsNeedingReview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("leads")
+      .select("id, full_name, phone, company_name, job_title, review_reason, created_at")
+      .eq("needs_review", true)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    const ids = (data ?? []).map((l) => l.id);
+    let previewByLead = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: convs } = await context.supabase
+        .from("conversations")
+        .select("lead_id, last_message_preview, last_message_at")
+        .in("lead_id", ids)
+        .eq("channel", "whatsapp");
+      for (const c of (convs ?? []) as any[]) {
+        if (c.lead_id && c.last_message_preview && !previewByLead.has(c.lead_id)) {
+          previewByLead.set(c.lead_id, c.last_message_preview);
+        }
+      }
+    }
+    return (data ?? []).map((l) => ({ ...l, preview: previewByLead.get(l.id) ?? null }));
+  });
+
+export const getLeadsNeedingReviewCount = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { count, error } = await context.supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("needs_review", true)
+      .is("archived_at", null);
+    if (error) throw new Error(error.message);
+    return { count: count ?? 0 };
+  });
+
+export const acceptLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("leads")
+      .update({ needs_review: false, review_reason: null, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const listIntegrations = createServerFn({ method: "GET" })
