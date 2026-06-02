@@ -40,6 +40,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Flag,
+  CalendarCheck,
+  CalendarSearch,
+  CalendarX,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +93,10 @@ type StepType =
   | "wait"
   | "condition_replied"
   | "action"
+  | "calcom_check_availability"
+  | "calcom_book_meeting"
+  | "calcom_cancel_booking"
+  | "calcom_reschedule_booking"
   | "end";
 
 type StepData = {
@@ -122,6 +130,10 @@ const PALETTE: Array<{
   { type: "wait", label: "Aguardar", icon: Clock, enabled: true },
   { type: "condition_replied", label: "Condição: respondeu?", icon: GitBranch, enabled: true },
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
+  { type: "calcom_check_availability", label: "Consultar agenda", icon: CalendarSearch, enabled: true },
+  { type: "calcom_book_meeting", label: "Agendar reunião", icon: CalendarCheck, enabled: true },
+  { type: "calcom_reschedule_booking", label: "Reagendar reunião", icon: CalendarClock, enabled: true },
+  { type: "calcom_cancel_booking", label: "Cancelar reunião", icon: CalendarX, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
   { type: "end", label: "Fim do fluxo", icon: Flag, enabled: true },
@@ -134,6 +146,10 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   wait: { duration_value: 1, duration_unit: "days" },
   condition_replied: { scope: "any_channel", timeout_value: 3, timeout_unit: "days" },
   action: { action_type: "set_status", params: {} },
+  calcom_check_availability: { event_type_id: 0, window_days: 7, business_hours_only: true },
+  calcom_book_meeting: { event_type_id: 0, slot_strategy: "first_available", cancel_retry_business_days: 3 },
+  calcom_cancel_booking: { reason_template: "" },
+  calcom_reschedule_booking: { event_type_id: 0, strategy: "first_available" },
   end: { reason: "" },
 };
 
