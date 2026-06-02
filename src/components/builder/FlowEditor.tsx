@@ -1049,11 +1049,72 @@ function ConfigPanel({
   onChange: (patch: Record<string, any>) => void;
 }) {
   if (node.type === "message_email") return <EmailPanel node={node} onChange={onChange} />;
+  if (node.type === "message_whatsapp") return <WhatsAppPanel node={node} onChange={onChange} />;
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
+
+function WhatsAppPanel({
+  node,
+  onChange,
+}: {
+  node: StepNode;
+  onChange: (patch: Record<string, any>) => void;
+}) {
+  const cfg = node.data.config as { body?: string };
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  function insertVar(v: string) {
+    const el = bodyRef.current;
+    if (!el) {
+      onChange({ body: (cfg.body ?? "") + v });
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = (cfg.body ?? "").slice(0, start) + v + (cfg.body ?? "").slice(end);
+    onChange({ body: next });
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + v.length, start + v.length);
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="wa-body">Mensagem</Label>
+        <Textarea
+          id="wa-body"
+          ref={bodyRef}
+          rows={8}
+          value={cfg.body ?? ""}
+          onChange={(e) => onChange({ body: e.target.value })}
+          placeholder="Oi {{ lead.first_name }}, tudo bem?"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Variáveis</Label>
+        <div className="flex flex-wrap gap-1">
+          {EMAIL_VARS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => insertVar(v)}
+              className="rounded-md border bg-surface px-1.5 py-0.5 text-[11px] font-mono hover:bg-surface-muted"
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Requer uma instância WhatsApp conectada em Integrações. Leads sem telefone são ignorados.
+      </p>
+    </div>
+  );
 
 function EmailPanel({
   node,
