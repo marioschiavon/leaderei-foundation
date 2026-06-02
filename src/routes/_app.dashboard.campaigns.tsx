@@ -306,17 +306,8 @@ function CampaignCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const activateFn = useServerFn(activateCampaign);
-  const activateMutation = useMutation({
-    mutationFn: () => activateFn({ data: { campaign_id: c.id } }),
-    onSuccess: (res: any) => {
-      toast.success(`Campanha ativada — ${res?.enrolled ?? 0} leads enrolados.`);
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const [execOpen, setExecOpen] = useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
   const canStart = c.status === "draft" || c.status === "paused";
   const canPause = c.status === "running";
 
