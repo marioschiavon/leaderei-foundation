@@ -145,7 +145,10 @@ function webhookUrlFor(org: string): string {
 // ---------------------------------------------------------------------------
 
 const SaveSchema = z.object({
-  api_key: z.string().trim().min(10).max(400),
+  api_key: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().trim().min(10).max(400).optional(),
+  ),
   default_event_type_id: z.number().int().positive().optional(),
 });
 
@@ -156,28 +159,31 @@ export const saveCalcomConnection = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const organization_id = await getActiveOrgId(supabase, userId);
 
-    // Validate key by hitting Cal.com /me
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    let res: Response;
-    try {
-      res = await fetch("https://api.cal.com/v2/me", {
-        headers: {
-          Authorization: `Bearer ${data.api_key}`,
-          "cal-api-version": "2024-08-13",
-          Accept: "application/json",
-        },
-        signal: ctrl.signal,
-      });
-    } catch (e: any) {
+    // Validate key by hitting Cal.com /me (only when a new key is provided)
+    if (data.api_key) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      let res: Response;
+      try {
+        res = await fetch("https://api.cal.com/v2/me", {
+          headers: {
+            Authorization: `Bearer ${data.api_key}`,
+            "cal-api-version": "2024-08-13",
+            Accept: "application/json",
+          },
+          signal: ctrl.signal,
+        });
+      } catch (e: any) {
+        clearTimeout(timer);
+        throw new Error(`Falha ao contactar Cal.com: ${e?.message ?? e}`);
+      }
       clearTimeout(timer);
-      throw new Error(`Falha ao contactar Cal.com: ${e?.message ?? e}`);
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("API key inválida — verifique no dashboard do Cal.com.");
+      }
+      if (!res.ok) throw new Error(`Cal.com retornou ${res.status}.`);
     }
-    clearTimeout(timer);
-    if (res.status === 401 || res.status === 403) {
-      throw new Error("API key inválida — verifique no dashboard do Cal.com.");
-    }
-    if (!res.ok) throw new Error(`Cal.com retornou ${res.status}.`);
+
 
     const { data: provider, error: pErr } = await supabase
       .from("integration_providers")
@@ -193,6 +199,12 @@ export const saveCalcomConnection = createServerFn({ method: "POST" })
       .eq("organization_id", organization_id)
       .eq("provider_id", provider.id)
       .maybeSingle();
+
+    if (!data.api_key && !existing) {
+      throw new Error("Informe a API key do Cal.com para conectar.");
+    }
+
+
 
     const cfg: Record<string, unknown> = {
       ...((existing?.config ?? {}) as any),
@@ -237,21 +249,24 @@ export const saveCalcomConnection = createServerFn({ method: "POST" })
       integration_id = inserted.id;
     }
 
-    // Upsert api_key
-    const { error: credErr } = await supabase
-      .from("integration_credentials")
-      .upsert(
-        {
-          organization_id,
-          integration_id,
-          key: "api_key",
-          value_encrypted: data.api_key,
-          metadata: {} as any,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "integration_id,key" },
-      );
-    if (credErr) throw new Error(credErr.message);
+    // Upsert api_key (only when a new one was provided)
+    if (data.api_key) {
+      const { error: credErr } = await supabase
+        .from("integration_credentials")
+        .upsert(
+          {
+            organization_id,
+            integration_id,
+            key: "api_key",
+            value_encrypted: data.api_key,
+            metadata: {} as any,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "integration_id,key" },
+        );
+      if (credErr) throw new Error(credErr.message);
+    }
+
 
     // Generate webhook secret if missing
     const { data: existingSecret } = await supabase
