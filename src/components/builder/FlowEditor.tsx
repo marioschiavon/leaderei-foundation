@@ -409,11 +409,42 @@ function ConditionRepliedNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function EndStepNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { reason?: string };
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 12px",
+          borderBottom: `1px solid ${COLORS.border}`,
+          background: "#f1f5f9",
+          color: COLORS.end,
+          fontSize: 13,
+          fontWeight: 600,
+          borderTopLeftRadius: 10,
+          borderTopRightRadius: 10,
+        }}
+      >
+        <Flag size={14} />
+        <span>Fim do fluxo</span>
+      </div>
+      <div style={{ padding: "10px 12px", fontSize: 12, color: COLORS.muted, fontStyle: cfg.reason ? "normal" : "italic" }}>
+        {cfg.reason ? cfg.reason : "Encerra a jornada. Sem saídas."}
+      </div>
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
+  end: EndStepNode,
 } as any;
 
 // ---------------------------------------------------------------------------
