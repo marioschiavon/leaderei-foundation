@@ -1115,6 +1115,9 @@ function WhatsAppPanel({
       </p>
     </div>
   );
+}
+
+
 
 function EmailPanel({
   node,
