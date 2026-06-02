@@ -155,8 +155,8 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       const cfg = step.config as { body?: string };
       const body = renderTemplate(cfg.body ?? "", vars);
       const phone = (lead.phone ?? "").replace(/\D+/g, "");
-      if (!phone) {
-        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_phone" } };
+      if (phone.length < 10 || phone.length > 15) {
+        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "invalid_phone", phone } };
       }
       // Pick a connected instance for the org
       const { data: instances } = await supabaseAdmin

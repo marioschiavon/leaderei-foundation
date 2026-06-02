@@ -25,21 +25,27 @@ import {
   Activity,
   PlayCircle,
   PauseCircle,
+  RefreshCw,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   listCampaignEnrollments,
   pauseEnrollment,
   resumeEnrollment,
   activateCampaign,
   getCampaignExecutorStats,
+  listEligibleLeadsForCampaign,
+  forceFlowTick,
 } from "@/lib/campaigns.functions";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -300,17 +306,8 @@ function CampaignCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const activateFn = useServerFn(activateCampaign);
-  const activateMutation = useMutation({
-    mutationFn: () => activateFn({ data: { campaign_id: c.id } }),
-    onSuccess: (res: any) => {
-      toast.success(`Campanha ativada — ${res?.enrolled ?? 0} leads enrolados.`);
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const [execOpen, setExecOpen] = useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
   const canStart = c.status === "draft" || c.status === "paused";
   const canPause = c.status === "running";
 
@@ -384,16 +381,12 @@ function CampaignCard({
               variant="ghost"
               onClick={() =>
                 c.status === "draft"
-                  ? activateMutation.mutate()
+                  ? setActivateOpen(true)
                   : statusMutation.mutate("running")
               }
-              disabled={statusMutation.isPending || activateMutation.isPending}
+              disabled={statusMutation.isPending}
             >
-              {activateMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Play className="h-3.5 w-3.5" />
-              )}
+              <Play className="h-3.5 w-3.5" />
               {c.status === "draft" ? "Ativar" : "Retomar"}
             </Button>
           )}
@@ -438,7 +431,248 @@ function CampaignCard({
         open={execOpen}
         onOpenChange={setExecOpen}
       />
+      <ActivateCampaignDialog
+        campaignId={c.id}
+        campaignName={c.name}
+        channel={c.channel}
+        open={activateOpen}
+        onOpenChange={setActivateOpen}
+        onSuccess={invalidate}
+      />
     </div>
+  );
+}
+
+function ActivateCampaignDialog({
+  campaignId,
+  campaignName,
+  channel,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  campaignId: string;
+  campaignName: string;
+  channel: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const listFn = useServerFn(listEligibleLeadsForCampaign);
+  const activateFn = useServerFn(activateCampaign);
+  const [mode, setMode] = useState<"all" | "manual">("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+
+  const { data, isLoading } = useQuery({
+    enabled: open,
+    queryKey: ["eligible-leads", campaignId],
+    queryFn: () => listFn({ data: { campaign_id: campaignId } }),
+  });
+
+  useEffect(() => {
+    if (!open) {
+      setSelected(new Set());
+      setSearch("");
+      setMode("all");
+    }
+  }, [open]);
+
+  const channelLabel = CHANNEL_LABEL[channel as (typeof CHANNELS)[number]] ?? channel;
+  const eligible = (data?.eligible ?? []) as Array<{ id: string; full_name: string | null; email: string | null; phone: string | null; company_name: string | null }>;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return eligible;
+    return eligible.filter(
+      (l) =>
+        (l.full_name ?? "").toLowerCase().includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q) ||
+        (l.phone ?? "").toLowerCase().includes(q) ||
+        (l.company_name ?? "").toLowerCase().includes(q),
+    );
+  }, [eligible, search]);
+
+  const activateMut = useMutation({
+    mutationFn: (ids: string[] | undefined) =>
+      activateFn({ data: { campaign_id: campaignId, lead_ids: ids } }),
+    onSuccess: (res: any) => {
+      toast.success(`Campanha ativada — ${res?.enrolled ?? 0} leads enrolados.`);
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleActivate = () => {
+    if (mode === "all") {
+      activateMut.mutate(undefined);
+    } else {
+      const ids = Array.from(selected);
+      if (ids.length === 0) {
+        toast.error("Selecione ao menos um lead.");
+        return;
+      }
+      activateMut.mutate(ids);
+    }
+  };
+
+  const willEnroll = mode === "all" ? (data?.eligible_count ?? 0) : selected.size;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Ativar campanha — {campaignName}</DialogTitle>
+          <DialogDescription>
+            Canal: <strong>{channelLabel}</strong>. Apenas leads com{" "}
+            {channel === "email"
+              ? "e-mail válido"
+              : channel === "whatsapp" || channel === "sms"
+                ? "telefone válido (10-15 dígitos com DDI/DDD)"
+                : channel === "multi"
+                  ? "e-mail OU telefone válido"
+                  : "dados de contato"}{" "}
+            entram no fluxo.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="grid place-items-center py-10 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <Stat label="Total na org" value={data?.total ?? 0} />
+              <Stat label="Elegíveis" value={data?.eligible_count ?? 0} accent />
+              <Stat label="Sem dado válido" value={data?.ineligible_count ?? 0} />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMode("all")}
+                className={cn(
+                  "flex-1 rounded-md border p-3 text-left text-sm transition-colors",
+                  mode === "all" ? "border-foreground bg-surface-muted/40" : "hover:bg-surface-muted/30",
+                )}
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  <Users className="h-4 w-4" /> Todos os elegíveis
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  Enrolla os {data?.eligible_count ?? 0} leads de uma vez.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("manual")}
+                className={cn(
+                  "flex-1 rounded-md border p-3 text-left text-sm transition-colors",
+                  mode === "manual" ? "border-foreground bg-surface-muted/40" : "hover:bg-surface-muted/30",
+                )}
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  <Pencil className="h-4 w-4" /> Selecionar manualmente
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  Escolhe um a um na lista.
+                </div>
+              </button>
+            </div>
+
+            {mode === "manual" && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar por nome, e-mail, telefone…"
+                      className="h-9 pl-9"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setSelected(
+                        selected.size === filtered.length
+                          ? new Set()
+                          : new Set(filtered.map((l) => l.id)),
+                      )
+                    }
+                  >
+                    {selected.size === filtered.length && filtered.length > 0
+                      ? "Limpar"
+                      : "Selecionar todos"}
+                  </Button>
+                </div>
+                <div className="max-h-64 overflow-y-auto rounded-md border">
+                  {filtered.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      Nenhum lead elegível.
+                    </div>
+                  ) : (
+                    <ul className="divide-y">
+                      {filtered.map((l) => {
+                        const checked = selected.has(l.id);
+                        return (
+                          <li
+                            key={l.id}
+                            className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface-muted/40"
+                            onClick={() => {
+                              const next = new Set(selected);
+                              if (checked) next.delete(l.id);
+                              else next.add(l.id);
+                              setSelected(next);
+                            }}
+                          >
+                            <Checkbox checked={checked} />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">
+                                {l.full_name ?? "Sem nome"}
+                              </div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {channel === "email"
+                                  ? l.email
+                                  : channel === "whatsapp" || channel === "sms"
+                                    ? l.phone
+                                    : (l.email ?? l.phone ?? "—")}
+                                {l.company_name && ` · ${l.company_name}`}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {selected.size} de {filtered.length} selecionado
+                  {selected.size !== 1 ? "s" : ""}.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleActivate}
+            disabled={activateMut.isPending || isLoading || willEnroll === 0}
+          >
+            {activateMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Ativar para {willEnroll} lead{willEnroll !== 1 ? "s" : ""}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -495,6 +729,17 @@ function ExecutionsDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const tickFn = useServerFn(forceFlowTick);
+  const tickMut = useMutation({
+    mutationFn: () => tickFn(),
+    onSuccess: (res: any) => {
+      toast.success(`Tick rodou — ${res?.processed ?? 0} jobs processados.`);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const STATUS_LABEL: Record<string, string> = {
     pending: "Pendente",
     active: "Ativo",
@@ -508,10 +753,28 @@ function ExecutionsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Execuções — {campaignName}</DialogTitle>
-          <DialogDescription>
-            Lista de leads enrolados no fluxo. Atualiza a cada 5s.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Execuções — {campaignName}</DialogTitle>
+              <DialogDescription>
+                Lista de leads enrolados no fluxo. Atualiza a cada 5s.
+              </DialogDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => tickMut.mutate()}
+              disabled={tickMut.isPending}
+              title="Roda o worker manualmente — útil para testar sem esperar o cron."
+            >
+              {tickMut.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              Forçar tick
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2 border-b pb-3">
