@@ -33,6 +33,14 @@ export function stepLabel(step: FlowStepLike): string {
       return "Condição";
     case "update_lead":
       return "Atualizar lead";
+    case "calcom_check_availability":
+      return "Consultar agenda Cal.com";
+    case "calcom_book_meeting":
+      return "Agendar reunião (Cal.com)";
+    case "calcom_cancel_booking":
+      return "Cancelar reunião";
+    case "calcom_reschedule_booking":
+      return "Reagendar reunião";
     case "end": {
       const reason = String(cfg.reason ?? "").trim();
       return reason ? `Fim: ${reason}` : "Fim do fluxo";
@@ -59,6 +67,10 @@ export function stepLabelShort(step: FlowStepLike): string {
     case "branch":
     case "condition": return "Condição";
     case "update_lead": return "Atualizar lead";
+    case "calcom_check_availability": return "Consultar agenda";
+    case "calcom_book_meeting": return "Agendar reunião";
+    case "calcom_cancel_booking": return "Cancelar reunião";
+    case "calcom_reschedule_booking": return "Reagendar";
     case "end": return "Fim";
     default: return step.type;
   }

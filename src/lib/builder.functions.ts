@@ -117,7 +117,7 @@ const TransitionInput = z.object({
   id: z.string().uuid(),
   from_step_id: z.string().uuid(),
   to_step_id: z.string().uuid(),
-  branch: z.enum(["next", "yes", "no"]).default("next"),
+  branch: z.enum(["next", "yes", "no", "failed", "no_slots"]).default("next"),
 });
 
 // ---------------------------------------------------------------------------
@@ -206,6 +206,26 @@ function validateGraph(
           step_id: s.id,
           message: 'Condição precisa de 0 ou 2 saídas ("Sim" e "Não").',
         });
+      }
+    } else if (s.type === "calcom_check_availability") {
+      // allowed: 'next' (slots found) and/or 'no_slots'
+      for (const b of out) {
+        if (b !== "next" && b !== "no_slots") {
+          errors.push({ step_id: s.id, message: `Saída "${b}" inválida em Consultar agenda.` });
+        }
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({ step_id: s.id, message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.' });
+      }
+    } else if (s.type === "calcom_book_meeting") {
+      // allowed: 'next' (booked) and/or 'failed' (no slot / api error)
+      for (const b of out) {
+        if (b !== "next" && b !== "failed") {
+          errors.push({ step_id: s.id, message: `Saída "${b}" inválida em Agendar reunião.` });
+        }
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({ step_id: s.id, message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.' });
       }
     } else {
       if (out.size > 1 || (out.size === 1 && !out.has("next"))) {
