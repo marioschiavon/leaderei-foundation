@@ -22,8 +22,27 @@ import {
   Archive,
   Pencil,
   Loader2,
+  Activity,
+  PlayCircle,
+  PauseCircle,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  listCampaignEnrollments,
+  pauseEnrollment,
+  resumeEnrollment,
+  activateCampaign,
+  getCampaignExecutorStats,
+} from "@/lib/campaigns.functions";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
