@@ -729,6 +729,17 @@ function ExecutionsDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const tickFn = useServerFn(forceFlowTick);
+  const tickMut = useMutation({
+    mutationFn: () => tickFn(),
+    onSuccess: (res: any) => {
+      toast.success(`Tick rodou — ${res?.processed ?? 0} jobs processados.`);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const STATUS_LABEL: Record<string, string> = {
     pending: "Pendente",
     active: "Ativo",
@@ -742,10 +753,28 @@ function ExecutionsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Execuções — {campaignName}</DialogTitle>
-          <DialogDescription>
-            Lista de leads enrolados no fluxo. Atualiza a cada 5s.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Execuções — {campaignName}</DialogTitle>
+              <DialogDescription>
+                Lista de leads enrolados no fluxo. Atualiza a cada 5s.
+              </DialogDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => tickMut.mutate()}
+              disabled={tickMut.isPending}
+              title="Roda o worker manualmente — útil para testar sem esperar o cron."
+            >
+              {tickMut.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              Forçar tick
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2 border-b pb-3">
