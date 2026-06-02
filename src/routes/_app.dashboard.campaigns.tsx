@@ -1021,41 +1021,7 @@ function ExecutionsDialog({
   );
 }
 
-function stepLabel(step: { type: string | null; config?: any } | null | undefined): string {
-  if (!step || !step.type) return "—";
-  const cfg = (step.config ?? {}) as any;
-  switch (step.type) {
-    case "message_whatsapp": {
-      const body = String(cfg.body ?? "").trim();
-      return body ? `WhatsApp: ${body.slice(0, 40)}${body.length > 40 ? "…" : ""}` : "WhatsApp";
-    }
-    case "message_email": {
-      const subj = String(cfg.subject ?? "").trim();
-      return subj ? `Email: ${subj.slice(0, 40)}` : "Email";
-    }
-    case "wait": {
-      const v = cfg.duration_value ?? 1;
-      const u = cfg.duration_unit ?? "days";
-      const uPt: Record<string, string> = {
-        minutes: "min", hours: "h", days: "dia(s)", weeks: "sem",
-      };
-      return `Espera ${v} ${uPt[u] ?? u}`;
-    }
-    case "wait_for_reply":
-      return `Aguarda resposta (${cfg.timeout_value ?? 3} ${cfg.timeout_unit ?? "days"})`;
-    case "branch":
-    case "condition":
-      return "Condição";
-    case "update_lead":
-      return "Atualizar lead";
-    case "end": {
-      const reason = String(cfg.reason ?? "").trim();
-      return reason ? `Fim: ${reason}` : "Fim do fluxo";
-    }
-    default:
-      return step.type;
-  }
-}
+// stepLabel was extracted to src/lib/flow-step-label.ts
 
 function formatNextRun(iso: string | null | undefined): string {
   if (!iso) return "—";
