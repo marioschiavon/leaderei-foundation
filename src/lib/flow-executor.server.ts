@@ -450,6 +450,7 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
     }).eq("id", runId);
     await supabaseAdmin.from("campaign_enrollments").update({
       status: "completed", completed_at: new Date().toISOString(), next_run_at: null,
+      current_step_id: step.id, last_error: null,
     }).eq("id", en.id);
     await supabaseAdmin.from("scheduled_jobs").update({ status: "completed" }).eq("id", job.id);
     return { ok: true, enrollment_id: en.id };
