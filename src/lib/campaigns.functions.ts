@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { runFlowTick } from "@/lib/flow-executor.server";
 
 async function getCallerOrgId(supabase: any, userId: string): Promise<string> {
   const { data } = await supabase
@@ -13,6 +14,44 @@ async function getCallerOrgId(supabase: any, userId: string): Promise<string> {
     .maybeSingle();
   if (!data) throw new Error("Sem organização ativa.");
   return data.organization_id as string;
+}
+
+// ---------------------------------------------------------------------------
+// Eligibility helpers (channel-aware)
+// ---------------------------------------------------------------------------
+
+export function normalizePhone(phone: string | null | undefined): string {
+  return (phone ?? "").replace(/\D+/g, "");
+}
+
+// Requires DDI (≥1) + DDD (2) + número (≥8) → mínimo 11 dígitos.
+// Padrão BR completo tem 12-13. Aceitamos ≥10 para tolerar números
+// internacionais curtos, mas rejeitamos lixo como "11111".
+export function isValidWhatsAppPhone(phone: string | null | undefined): boolean {
+  const d = normalizePhone(phone);
+  return d.length >= 10 && d.length <= 15;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function isValidEmail(email: string | null | undefined): boolean {
+  return !!email && EMAIL_RE.test(email);
+}
+
+function isLeadEligibleForChannel(lead: { email: string | null; phone: string | null }, channel: string): boolean {
+  switch (channel) {
+    case "whatsapp":
+    case "sms":
+      return isValidWhatsAppPhone(lead.phone);
+    case "email":
+      return isValidEmail(lead.email);
+    case "multi":
+      return isValidEmail(lead.email) || isValidWhatsAppPhone(lead.phone);
+    case "linkedin":
+      // Sem checagem efetiva no momento — qualquer lead é elegível.
+      return true;
+    default:
+      return true;
+  }
 }
 
 async function resolveDocumentAndEntry(supabase: any, campaign_id: string) {
