@@ -88,7 +88,8 @@ type StepType =
   | "message_linkedin"
   | "wait"
   | "condition_replied"
-  | "action";
+  | "action"
+  | "end";
 
 type StepData = {
   config: Record<string, any>;
@@ -108,6 +109,7 @@ const COLORS = {
   borderError: "#ef4444",
   text: "#0f172a",
   muted: "#64748b",
+  end: "#475569",
 };
 
 const PALETTE: Array<{
@@ -122,6 +124,7 @@ const PALETTE: Array<{
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
+  { type: "end", label: "Fim do fluxo", icon: Flag, enabled: true },
 ];
 
 const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
@@ -131,6 +134,7 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   wait: { duration_value: 1, duration_unit: "days" },
   condition_replied: { scope: "any_channel", timeout_value: 3, timeout_unit: "days" },
   action: { action_type: "set_status", params: {} },
+  end: { reason: "" },
 };
 
 function newId() {
