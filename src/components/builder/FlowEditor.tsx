@@ -455,11 +455,87 @@ function EndStepNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+// ---- Cal.com nodes -------------------------------------------------------
+
+function CalSimpleNode({
+  data, selected, icon: Icon, label, helper,
+}: NodeProps<StepNode> & { icon: any; label: string; helper?: string }) {
+  const cfg = data.config as { event_type_id?: number };
+  const hasEvent = !!(cfg.event_type_id && cfg.event_type_id > 0);
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Icon} label={label} />
+      <div style={{ padding: "10px 12px", fontSize: 12 }}>
+        <div style={{ color: hasEvent ? COLORS.text : COLORS.muted, fontStyle: hasEvent ? "normal" : "italic" }}>
+          {hasEvent ? `Event type #${cfg.event_type_id}` : helper ?? "Configure o event type"}
+        </div>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
+function CalCheckAvailabilityNode(props: NodeProps<StepNode>) {
+  return (
+    <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={CalendarSearch} label="Consultar agenda" />
+      <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
+        Janela: {(props.data.config as any).window_days ?? 7} dias · event #{(props.data.config as any).event_type_id ?? "—"}
+      </div>
+      <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
+          Tem horário
+          <Handle type="source" id="next" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.yes, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+        <div style={{ position: "relative", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
+          Sem horário
+          <Handle type="source" id="no_slots" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.no, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+      </div>
+    </NodeShell>
+  );
+}
+
+function CalBookMeetingNode(props: NodeProps<StepNode>) {
+  return (
+    <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={CalendarCheck} label="Agendar reunião" />
+      <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
+        event #{(props.data.config as any).event_type_id ?? "—"} · {(props.data.config as any).slot_strategy ?? "first_available"}
+      </div>
+      <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
+          Agendado
+          <Handle type="source" id="next" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.yes, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+        <div style={{ position: "relative", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
+          Falhou
+          <Handle type="source" id="failed" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.no, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+      </div>
+    </NodeShell>
+  );
+}
+
+function CalCancelNode(props: NodeProps<StepNode>) {
+  return <CalSimpleNode {...props} icon={CalendarX} label="Cancelar reunião" helper="Cancela a reunião ativa do lead" />;
+}
+function CalRescheduleNode(props: NodeProps<StepNode>) {
+  return <CalSimpleNode {...props} icon={CalendarClock} label="Reagendar reunião" helper="Move para o próximo horário disponível" />;
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
+  calcom_check_availability: CalCheckAvailabilityNode,
+  calcom_book_meeting: CalBookMeetingNode,
+  calcom_cancel_booking: CalCancelNode,
+  calcom_reschedule_booking: CalRescheduleNode,
   end: EndStepNode,
 } as any;
 
