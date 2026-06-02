@@ -406,6 +406,7 @@ function ConditionRepliedNode({ data, selected }: NodeProps<StepNode>) {
 
 const nodeTypes = {
   message_email: EmailStepNode,
+  message_whatsapp: WhatsAppStepNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
 } as any;
