@@ -307,6 +307,69 @@ export const disconnectCalcom = createServerFn({ method: "POST" })
   });
 
 // ---------------------------------------------------------------------------
+// Test webhook signature end-to-end
+// ---------------------------------------------------------------------------
+
+export const testCalcomWebhook = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const organization_id = await getActiveOrgId(supabase, userId);
+
+    const { loadCalcomConnection } = await import("./calcom.server");
+    const conn = await loadCalcomConnection(organization_id);
+    if (!conn) throw new Error("Cal.com não está conectado.");
+    if (!conn.webhook_secret) throw new Error("Webhook secret ausente. Gere um secret antes.");
+
+    const base = process.env.PUBLIC_APP_URL
+      || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
+      || "https://leaderei.lovable.app";
+    const url = `${base.replace(/\/+$/, "")}/api/public/hooks/calcom?org=${organization_id}`;
+
+    // Synthetic payload — uses an unknown trigger so the handler ack's but does NOT
+    // touch lead_bookings / leads / enrollments.
+    const payload = {
+      triggerEvent: "LEADEREI_PING",
+      createdAt: new Date().toISOString(),
+      payload: { test: true, organization_id },
+    };
+    const rawBody = JSON.stringify(payload);
+
+    const { createHmac } = await import("node:crypto");
+    const signature = createHmac("sha256", conn.webhook_secret).update(rawBody, "utf8").digest("hex");
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    let res: Response;
+    let bodyText = "";
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Cal-Signature-256": signature,
+        },
+        body: rawBody,
+        signal: ctrl.signal,
+      });
+      bodyText = await res.text();
+    } catch (e: any) {
+      clearTimeout(timer);
+      throw new Error(`Falha ao contactar o webhook: ${e?.message ?? e}`);
+    }
+    clearTimeout(timer);
+
+    if (res.status === 401) {
+      throw new Error("Assinatura rejeitada (401). Confirme que o secret colado no Cal.com é o mesmo exibido aqui.");
+    }
+    if (!res.ok) {
+      throw new Error(`Webhook respondeu ${res.status}: ${bodyText.slice(0, 200)}`);
+    }
+
+    return { ok: true, url, status: res.status };
+  });
+
+// ---------------------------------------------------------------------------
 // Sync event types (calls Cal.com and upserts cache)
 // ---------------------------------------------------------------------------
 
