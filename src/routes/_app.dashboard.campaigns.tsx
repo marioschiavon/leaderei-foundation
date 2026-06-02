@@ -831,62 +831,108 @@ function ExecutionsDialog({
             </div>
           ) : (
             <ul className="divide-y">
-              {rows.map((r: any) => (
-                <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      {r.leads?.full_name ?? "Lead sem nome"}
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {r.leads?.email ?? r.leads?.phone ?? "—"}
-                    </div>
-                    {r.last_error && (
-                      <div className="mt-1 truncate text-xs text-destructive" title={r.last_error}>
-                        ⚠ {r.last_error}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    <div className="font-medium text-foreground">{STATUS_LABEL[r.status] ?? r.status}</div>
-                    {r.next_run_at && r.status === "active" && (
-                      <div>
-                        próximo:{" "}
-                        {formatDistanceToNow(new Date(r.next_run_at), {
-                          locale: ptBR,
-                          addSuffix: true,
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {r.status === "active" && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Pausar"
-                        onClick={() => pauseMut.mutate(r.id)}
-                        disabled={pauseMut.isPending}
+              {rows.map((r: any) => {
+                const isOpen = expanded === r.id;
+                const blockerLabel = computeBlocker(r);
+                return (
+                  <li key={r.id} className="py-2">
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        className="mt-0.5 rounded p-0.5 hover:bg-surface-muted"
+                        onClick={() => setExpanded(isOpen ? null : r.id)}
+                        title={isOpen ? "Recolher" : "Ver histórico"}
                       >
-                        <PauseCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {(r.status === "paused" || r.status === "failed") && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Retomar"
-                        onClick={() => resumeMut.mutate(r.id)}
-                        disabled={resumeMut.isPending}
-                      >
-                        <PlayCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="truncate text-sm font-medium">
+                            {r.leads?.full_name ?? "Lead sem nome"}
+                          </div>
+                          <span className="rounded bg-surface-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+                            {STATUS_LABEL[r.status] ?? r.status}
+                          </span>
+                          {blockerLabel && (
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-2xs font-medium",
+                                blockerLabel.tone === "warn" &&
+                                  "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+                                blockerLabel.tone === "danger" &&
+                                  "bg-destructive/10 text-destructive",
+                                blockerLabel.tone === "muted" &&
+                                  "bg-surface-muted text-muted-foreground",
+                              )}
+                              title={blockerLabel.title}
+                            >
+                              {blockerLabel.text}
+                            </span>
+                          )}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {r.leads?.email ?? r.leads?.phone ?? "—"}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                          <span className="text-muted-foreground">
+                            Nó atual:{" "}
+                            <span className="text-foreground">
+                              {r.current_step ? stepLabel(r.current_step) : "—"}
+                            </span>
+                          </span>
+                          {r.next_steps && r.next_steps.length > 0 && (
+                            <span className="text-muted-foreground">
+                              → Próximo:{" "}
+                              <span className="text-foreground">
+                                {r.next_steps
+                                  .map((n: any) =>
+                                    n.branch && n.branch !== "next"
+                                      ? `[${n.branch}] ${stepLabel(n)}`
+                                      : stepLabel(n),
+                                  )
+                                  .join(" | ")}
+                              </span>
+                            </span>
+                          )}
+                          <span className="text-muted-foreground">
+                            next_run: <span className="text-foreground">{formatNextRun(r.next_run_at)}</span>
+                          </span>
+                        </div>
+                        {r.last_error && (
+                          <div className="mt-1 break-words text-xs text-destructive" title={r.last_error}>
+                            ⚠ {r.last_error}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {r.status === "active" && (
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7" title="Pausar"
+                            onClick={() => pauseMut.mutate(r.id)} disabled={pauseMut.isPending}
+                          >
+                            <PauseCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(r.status === "paused" || r.status === "failed") && (
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7" title="Retomar"
+                            onClick={() => resumeMut.mutate(r.id)} disabled={resumeMut.isPending}
+                          >
+                            <PlayCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {isOpen && <EnrollmentTimeline enrollmentId={r.id} />}
+                  </li>
+                );
+              })}
             </ul>
+
           )}
         </div>
       </DialogContent>
