@@ -335,6 +335,12 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       return { kind: "advance", next_step_id: next, delay_until: now, output: { action: cfg.action_type, applied: updates } };
     }
 
+    // -----------------------------------------------------------------------
+    case "end": {
+      const cfg = step.config as { reason?: string };
+      return { kind: "complete", output: { reason: cfg.reason ?? null, ended_at: now.toISOString() } };
+    }
+
     default:
       return { kind: "fail", error: `tipo de passo desconhecido: ${step.type}` };
   }
