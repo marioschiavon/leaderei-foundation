@@ -940,6 +940,101 @@ function ExecutionsDialog({
   );
 }
 
+function stepLabel(step: { type: string | null; config?: any } | null | undefined): string {
+  if (!step || !step.type) return "—";
+  const cfg = (step.config ?? {}) as any;
+  switch (step.type) {
+    case "message_whatsapp": {
+      const body = String(cfg.body ?? "").trim();
+      return body ? `WhatsApp: ${body.slice(0, 40)}${body.length > 40 ? "…" : ""}` : "WhatsApp";
+    }
+    case "message_email": {
+      const subj = String(cfg.subject ?? "").trim();
+      return subj ? `Email: ${subj.slice(0, 40)}` : "Email";
+    }
+    case "wait": {
+      const v = cfg.duration_value ?? 1;
+      const u = cfg.duration_unit ?? "days";
+      const uPt: Record<string, string> = {
+        minutes: "min", hours: "h", days: "dia(s)", weeks: "sem",
+      };
+      return `Espera ${v} ${uPt[u] ?? u}`;
+    }
+    case "wait_for_reply":
+      return `Aguarda resposta (${cfg.timeout_value ?? 3} ${cfg.timeout_unit ?? "days"})`;
+    case "branch":
+    case "condition":
+      return "Condição";
+    case "update_lead":
+      return "Atualizar lead";
+    default:
+      return step.type;
+  }
+}
+
+function formatNextRun(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const diff = d.getTime() - Date.now();
+  if (Math.abs(diff) < 60_000) return "agora";
+  return formatDistanceToNow(d, { locale: ptBR, addSuffix: true });
+}
+
+function computeBlocker(r: any): { text: string; tone: "warn" | "danger" | "muted"; title?: string } | null {
+  if (r.status === "failed") return { text: "Falhou", tone: "danger", title: r.last_error ?? undefined };
+  if (r.status === "paused") return { text: "Pausado manualmente", tone: "muted" };
+  if (r.status === "completed") return null;
+  if (r.status === "active") {
+    if (!r.current_step_id) return { text: "Sem passo atual", tone: "danger" };
+    if (r.is_overdue) return { text: "Aguardando worker", tone: "warn", title: "next_run_at vencido — cron não processou ainda" };
+  }
+  return null;
+}
+
+function EnrollmentTimeline({ enrollmentId }: { enrollmentId: string }) {
+  const runsFn = useServerFn(getEnrollmentRuns);
+  const { data, isLoading } = useQuery({
+    queryKey: ["enrollment-runs", enrollmentId],
+    queryFn: () => runsFn({ data: { enrollment_id: enrollmentId } }),
+  });
+  if (isLoading) {
+    return (
+      <div className="ml-6 mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> carregando histórico…
+      </div>
+    );
+  }
+  if (!data || data.length === 0) {
+    return <div className="ml-6 mt-2 text-xs text-muted-foreground">Sem execuções registradas ainda.</div>;
+  }
+  return (
+    <ol className="ml-6 mt-2 space-y-1 border-l pl-3 text-xs">
+      {(data as any[]).map((run) => (
+        <li key={run.id} className="relative">
+          <span className="text-muted-foreground">
+            {new Date(run.started_at).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+          </span>{" "}
+          <span className="font-medium">{stepLabel(run.step)}</span>{" "}
+          <span
+            className={cn(
+              "rounded px-1 py-0.5 text-2xs",
+              run.status === "completed" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+              run.status === "failed" && "bg-destructive/10 text-destructive",
+              run.status === "running" && "bg-amber-100 text-amber-800",
+              run.status === "pending" && "bg-surface-muted text-muted-foreground",
+            )}
+          >
+            {run.status}
+          </span>
+          {run.branch_taken && <span className="ml-1 text-muted-foreground">→ {run.branch_taken}</span>}
+          {run.error && <div className="mt-0.5 text-destructive">⚠ {run.error}</div>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+
 function Stat({
   label,
   value,
