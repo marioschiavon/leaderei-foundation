@@ -107,6 +107,8 @@ import {
   changeCampaignStatus,
   duplicateCampaign,
   archiveCampaign,
+  restoreCampaign,
+  deleteCampaign,
 } from "@/lib/tenant.functions";
 import { cn } from "@/lib/utils";
 
