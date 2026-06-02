@@ -131,10 +131,11 @@ export const enrollLeadInCampaign = createServerFn({ method: "POST" })
   });
 
 // ---------------------------------------------------------------------------
-// Activate campaign — enrolls every non-archived lead in the org
+// ---------------------------------------------------------------------------
+// Eligibility preview — used by the activation dialog
 // ---------------------------------------------------------------------------
 
-export const activateCampaign = createServerFn({ method: "POST" })
+export const listEligibleLeadsForCampaign = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ campaign_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
@@ -142,21 +143,72 @@ export const activateCampaign = createServerFn({ method: "POST" })
     const orgId = await getCallerOrgId(supabase, userId);
 
     const { data: campaign } = await supabase
-      .from("campaigns").select("id, organization_id, status").eq("id", data.campaign_id).maybeSingle();
+      .from("campaigns").select("id, organization_id, channel").eq("id", data.campaign_id).maybeSingle();
+    if (!campaign || campaign.organization_id !== orgId) throw new Error("Campanha não encontrada.");
+
+    const { data: leads } = await supabase
+      .from("leads")
+      .select("id, full_name, email, phone, company_name")
+      .eq("organization_id", orgId)
+      .is("archived_at", null)
+      .order("full_name", { ascending: true })
+      .limit(5000);
+
+    const all = (leads ?? []) as Array<{ id: string; full_name: string | null; email: string | null; phone: string | null; company_name: string | null }>;
+    const eligible = all.filter((l) => isLeadEligibleForChannel(l, campaign.channel));
+    const ineligible = all.filter((l) => !isLeadEligibleForChannel(l, campaign.channel));
+
+    return {
+      channel: campaign.channel as string,
+      total: all.length,
+      eligible_count: eligible.length,
+      ineligible_count: ineligible.length,
+      eligible,
+      ineligible,
+    };
+  });
+
+// ---------------------------------------------------------------------------
+// Activate campaign — enrolls eligible leads (or a manually-selected subset)
+// ---------------------------------------------------------------------------
+
+export const activateCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      campaign_id: z.string().uuid(),
+      lead_ids: z.array(z.string().uuid()).optional(),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const orgId = await getCallerOrgId(supabase, userId);
+
+    const { data: campaign } = await supabase
+      .from("campaigns").select("id, organization_id, channel, status").eq("id", data.campaign_id).maybeSingle();
     if (!campaign || campaign.organization_id !== orgId) throw new Error("Campanha não encontrada.");
 
     const { document_id, entry_step_id } = await resolveDocumentAndEntry(supabase, data.campaign_id);
 
-    const { data: leads } = await supabase
+    // Pull candidates (either explicit ids or all org leads), then filter by channel.
+    let query = supabase
       .from("leads")
-      .select("id")
+      .select("id, email, phone")
       .eq("organization_id", orgId)
-      .is("archived_at", null)
-      .limit(5000);
+      .is("archived_at", null);
+    if (data.lead_ids && data.lead_ids.length > 0) {
+      query = query.in("id", data.lead_ids);
+    }
+    const { data: leads } = await query.limit(5000);
+
+    const channel = campaign.channel as string;
+    const candidates = ((leads ?? []) as Array<{ id: string; email: string | null; phone: string | null }>)
+      .filter((l) => isLeadEligibleForChannel(l, channel));
 
     let enrolled = 0;
+    let skipped = 0;
     const now = new Date().toISOString();
-    for (const l of leads ?? []) {
+    for (const l of candidates) {
       const { data: en, error: enErr } = await supabase
         .from("campaign_enrollments")
         .upsert({
@@ -171,7 +223,7 @@ export const activateCampaign = createServerFn({ method: "POST" })
         }, { onConflict: "campaign_id,lead_id", ignoreDuplicates: false })
         .select("id")
         .single();
-      if (enErr || !en) continue;
+      if (enErr || !en) { skipped += 1; continue; }
       await supabase.from("scheduled_jobs").insert({
         organization_id: orgId,
         kind: "flow_step",
@@ -189,7 +241,7 @@ export const activateCampaign = createServerFn({ method: "POST" })
       total_enrolled: enrolled,
     }).eq("id", data.campaign_id);
 
-    return { ok: true, enrolled };
+    return { ok: true, enrolled, skipped, requested: (data.lead_ids?.length ?? leads?.length ?? 0) };
   });
 
 // ---------------------------------------------------------------------------
