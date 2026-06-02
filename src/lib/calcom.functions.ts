@@ -159,28 +159,31 @@ export const saveCalcomConnection = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const organization_id = await getActiveOrgId(supabase, userId);
 
-    // Validate key by hitting Cal.com /me
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    let res: Response;
-    try {
-      res = await fetch("https://api.cal.com/v2/me", {
-        headers: {
-          Authorization: `Bearer ${data.api_key}`,
-          "cal-api-version": "2024-08-13",
-          Accept: "application/json",
-        },
-        signal: ctrl.signal,
-      });
-    } catch (e: any) {
+    // Validate key by hitting Cal.com /me (only when a new key is provided)
+    if (data.api_key) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      let res: Response;
+      try {
+        res = await fetch("https://api.cal.com/v2/me", {
+          headers: {
+            Authorization: `Bearer ${data.api_key}`,
+            "cal-api-version": "2024-08-13",
+            Accept: "application/json",
+          },
+          signal: ctrl.signal,
+        });
+      } catch (e: any) {
+        clearTimeout(timer);
+        throw new Error(`Falha ao contactar Cal.com: ${e?.message ?? e}`);
+      }
       clearTimeout(timer);
-      throw new Error(`Falha ao contactar Cal.com: ${e?.message ?? e}`);
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("API key inválida — verifique no dashboard do Cal.com.");
+      }
+      if (!res.ok) throw new Error(`Cal.com retornou ${res.status}.`);
     }
-    clearTimeout(timer);
-    if (res.status === 401 || res.status === 403) {
-      throw new Error("API key inválida — verifique no dashboard do Cal.com.");
-    }
-    if (!res.ok) throw new Error(`Cal.com retornou ${res.status}.`);
+
 
     const { data: provider, error: pErr } = await supabase
       .from("integration_providers")
