@@ -1,46 +1,57 @@
-## Diagnóstico
+## Objetivo
 
-O cron está rodando a cada minuto **com sucesso do lado do Postgres**, mas todas as chamadas HTTP estão retornando **404**:
+Mostrar, por lead enrolado, em que nó do fluxo ele está, quando o próximo passo vai rodar e por que está parado — direto no diálogo **Execuções** da campanha.
 
-- URL chamada: `https://project--ab6c70f9-…lovable.app/api/public/hooks/run-flow-tick`
-- Resposta: `404` + HTML do SPA (5 últimas execuções, 03:34→03:38)
+## O que muda na UI (ExecutionsDialog)
 
-Causa: a rota `src/routes/api/public/hooks/run-flow-tick.ts` **existe no preview, mas ainda não foi publicada**. O `pg_cron` aponta para a URL de produção (`project--<id>.lovable.app` = published deployment) e essa versão publicada não contém a rota nova. Por isso o tick nunca executa, o enrollment ativo `afafbb44…` fica travado com `next_run_at = 03:34:14` (vencido) sem ninguém para processá-lo.
+Cada linha de lead passa a exibir:
 
-Sintoma colateral: quando você re-ativou a campanha com o lead selecionado, o lead escolhido (`c7f4dbfc…`) já tinha um enrollment ativo desde 01:35 (que enviou 1 mensagem WhatsApp e parou aguardando o `wait`). O re-activate apenas marcou `started_at` de novo; o enrollment continua o mesmo e segue parado pelo mesmo motivo do 404.
+1. **Nó atual** — tipo do passo (`message_whatsapp`, `wait`, `branch`, etc.) + label/preview da config (ex.: "Wait 1 dia", "WhatsApp: Olá, {{nome}}…").
+2. **Próximo nó programado** — calculado a partir das `flow_transitions` do passo atual (mostra "→ Wait 3 dias" por exemplo).
+3. **next_run_at** — já existe, mas vai ficar visível para **todos** os status (não só `active`), com:
+   - "agora" se vencido e ainda `active` (= cron não pegou ainda).
+   - "em X min/h/dias" se futuro.
+   - "—" se `null`.
+4. **Motivo de pausa/impedimento** — badge colorida:
+   - `paused` → "Pausado manualmente".
+   - `failed` → `last_error` completo (já existe, vai ganhar destaque).
+   - `active` + `next_run_at` vencido há > 2 min → badge âmbar "Aguardando worker" (sinal de que o cron não rodou).
+   - `active` sem `current_step_id` → "Sem passo atual" (fluxo travou).
+   - `completed` → data de conclusão.
+5. **Expandir linha** (botão chevron) → abre timeline inline com os `flow_step_runs` do enrollment (passos já executados, branch tomado, erros), usando o `getEnrollmentRuns` que já existe.
 
-## Plano
+## O que muda no backend
 
-**Passo 1 — Publicar o app**
-- Você abre Publish e republica. Isso leva `run-flow-tick.ts` para produção e o cron volta a receber 200.
-- Não tem mudança de código necessária para destravar.
+`listCampaignEnrollments` (`src/lib/campaigns.functions.ts`) passa a retornar, em cada linha:
+- `current_step`: `{ id, type, config, label }` (join em `flow_steps` pelo `current_step_id`).
+- `next_step_preview`: `{ id, type, config, label, branch }` — busca a `flow_transitions` com `from_step_id = current_step_id` (pega a transição `next` por padrão; se for `branch`, lista as opções).
+- `is_overdue`: boolean (`next_run_at < now() - interval '2 min'` AND `status = 'active'`).
 
-**Passo 2 — Validação automática pós-publish**
-- Após publicar, eu chamo `curl` na rota de produção para confirmar `200`.
-- Consulto `net._http_response` para confirmar que o próximo tick retornou `200`.
-- Consulto `campaign_enrollments` para confirmar que `afafbb44…` avançou de step e `flow_step_runs` ganhou um novo registro.
-
-**Passo 3 — Ajuste defensivo no ActivateCampaignDialog (frontend)**
-- Hoje, quando o lead já tem enrollment ativo, "Ativar" não cria nada novo nem avisa. Vou:
-  - Mostrar no diálogo um contador "X leads já em execução (serão ignorados)" ao lado de "Y novos serão enrollados".
-  - Se 0 novos enrollments serão criados, exibir aviso explicando que nada novo será disparado.
-- Mudança apenas de UI/contagem, sem alterar regra de enrollment.
-
-**Passo 4 — Fallback de URL no cron (proteção futura)**
-- Atualizar o comando do `cron.job` para chamar a URL `-dev` (preview) **somente** se você quiser testar antes de publicar. Por padrão mantemos produção. Documento isso no `.lovable/plan.md` para facilitar troubleshooting.
-- Não vou trocar a URL agora — produção é o destino correto; só registro a opção.
+Sem mudar schema, sem nova migration — só consulta adicional. RLS já permite porque `flow_steps` é acessível via `is_org_member` no `builder_documents`.
 
 ## Fora de escopo
-- Mexer no executor, no scheduler, ou na lógica de wait/branch.
-- Mexer no schema de `campaign_enrollments` ou `flow_step_runs`.
 
-## Pronto quando
-- `curl POST` na rota publicada retorna `200`.
-- `net._http_response` mostra `200` nas chamadas recentes do cron.
-- O enrollment `afafbb44…` avança para o próximo nó (novo registro em `flow_step_runs` após o wait expirar).
-- Diálogo de ativar mostra contagem de "já em execução" vs "novos".
+- Não mexer no executor, scheduler, cron, ou regra de wait/branch.
+- Não criar tabela nova nem alterar `campaign_enrollments`.
+- Não mudar o fluxo de ativação ou enrollment.
 
 ## Detalhes técnicos
-- Arquivo a editar: `src/routes/_app.dashboard.campaigns.tsx` (somente a UI do `ActivateCampaignDialog`).
-- Server fn `listEligibleLeadsForCampaign` precisa retornar também os IDs de leads já com enrollment ativo (ou criar `countActiveEnrollmentsForLeads`).
-- Nenhuma migração SQL.
+
+**Arquivos a editar:**
+- `src/lib/campaigns.functions.ts` — enriquecer `listCampaignEnrollments` com `current_step` + `next_step_preview` + `is_overdue`.
+- `src/routes/_app.dashboard.campaigns.tsx` — `ExecutionsDialog`: adicionar coluna "Nó atual → próximo", badge de impedimento, expand com timeline (`getEnrollmentRuns`).
+
+**Helper de label do nó (frontend):**
+- `message_whatsapp` → "WhatsApp: <primeiros 40 chars do body>"
+- `wait` → "Espera <duration> <unit>" (lê `config.duration` + `config.unit`)
+- `branch` / `condition` → "Condição"
+- demais tipos → `type`
+
+**Timeline expand:** usa `useQuery` lazy (só dispara quando expand abre), key `["enrollment-runs", enrollment_id]`.
+
+## Pronto quando
+
+- Para o enrollment travado, a linha mostra: "Nó atual: WhatsApp: Olá este é um teste o inicio · Próximo: Wait 1 min · next_run_at: vencido há Xh · badge âmbar 'Aguardando worker'".
+- Ao expandir, vejo o `flow_step_runs` com a 1ª mensagem como `completed` e nada depois — confirmando que o wait expirou e o cron não avançou.
+- Lead com `failed` mostra `last_error` em destaque.
+- Lead `paused` mostra "Pausado manualmente".
