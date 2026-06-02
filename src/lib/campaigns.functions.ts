@@ -442,9 +442,9 @@ export const resetEnrollmentsBulk = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const statuses = data.scope === "all_finished"
+    const statuses = (data.scope === "all_finished"
       ? ["completed", "failed", "paused"]
-      : data.scope === "failed" ? ["failed"] : ["completed"];
+      : data.scope === "failed" ? ["failed"] : ["completed"]) as Array<"completed" | "failed" | "paused">;
     const { data: rows } = await supabase
       .from("campaign_enrollments")
       .select("id")
