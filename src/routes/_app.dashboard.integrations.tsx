@@ -249,6 +249,7 @@ function IntegrationsPage() {
                       onClick={() => {
                         if (isResend) setResendOpen(true);
                         else if (isWhatsApp) setWhatsAppOpen(true);
+                        else if (isCalcom) setCalcomOpen(true);
                       }}
                       title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
@@ -263,6 +264,7 @@ function IntegrationsPage() {
 
       <ResendConnectionDialog open={resendOpen} onOpenChange={setResendOpen} />
       <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
+      <CalcomConnectionDialog open={calcomOpen} onOpenChange={setCalcomOpen} />
     </div>
   );
 }
