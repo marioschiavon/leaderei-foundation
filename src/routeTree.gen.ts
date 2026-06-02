@@ -33,6 +33,7 @@ import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.i
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
 import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
+import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
@@ -157,6 +158,11 @@ const ApiPublicHooksRunFlowTickRoute =
     path: '/api/public/hooks/run-flow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCalcomRoute = ApiPublicHooksCalcomRouteImport.update({
+  id: '/api/public/hooks/calcom',
+  path: '/api/public/hooks/calcom',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppDashboardBuilderDocumentIdRoute =
   AppDashboardBuilderDocumentIdRouteImport.update({
     id: '/builder/$documentId',
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/master/': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
@@ -210,6 +217,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/master': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
 }
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_master/master/': typeof MasterMasterIndexRoute
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/master/'
     | '/dashboard/builder/$documentId'
+    | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder/'
   fileRoutesByTo: FileRoutesByTo
@@ -289,6 +299,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/master'
     | '/dashboard/builder/$documentId'
+    | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder'
   id:
@@ -316,6 +327,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_master/master/'
     | '/_app/dashboard/builder/$documentId'
+    | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/_app/dashboard/builder/'
   fileRoutesById: FileRoutesById
@@ -329,6 +341,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiPublicHooksCalcomRoute: typeof ApiPublicHooksCalcomRoute
   ApiPublicHooksRunFlowTickRoute: typeof ApiPublicHooksRunFlowTickRoute
 }
 
@@ -502,6 +515,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksRunFlowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/calcom': {
+      id: '/api/public/hooks/calcom'
+      path: '/api/public/hooks/calcom'
+      fullPath: '/api/public/hooks/calcom'
+      preLoaderRoute: typeof ApiPublicHooksCalcomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/dashboard/builder/$documentId': {
       id: '/_app/dashboard/builder/$documentId'
       path: '/builder/$documentId'
@@ -580,6 +600,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiPublicHooksCalcomRoute: ApiPublicHooksCalcomRoute,
   ApiPublicHooksRunFlowTickRoute: ApiPublicHooksRunFlowTickRoute,
 }
 export const routeTree = rootRouteImport
