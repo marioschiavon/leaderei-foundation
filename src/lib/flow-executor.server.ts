@@ -295,7 +295,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       // Persist startedAt in context and re-check in 5 minutes
       const recheck = new Date(now.getTime() + 5 * 60_000);
       const newCtx = { ...ctx, [stepCtxKey]: { started_at: startedAt.toISOString() } };
-      await supabaseAdmin.from("campaign_enrollments").update({ context: newCtx }).eq("id", en.id);
+      await supabaseAdmin.from("campaign_enrollments").update({ context: newCtx as any }).eq("id", en.id);
       return { kind: "wait", resume_at: recheck < deadline ? recheck : deadline, output: { waiting: true } };
     }
 
@@ -328,7 +328,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
           break;
       }
       if (Object.keys(updates).length) {
-        await supabaseAdmin.from("leads").update(updates).eq("id", lead.id);
+        await supabaseAdmin.from("leads").update(updates as any).eq("id", lead.id);
       }
       const next = await findNextStep(step.document_id, step.id, "next");
       return { kind: "advance", next_step_id: next, delay_until: now, output: { action: cfg.action_type, applied: updates } };
