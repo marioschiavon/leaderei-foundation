@@ -25,21 +25,27 @@ import {
   Activity,
   PlayCircle,
   PauseCircle,
+  RefreshCw,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   listCampaignEnrollments,
   pauseEnrollment,
   resumeEnrollment,
   activateCampaign,
   getCampaignExecutorStats,
+  listEligibleLeadsForCampaign,
+  forceFlowTick,
 } from "@/lib/campaigns.functions";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
