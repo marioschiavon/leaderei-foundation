@@ -381,16 +381,12 @@ function CampaignCard({
               variant="ghost"
               onClick={() =>
                 c.status === "draft"
-                  ? activateMutation.mutate()
+                  ? setActivateOpen(true)
                   : statusMutation.mutate("running")
               }
-              disabled={statusMutation.isPending || activateMutation.isPending}
+              disabled={statusMutation.isPending}
             >
-              {activateMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Play className="h-3.5 w-3.5" />
-              )}
+              <Play className="h-3.5 w-3.5" />
               {c.status === "draft" ? "Ativar" : "Retomar"}
             </Button>
           )}
