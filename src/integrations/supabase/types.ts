@@ -216,6 +216,8 @@ export type Database = {
           context: Json
           created_at: string
           current_node_id: string | null
+          current_step_id: string | null
+          document_id: string | null
           enrolled_at: string
           flow_definition_id: string | null
           id: string
@@ -232,6 +234,8 @@ export type Database = {
           context?: Json
           created_at?: string
           current_node_id?: string | null
+          current_step_id?: string | null
+          document_id?: string | null
           enrolled_at?: string
           flow_definition_id?: string | null
           id?: string
@@ -248,6 +252,8 @@ export type Database = {
           context?: Json
           created_at?: string
           current_node_id?: string | null
+          current_step_id?: string | null
+          document_id?: string | null
           enrolled_at?: string
           flow_definition_id?: string | null
           id?: string
@@ -271,6 +277,20 @@ export type Database = {
             columns: ["current_node_id"]
             isOneToOne: false
             referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "flow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "builder_documents"
             referencedColumns: ["id"]
           },
           {
@@ -735,6 +755,70 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_step_runs: {
+        Row: {
+          branch_taken: string | null
+          created_at: string
+          enrollment_id: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          organization_id: string
+          output: Json
+          started_at: string
+          status: Database["public"]["Enums"]["flow_step_run_status"]
+          step_id: string
+        }
+        Insert: {
+          branch_taken?: string | null
+          created_at?: string
+          enrollment_id: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          output?: Json
+          started_at?: string
+          status?: Database["public"]["Enums"]["flow_step_run_status"]
+          step_id: string
+        }
+        Update: {
+          branch_taken?: string | null
+          created_at?: string
+          enrollment_id?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          output?: Json
+          started_at?: string
+          status?: Database["public"]["Enums"]["flow_step_run_status"]
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_step_runs_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_step_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_step_runs_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "flow_steps"
             referencedColumns: ["id"]
           },
         ]
@@ -1886,6 +1970,7 @@ export type Database = {
         Row: {
           attempts: number
           created_at: string
+          enrollment_id: string | null
           id: string
           kind: string
           last_error: string | null
@@ -1902,6 +1987,7 @@ export type Database = {
         Insert: {
           attempts?: number
           created_at?: string
+          enrollment_id?: string | null
           id?: string
           kind: string
           last_error?: string | null
@@ -1918,6 +2004,7 @@ export type Database = {
         Update: {
           attempts?: number
           created_at?: string
+          enrollment_id?: string | null
           id?: string
           kind?: string
           last_error?: string | null
@@ -1931,7 +2018,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["job_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_jobs_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -2036,6 +2131,10 @@ export type Database = {
     Functions: {
       _platform_passphrase: { Args: never; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: string }
+      add_business_days: {
+        Args: { _days: number; _ts: string }
+        Returns: string
+      }
       get_hook7_instance_token: {
         Args: { _instance_id: string }
         Returns: string
@@ -2168,6 +2267,12 @@ export type Database = {
         | "enrich"
         | "tag"
         | "end"
+      flow_step_run_status:
+        | "pending"
+        | "running"
+        | "done"
+        | "failed"
+        | "skipped"
       integration_status: "disconnected" | "connected" | "error" | "pending"
       job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
       knowledge_source_kind: "url" | "file" | "text" | "faq"
@@ -2394,6 +2499,7 @@ export const Constants = {
         "tag",
         "end",
       ],
+      flow_step_run_status: ["pending", "running", "done", "failed", "skipped"],
       integration_status: ["disconnected", "connected", "error", "pending"],
       job_status: ["pending", "running", "completed", "failed", "cancelled"],
       knowledge_source_kind: ["url", "file", "text", "faq"],

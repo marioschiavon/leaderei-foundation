@@ -32,6 +32,7 @@ import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dash
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
+import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
@@ -150,6 +151,12 @@ const AppDashboardBuilderIndexRoute =
     path: '/builder/',
     getParentRoute: () => AppDashboardRoute,
   } as any)
+const ApiPublicHooksRunFlowTickRoute =
+  ApiPublicHooksRunFlowTickRouteImport.update({
+    id: '/api/public/hooks/run-flow-tick',
+    path: '/api/public/hooks/run-flow-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppDashboardBuilderDocumentIdRoute =
   AppDashboardBuilderDocumentIdRouteImport.update({
     id: '/builder/$documentId',
@@ -179,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/master/': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRoutesByTo {
@@ -202,6 +210,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/master': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRoutesById {
@@ -229,6 +238,7 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_master/master/': typeof MasterMasterIndexRoute
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRouteTypes {
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/master/'
     | '/dashboard/builder/$documentId'
+    | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/master'
     | '/dashboard/builder/$documentId'
+    | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder'
   id:
     | '__root__'
@@ -304,6 +316,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_master/master/'
     | '/_app/dashboard/builder/$documentId'
+    | '/api/public/hooks/run-flow-tick'
     | '/_app/dashboard/builder/'
   fileRoutesById: FileRoutesById
 }
@@ -316,6 +329,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiPublicHooksRunFlowTickRoute: typeof ApiPublicHooksRunFlowTickRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -481,6 +495,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardBuilderIndexRouteImport
       parentRoute: typeof AppDashboardRoute
     }
+    '/api/public/hooks/run-flow-tick': {
+      id: '/api/public/hooks/run-flow-tick'
+      path: '/api/public/hooks/run-flow-tick'
+      fullPath: '/api/public/hooks/run-flow-tick'
+      preLoaderRoute: typeof ApiPublicHooksRunFlowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/dashboard/builder/$documentId': {
       id: '/_app/dashboard/builder/$documentId'
       path: '/builder/$documentId'
@@ -559,17 +580,8 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiPublicHooksRunFlowTickRoute: ApiPublicHooksRunFlowTickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

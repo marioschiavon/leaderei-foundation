@@ -1,120 +1,81 @@
-## Problema
 
-A tabela `public.user_roles` hoje só tem duas policies:
-- `SELECT` permitindo o usuário ver suas próprias roles (`user_id = auth.uid()`)
-- `ALL` para `master_admin`
+# Plano: Executor de Fluxos (Scheduler/Worker)
 
-Não existe nenhuma policy de `INSERT/UPDATE/DELETE` para usuários comuns — e como RLS é permissiva por padrão, isso **não bloqueia** escrita: qualquer usuário autenticado pode rodar um `INSERT` atribuindo a si mesmo a role `master_admin` e ganhar acesso global.
+## Diagnóstico
 
-## Correção
+O banco já tem **metade da infra** pronta — mas em dois esquemas paralelos que nunca se conversaram:
 
-Migração SQL adicionando policies de escrita restritivas em `public.user_roles`:
+- **Builder (UI)** escreve em `builder_documents` → `flow_steps` / `flow_transitions`. Tem 5 docs e 19 steps salvos.
+- **Runtime (vazio)** tem `flow_definitions` / `flow_nodes` / `flow_edges` + `campaign_enrollments` (com `next_run_at`, `current_node_id`, `context jsonb`) + `scheduled_jobs` (fila genérica com `run_at`, `status`, `attempts`, `locked_at`). Zero linhas nas três.
 
-1. **`INSERT` apenas para `master_admin`**
-   ```sql
-   CREATE POLICY "Only master_admin can insert roles"
-   ON public.user_roles FOR INSERT TO authenticated
-   WITH CHECK (public.has_role(auth.uid(), 'master_admin'));
-   ```
-2. **`UPDATE` apenas para `master_admin`**
-   ```sql
-   CREATE POLICY "Only master_admin can update roles"
-   ON public.user_roles FOR UPDATE TO authenticated
-   USING (public.has_role(auth.uid(), 'master_admin'))
-   WITH CHECK (public.has_role(auth.uid(), 'master_admin'));
-   ```
-3. **`DELETE` apenas para `master_admin`**
-   ```sql
-   CREATE POLICY "Only master_admin can delete roles"
-   ON public.user_roles FOR DELETE TO authenticated
-   USING (public.has_role(auth.uid(), 'master_admin'));
-   ```
+Ou seja: a fila existe, o estado por lead existe, mas **(a)** o executor referencia tabelas que o Builder não popula, e **(b)** não há worker que drene a fila. É isso que precisa ser construído.
 
-A policy `ALL` de `master_admin` já existente continua funcionando (policies permissivas são unidas por OR). A nova explicitação fecha o buraco para usuários comuns.
+## Decisão de arquitetura
 
-## Por que isso não quebra signup/convites
+1. **Unificar no schema do Builder** (`flow_steps` / `flow_transitions`). É o que tem dados reais e o que a UI já edita. Apontar `campaign_enrollments` para `builder_documents` (via `campaigns.builder_document_id` que já existe implicitamente pelo `getBuilderDocumentByCampaign`) — depreciar `flow_definitions`/`flow_nodes`/`flow_edges`.
+2. **Fila = `scheduled_jobs`** (já existe). O worker = TanStack server route em `/api/public/hooks/run-flow-tick`, disparado por `pg_cron` a cada minuto.
+3. **Lock pessimista** via `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED LIMIT N)` para permitir múltiplos ticks concorrentes sem dupla execução.
 
-Os fluxos que hoje inserem em `user_roles` rodam via funções `SECURITY DEFINER` (executam como dono da função, ignorando RLS):
-- `public.provision_user_account` — usada por `handle_new_user` no signup → insere `company_admin`.
-- `public.accept_invitation` — usada na aceitação de convite → insere `company_admin`/`user`.
+## Passos
 
-Nenhum código cliente faz `supabase.from('user_roles').insert(...)` diretamente, então a restrição não afeta a aplicação.
+### 1. Migration de reconciliação de schema
+- Adicionar `campaign_enrollments.document_id uuid REFERENCES builder_documents(id)` e `current_step_id uuid REFERENCES flow_steps(id)`.
+- Marcar `flow_definition_id` / `current_node_id` como deprecated (manter por ora, ninguém usa).
+- Adicionar `scheduled_jobs.enrollment_id uuid` + índice parcial em jobs do tipo `flow_step`.
+- Criar tabela `flow_step_runs` (id, enrollment_id, step_id, status enum: `pending|running|done|failed|skipped`, output jsonb, error text, started_at, finished_at) — log de auditoria por execução de step. RLS + GRANTs.
 
-## Verificação após aplicar
+### 2. Enrollment: enfileirar leads na campanha
+- Server fn `enrollLeadInCampaign({ campaign_id, lead_id })`:
+  - Resolve `builder_documents` da campanha (status = published).
+  - Cria `campaign_enrollments` com `status=active`, `current_step_id = step is_entry`, `next_run_at = now()`.
+  - Insere `scheduled_jobs(kind='flow_step', payload={enrollment_id}, run_at=now())`.
+- Gatilho automático: ao mudar `campaigns.status` de `draft` → `active`, enrolla todos os leads do segmento (server fn `activateCampaign`).
+- Botão "Adicionar à campanha" na UI de Leads (já existe a tela) chama `enrollLeadInCampaign`.
 
-- Re-rodar o scanner de segurança — finding `user_roles_self_assignment` deve sumir.
-- Signup novo continua provisionando role corretamente.
-- Aceite de convite continua atribuindo role corretamente.
+### 3. Worker: tick endpoint + cron
+- `src/routes/api/public/hooks/run-flow-tick.ts` (POST, sem body):
+  - `SELECT FOR UPDATE SKIP LOCKED LIMIT 25` em `scheduled_jobs` com `status='pending' AND run_at <= now() AND kind='flow_step'`.
+  - Marca `status=running`, `locked_at=now()`, `attempts+=1`.
+  - Para cada job, carrega enrollment + step atual + transitions, executa via dispatcher (passo 4), avança `current_step_id`, calcula `next_run_at` do próximo step e re-enfileira.
+  - Em erro: se `attempts < max_attempts` → reagenda com backoff exponencial (1m, 5m, 30m, 2h, 12h). Senão: `status=failed`, enrollment `status='failed'`, `last_error`.
+  - Sempre retorna 200 com `{processed, failed, skipped}`.
+- `pg_cron`: `*/1 * * * *` chamando o endpoint com `apikey` header. Usar URL estável `project--ab6c70f9-…lovable.app`.
 
-## Escopo
+### 4. Dispatcher por tipo de step
+Função `executeStep(enrollment, step, supabaseAdmin)` retornando `{next_step_id, delay_until, side_effect_log}`:
 
-Apenas 1 migração SQL. Sem mudanças em código TypeScript. Os outros findings do painel (tokens de convite, hashes de api_keys, funções SECURITY DEFINER executáveis, bucket público) ficam fora desta rodada — posso tratar em seguida se quiser.
----
+| Step type | Ação |
+|---|---|
+| `message_email` | Renderiza template com `lead.*` vars, chama `sendEmail` (já existe), grava `lead_activities`, transição `next` imediato. |
+| `message_whatsapp` | Chama `sendWhatsAppMessage` (já existe em hook7.functions), idem. |
+| `message_linkedin` | Por ora: marca `skipped` com motivo "não implementado", transição `next`. |
+| `wait` | Calcula `delay_until = now() + config.duration`, transição `next` agendada. |
+| `condition_replied` | Consulta `lead_activities` (channel + window). Se respondeu → branch `yes`. Se não → agenda re-avaliação até `timeout`; ao estourar → branch `no`. |
+| `action` | Aplica `set_status` / `set_temperature` / `add_tag` / `remove_tag` / `move_pipeline` direto no `leads`, transição `next`. |
 
-## Rodada — Onboarding + signup sem confirmação + auto-link Builder (28/05/2026)
+Sem próximo step (fim do grafo) → `enrollment.status='completed'`, `completed_at=now()`. Grava cada execução em `flow_step_runs`.
 
-Critérios fechados:
+### 5. UI mínima de observabilidade
+- Aba **"Execuções"** dentro da página da Campanha: lista `campaign_enrollments` com lead, current_step, status, next_run_at, last_error. Filtros por status.
+- Botões: **Pausar** (status=paused, remove jobs), **Retomar** (status=active, reenfileira), **Forçar tick agora** (admin only, chama o endpoint).
+- Badge no sidebar quando `enrollments.status='failed' > 0`.
 
-1. ✅ Signup auto-confirma email e redireciona pra `/onboarding`.
-2. ✅ Tela `/onboarding` com 5 cards (3 ativos + 2 "Em breve") e botão funcional.
-3. ✅ "Começar a usar" seta `onboarding_completed_at = now()` e leva pra `/dashboard`.
-4. ✅ Login subsequente NÃO mostra `/onboarding` (vai direto pra `/dashboard`).
-5. ✅ Rota `/onboarding` acessível manualmente após conclusão.
-6. ✅ Builder auto-conecta novo Email ao último nó.
-7. ✅ Sequência horizontal Email → Wait (position.x = last.x + 280).
-8. ✅ Auto-link em Condição com `yes` ocupado conecta em `no`.
-9. ✅ Condição com `yes` e `no` ocupados → nó solto.
-10. ✅ Save + F5 mantém conexões criadas pelo auto-link (mesmo caminho de save).
-11. ✅ Build passa.
+## Detalhes técnicos
 
-Mudanças:
-- Migration: `profiles.onboarding_completed_at timestamptz`.
-- Auth: `auto_confirm_email = true`.
-- Server fn: `markOnboardingCompleted` + `getMyContext` expõe `profile` e `onboardingCompleted`.
-- Rota nova: `/onboarding`.
-- `_app.tsx` redireciona pra `/onboarding` se `!onboardingCompleted`.
-- `signup.tsx` redireciona pra `/onboarding` quando `data.session` existe (fallback pra `/login` se confirmação for reativada).
-- `FlowEditor.tsx`: hidratação ordena steps por `created_at` ASC; `onDrop` implementa auto-link + `fitView`.
+- **Idempotência**: cada job tem `id`; o lock via `SKIP LOCKED` garante 1 worker por vez. `flow_step_runs` tem unique parcial `(enrollment_id, step_id, started_at)` para detectar dupla execução.
+- **Timezone**: tudo em `timestamptz`. `wait` de "business_days" usa função SQL `add_business_days(ts, n)` (criar).
+- **Throughput**: 25 jobs/tick × 60 ticks/h = 1.500 steps/h por organização. Suficiente para MVP.
+- **Sem Inngest/queue externa**: `pg_cron` + `scheduled_jobs` é o suficiente até ~10k leads ativos/dia. Migrar para Inngest depois é uma troca do worker, não do schema.
+- **Segurança**: o endpoint `/api/public/hooks/run-flow-tick` valida o header `apikey` (anon key do Supabase) — padrão da knowledge `schedule-jobs-options`. Usa `supabaseAdmin` para bypass de RLS.
 
-## Rodada 1A — WhatsApp via Hook7 (criar + conectar instâncias)
+## Fora do escopo desta rodada
 
-- Migrations: `hook7_instances` (org, owner_user_id, external_id/name, status, token criptografado), `organizations.whatsapp_mode`, `platform_settings.hook7_*`.
-- RPCs: `set_hook7_instance_token` / `get_hook7_instance_token` (pgp_sym_encrypt, SECURITY DEFINER).
-- `src/lib/hook7.functions.ts`: helper `hook7Fetch`, master config (apikey global + base_url), mode org-level, CRUD de instâncias (create, connect, qr, status, disconnect, reconnect, delete, rename).
-- UI: `WhatsAppManagerDialog` com fluxo QR (polling 3s, timeout 2min), wired em **Integrações** (card WhatsApp → "Gerenciar instâncias").
-- Master → Plataforma: seção "WhatsApp via Hook7" para salvar apikey global e base URL.
-- Configurações: nova aba **WhatsApp** para alternar `shared` ↔ `per_user`.
-- Docs: seção "WhatsApp via Hook7" em `docs/user/README.md`.
+- Editor visual de gatilhos de entrada (vai vir junto da UI de Campanha).
+- A/B testing, throttling por canal, quiet hours — anotar como follow-up.
+- Métricas agregadas (taxa de abertura, resposta) — usar `lead_activities` já existente como base depois.
 
-## Rodada 1A-fix — Chave global Hook7 sai do banco e vai para env var
+## Critério de pronto
 
-- Migration: `DELETE FROM platform_settings WHERE key = 'hook7_global_apikey'` (entrada removida, `hook7_base_url` permanece).
-- `src/lib/hook7.functions.ts`: `getHook7GlobalApiKey()` agora é síncrona e lê apenas `process.env.HOOK7_GLOBAL_APIKEY`. Server fn `setHook7GlobalApiKey` removida. Adicionadas `getHook7GlobalApiKeyStatus` (retorna `{ configured }`) e `testHook7Connection` (cria+deleta instância de healthcheck).
-- Master → Plataforma → "WhatsApp · Hook7": apenas leitura (status da apikey + URL base editável + prefixo read-only + botão "Testar conexão" + aviso explicando que a chave é segredo de infra).
-- `.env.example`: documenta `HOOK7_GLOBAL_APIKEY` e `HOOK7_INSTANCE_PREFIX`.
-- Docs: `docs/user/README.md` atualizado.
-
-### Dívida técnica registrada
-- Migrar `resend_global_api_key` de `platform_settings` para variável de ambiente, alinhando padrão de chaves de infraestrutura (mesma motivação de separação de responsabilidades entre operação e infraestrutura).
-
-## Rodada 1A-fix2 — Mapeamento Hook7 (Connected/Qrcode/Name) + cancelamento seguro
-
-- Migration: `hook7_instances.connected_profile_name text`.
-- `getHook7InstanceQR`: lê `data.Qrcode` (capitalização exata).
-- `getHook7InstanceStatus`: lê `data.Connected`/`LoggedIn`/`Name`; só vira `connected` quando ambos `true`; nunca regride automaticamente para `disconnected`; grava `connected_profile_name` e `last_connected_at`. Erro de fetch → status `error`.
-- `createHook7Instance`: audita o mapeamento `data.id → external_id`, `data.name → external_name`, `data.token → token_encrypted`; warning se o nome devolvido divergir do enviado.
-- `deleteHook7Instance`: aceita `reason` (`user_delete`/`cancel`/`timeout`). Defensivo: nunca arquiva uma instância `connected` em rollback de cancel/timeout.
-- `WhatsAppManagerDialog`: `handleCancel(reason)` propaga motivo; auto-arquiva no timeout 2min; passo 2 mostra "Conectado como {Name}" + nota "O número será detectado em breve"; lista usa `connected_profile_name` como fallback quando `phone_number` é NULL.
-
----
-
-## Rodada 1B — Webhook Hook7 (FECHADA)
-
-- Migration: campos `external_message_id`, `source_channel`, `whatsapp_status`, `whatsapp_status_at` em `messages`; `needs_review`/`review_reason` em `leads`; índice único parcial em `external_message_id`; realtime habilitado em `messages`.
-- Edge Function `hook7-webhook` (Deno, service_role) recebe eventos Hook7, valida secret de path + `instanceToken`, e roteia `Message` / `Receipt` / `Connected` / `LoggedOut`. Sempre retorna 200.
-- `connectHook7Instance` / `reconnectHook7Instance` agora registram o `webhookUrl` automaticamente no Hook7 (graceful degradation se `HOOK7_WEBHOOK_SECRET` ausente).
-- Master → Plataforma → WhatsApp · Hook7 mostra status do webhook (URL com secret mascarado).
-
-### Próxima — Rodada 1B.2
-
-UI do Inbox consumindo `messages` em tempo real (canal realtime client-side) + filtro de leads `needs_review = true` ("Caixa de entrada órfã").
+1. Publico um fluxo `Email → Wait 5min → Email → Wait 5min → Condition replied (24h) → tag "hot"/"cold"`.
+2. Enrollo 3 leads.
+3. Em 15 min vejo 2 emails enviados por lead, em 24h vejo a tag aplicada de acordo com resposta real, e `flow_step_runs` tem 1 linha por step×lead com status correto.
