@@ -30,6 +30,10 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
+  Trash2,
+  ArchiveRestore,
+  UserMinus,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -52,7 +56,20 @@ import {
   listEligibleLeadsForCampaign,
   forceFlowTick,
   getEnrollmentRuns,
+  cancelEnrollment,
 } from "@/lib/campaigns.functions";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { stepLabel, stepLabelShort } from "@/lib/flow-step-label";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -90,6 +107,8 @@ import {
   changeCampaignStatus,
   duplicateCampaign,
   archiveCampaign,
+  restoreCampaign,
+  deleteCampaign,
 } from "@/lib/tenant.functions";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +142,13 @@ const CHANNEL_LABEL: Record<(typeof CHANNELS)[number], string> = {
   multi: "Multicanal",
 };
 
+type CurrentNode = {
+  step_id: string;
+  type: string;
+  config: any;
+  count: number;
+};
+
 type Campaign = {
   id: string;
   name: string;
@@ -136,23 +162,33 @@ type Campaign = {
   scheduled_at: string | null;
   flow_step_count: number | null;
   flow_status: string | null;
+  current_nodes: CurrentNode[];
+};
+
+type ListCampaignsResponse = {
+  items: Campaign[];
+  archived_count: number;
 };
 
 function CampaignsPage() {
   const fetchFn = useServerFn(listCampaigns);
+  const [scope, setScope] = useState<"active" | "archived">("active");
   const { data, isLoading, error } = useQuery({
-    queryKey: ["campaigns"],
-    queryFn: () => fetchFn(),
+    queryKey: ["campaigns", scope],
+    queryFn: () => fetchFn({ data: { scope } }) as Promise<ListCampaignsResponse>,
   });
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
 
+  const items = data?.items ?? [];
+  const archivedCount = data?.archived_count ?? 0;
+
   const filtered = useMemo(() => {
-    return ((data ?? []) as Campaign[]).filter(
+    return items.filter(
       (c) => !query || c.name.toLowerCase().includes(query.toLowerCase()),
     );
-  }, [data, query]);
+  }, [items, query]);
 
   return (
     <div className="space-y-6">
@@ -166,7 +202,7 @@ function CampaignsPage() {
         }
       />
 
-      <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-surface p-3">
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -175,6 +211,45 @@ function CampaignsPage() {
             placeholder="Buscar campanha…"
             className="h-9 pl-9"
           />
+        </div>
+        <div className="inline-flex rounded-md border bg-surface p-0.5 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setScope("active")}
+            className={cn(
+              "rounded px-3 py-1 transition-colors",
+              scope === "active"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Ativas
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("archived")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded px-3 py-1 transition-colors",
+              scope === "archived"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Arquivadas
+            {archivedCount > 0 && (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-2xs font-semibold",
+                  scope === "archived"
+                    ? "bg-background/20 text-background"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                {archivedCount}
+              </span>
+            )}
+          </button>
         </div>
         <div className="ml-auto text-xs text-muted-foreground">
           {isLoading
@@ -195,11 +270,23 @@ function CampaignsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={Megaphone}
-          title={query ? "Nenhuma campanha encontrada" : "Nenhuma campanha ainda"}
-          description={query ? "Ajuste a busca." : "Crie a primeira sequência multicanal."}
+          icon={scope === "archived" ? Archive : Megaphone}
+          title={
+            query
+              ? "Nenhuma campanha encontrada"
+              : scope === "archived"
+                ? "Nenhuma campanha arquivada"
+                : "Nenhuma campanha ainda"
+          }
+          description={
+            query
+              ? "Ajuste a busca."
+              : scope === "archived"
+                ? "Campanhas arquivadas aparecerão aqui."
+                : "Crie a primeira sequência multicanal."
+          }
           action={
-            !query && (
+            !query && scope === "active" && (
               <Button onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" /> Criar campanha
               </Button>
@@ -209,10 +296,16 @@ function CampaignsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
-            <CampaignCard key={c.id} campaign={c} onEdit={() => setEditing(c)} />
+            <CampaignCard
+              key={c.id}
+              campaign={c}
+              scope={scope}
+              onEdit={() => setEditing(c)}
+            />
           ))}
         </div>
       )}
+
 
       <CampaignFormSheet
         open={createOpen}
@@ -265,15 +358,19 @@ function EditFlowButton({ campaignId, status }: { campaignId: string; status: st
 
 function CampaignCard({
   campaign: c,
+  scope,
   onEdit,
 }: {
   campaign: Campaign;
+  scope: "active" | "archived";
   onEdit: () => void;
 }) {
   const queryClient = useQueryClient();
   const changeStatusFn = useServerFn(changeCampaignStatus);
   const duplicateFn = useServerFn(duplicateCampaign);
   const archiveFn = useServerFn(archiveCampaign);
+  const restoreFn = useServerFn(restoreCampaign);
+  const deleteFn = useServerFn(deleteCampaign);
 
   const meta = STATUS_META[c.status] ?? STATUS_META.draft;
   const Icon = CHANNEL_ICON[c.channel] ?? Megaphone;
@@ -312,10 +409,33 @@ function CampaignCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: () => restoreFn({ data: { id: c.id } }),
+    onSuccess: () => {
+      toast.success("Campanha restaurada como rascunho.");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteFn({ data: { id: c.id } }),
+    onSuccess: () => {
+      toast.success("Campanha excluída definitivamente.");
+      invalidate();
+      setDeleteOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [execOpen, setExecOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
-  const canStart = c.status === "draft" || c.status === "paused";
-  const canPause = c.status === "running";
+  const [leadsOpen, setLeadsOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const isArchived = scope === "archived";
+  const canStart = !isArchived && (c.status === "draft" || c.status === "paused");
+  const canPause = !isArchived && c.status === "running";
+  const isLive = c.status === "running" || c.status === "paused";
 
   return (
     <div className="flex flex-col rounded-xl border bg-surface">
@@ -367,6 +487,9 @@ function CampaignCard({
             </span>
           )}
         </div>
+        {isLive && (
+          <CurrentNodesStrip nodes={c.current_nodes} />
+        )}
       </div>
       <div className="grid grid-cols-3 divide-x border-b">
         <Stat label="Inscritos" value={c.total_enrolled} />
@@ -376,59 +499,95 @@ function CampaignCard({
       <div className="flex items-center justify-between gap-2 p-3 text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
           <EditFlowButton campaignId={c.id} status={c.status} />
-          <Button size="sm" variant="ghost" onClick={() => setExecOpen(true)}>
-            <Activity className="h-3.5 w-3.5" /> Execuções
-          </Button>
+          {!isArchived && (
+            <>
+              <Button size="sm" variant="ghost" onClick={() => setExecOpen(true)}>
+                <Activity className="h-3.5 w-3.5" /> Execuções
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setLeadsOpen(true)}>
+                <Users className="h-3.5 w-3.5" /> Leads
+              </Button>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1">
-          {canStart && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                c.status === "draft"
-                  ? setActivateOpen(true)
-                  : statusMutation.mutate("running")
-              }
-              disabled={statusMutation.isPending}
-            >
-              <Play className="h-3.5 w-3.5" />
-              {c.status === "draft" ? "Ativar" : "Retomar"}
-            </Button>
-          )}
-          {canPause && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => statusMutation.mutate("paused")}
-              disabled={statusMutation.isPending}
-            >
-              <Pause className="h-3.5 w-3.5" /> Pausar
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Pencil className="h-4 w-4" /> Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => duplicateMutation.mutate()}>
-                <Copy className="h-4 w-4" /> Duplicar
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => archiveMutation.mutate()}
-                disabled={c.status === "archived"}
-                className="text-destructive focus:text-destructive"
+          {isArchived ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => restoreMutation.mutate()}
+                disabled={restoreMutation.isPending}
               >
-                <Archive className="h-4 w-4" /> Arquivar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {restoreMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArchiveRestore className="h-3.5 w-3.5" />
+                )}
+                Restaurar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Excluir
+              </Button>
+            </>
+          ) : (
+            <>
+              {canStart && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    c.status === "draft"
+                      ? setActivateOpen(true)
+                      : statusMutation.mutate("running")
+                  }
+                  disabled={statusMutation.isPending}
+                >
+                  <Play className="h-3.5 w-3.5" />
+                  {c.status === "draft" ? "Ativar" : "Retomar"}
+                </Button>
+              )}
+              {canPause && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => statusMutation.mutate("paused")}
+                  disabled={statusMutation.isPending}
+                >
+                  <Pause className="h-3.5 w-3.5" /> Pausar
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={onEdit}>
+                    <Pencil className="h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => duplicateMutation.mutate()}>
+                    <Copy className="h-4 w-4" /> Duplicar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => archiveMutation.mutate()}
+                    disabled={c.status === "archived"}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Archive className="h-4 w-4" /> Arquivar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
         </div>
       </div>
       <ExecutionsDialog
@@ -445,9 +604,391 @@ function CampaignCard({
         onOpenChange={setActivateOpen}
         onSuccess={invalidate}
       />
+      <ManageLeadsDialog
+        campaignId={c.id}
+        campaignName={c.name}
+        channel={c.channel}
+        open={leadsOpen}
+        onOpenChange={setLeadsOpen}
+      />
+      <DeleteCampaignDialog
+        campaignName={c.name}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={() => deleteMutation.mutate()}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }
+
+function CurrentNodesStrip({ nodes }: { nodes: CurrentNode[] }) {
+  if (!nodes || nodes.length === 0) {
+    return (
+      <div className="mt-2 text-2xs text-muted-foreground">
+        Nó atual:{" "}
+        <span className="rounded bg-surface-muted px-1.5 py-0.5">
+          Sem leads em execução
+        </span>
+      </div>
+    );
+  }
+  const visible = nodes.slice(0, 3);
+  const rest = nodes.length - visible.length;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1 text-2xs">
+      <span className="text-muted-foreground">Nó atual:</span>
+      {visible.map((n) => (
+        <span
+          key={n.step_id}
+          className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 font-medium text-emerald-700 dark:text-emerald-300"
+          title={stepLabel({ type: n.type, config: n.config })}
+        >
+          {stepLabelShort({ type: n.type, config: n.config })}
+          <span className="rounded bg-emerald-500/20 px-1 text-emerald-800 dark:text-emerald-200">
+            {n.count}
+          </span>
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="rounded bg-surface-muted px-1.5 py-0.5 text-muted-foreground">
+          +{rest}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DeleteCampaignDialog({
+  campaignName,
+  open,
+  onOpenChange,
+  onConfirm,
+  isPending,
+}: {
+  campaignName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  const [typed, setTyped] = useState("");
+  useEffect(() => {
+    if (!open) setTyped("");
+  }, [open]);
+  const matches = typed.trim() === campaignName.trim();
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir campanha definitivamente?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta ação <strong>não pode ser desfeita</strong>. A campanha
+            <strong> {campaignName}</strong>, todos os enrollments e histórico
+            de execução serão removidos. O fluxo do builder será arquivado.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-name" className="text-xs">
+            Digite o nome da campanha para confirmar:
+          </Label>
+          <Input
+            id="confirm-name"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={campaignName}
+            autoFocus
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault();
+              if (matches) onConfirm();
+            }}
+            disabled={!matches || isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            Excluir definitivamente
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function ManageLeadsDialog({
+  campaignId,
+  campaignName,
+  channel,
+  open,
+  onOpenChange,
+}: {
+  campaignId: string;
+  campaignName: string;
+  channel: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const enrollmentsFn = useServerFn(listCampaignEnrollments);
+  const eligibleFn = useServerFn(listEligibleLeadsForCampaign);
+  const cancelFn = useServerFn(cancelEnrollment);
+  const activateFn = useServerFn(activateCampaign);
+
+  const enrollmentsQ = useQuery({
+    enabled: open,
+    queryKey: ["campaign-enrollments", campaignId, "all"],
+    queryFn: () =>
+      enrollmentsFn({ data: { campaign_id: campaignId, status: "all", limit: 500 } }),
+  });
+  const eligibleQ = useQuery({
+    enabled: open,
+    queryKey: ["eligible-leads-manage", campaignId],
+    queryFn: () => eligibleFn({ data: { campaign_id: campaignId } }),
+  });
+
+  const cancelMut = useMutation({
+    mutationFn: (id: string) => cancelFn({ data: { enrollment_id: id } }),
+    onSuccess: () => {
+      toast.success("Lead removido da campanha.");
+      enrollmentsQ.refetch();
+      eligibleQ.refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setSelected(new Set());
+      setSearch("");
+    }
+  }, [open]);
+
+  const activeLeadIds = new Set((eligibleQ.data?.active_lead_ids ?? []) as string[]);
+  const availableLeads = ((eligibleQ.data?.eligible ?? []) as Array<{
+    id: string; full_name: string | null; email: string | null; phone: string | null; company_name: string | null;
+  }>).filter((l) => !activeLeadIds.has(l.id));
+  const filteredAvailable = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return availableLeads;
+    return availableLeads.filter(
+      (l) =>
+        (l.full_name ?? "").toLowerCase().includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q) ||
+        (l.phone ?? "").toLowerCase().includes(q) ||
+        (l.company_name ?? "").toLowerCase().includes(q),
+    );
+  }, [availableLeads, search]);
+
+  const addMut = useMutation({
+    mutationFn: (ids: string[]) =>
+      activateFn({ data: { campaign_id: campaignId, lead_ids: ids } }),
+    onSuccess: (res: any) => {
+      toast.success(`${res?.enrolled ?? 0} lead(s) adicionado(s).`);
+      setSelected(new Set());
+      enrollmentsQ.refetch();
+      eligibleQ.refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const enrollments = (enrollmentsQ.data ?? []) as Array<any>;
+  const liveEnrollments = enrollments.filter((r) => r.status !== "cancelled");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Leads — {campaignName}</DialogTitle>
+          <DialogDescription>
+            Gerencie quem está inscrito e adicione novos leads sem reiniciar
+            os já em execução.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs defaultValue="enrolled">
+          <TabsList>
+            <TabsTrigger value="enrolled">
+              Inscritos · {liveEnrollments.length}
+            </TabsTrigger>
+            <TabsTrigger value="add">
+              Adicionar · {availableLeads.length}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="enrolled" className="mt-3">
+            {enrollmentsQ.isLoading ? (
+              <div className="grid place-items-center py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : liveEnrollments.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                Nenhum lead inscrito ainda.
+              </div>
+            ) : (
+              <ul className="max-h-[55vh] divide-y overflow-y-auto rounded-md border">
+                {liveEnrollments.map((r) => (
+                  <li key={r.id} className="flex items-start gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 truncate text-sm font-medium">
+                        <span className="truncate">
+                          {r.leads?.full_name ?? "Lead sem nome"}
+                        </span>
+                        <span className="rounded bg-surface-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+                          {r.status}
+                        </span>
+                      </div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {r.leads?.email ?? r.leads?.phone ?? "—"}
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        Nó atual:{" "}
+                        <span className="text-foreground">
+                          {r.current_step ? stepLabel(r.current_step) : "—"}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Remover ${r.leads?.full_name ?? "este lead"} da campanha? O histórico de execução será mantido.`,
+                          )
+                        ) {
+                          cancelMut.mutate(r.id);
+                        }
+                      }}
+                      disabled={cancelMut.isPending}
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                      Remover
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+
+          <TabsContent value="add" className="mt-3 space-y-3">
+            {eligibleQ.isLoading ? (
+              <div className="grid place-items-center py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar lead…"
+                      className="h-9 pl-9"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setSelected(
+                        selected.size === filteredAvailable.length
+                          ? new Set()
+                          : new Set(filteredAvailable.map((l) => l.id)),
+                      )
+                    }
+                    disabled={filteredAvailable.length === 0}
+                  >
+                    {selected.size === filteredAvailable.length && filteredAvailable.length > 0
+                      ? "Limpar"
+                      : "Selecionar todos"}
+                  </Button>
+                </div>
+
+                <div className="max-h-[45vh] overflow-y-auto rounded-md border">
+                  {filteredAvailable.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      {availableLeads.length === 0
+                        ? "Todos os leads elegíveis já estão inscritos."
+                        : "Nenhum lead corresponde à busca."}
+                    </div>
+                  ) : (
+                    <ul className="divide-y">
+                      {filteredAvailable.map((l) => {
+                        const checked = selected.has(l.id);
+                        return (
+                          <li
+                            key={l.id}
+                            className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface-muted/40"
+                            onClick={() => {
+                              const next = new Set(selected);
+                              if (checked) next.delete(l.id);
+                              else next.add(l.id);
+                              setSelected(next);
+                            }}
+                          >
+                            <Checkbox checked={checked} />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">
+                                {l.full_name ?? "Sem nome"}
+                              </div>
+                              <div className="truncate text-xs text-muted-foreground">
+                                {channel === "email"
+                                  ? l.email
+                                  : channel === "whatsapp" || channel === "sms"
+                                    ? l.phone
+                                    : (l.email ?? l.phone ?? "—")}
+                                {l.company_name && ` · ${l.company_name}`}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    {selected.size} de {filteredAvailable.length} selecionado
+                    {selected.size !== 1 ? "s" : ""}.
+                  </div>
+                  <Button
+                    onClick={() => addMut.mutate(Array.from(selected))}
+                    disabled={addMut.isPending || selected.size === 0}
+                  >
+                    {addMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    <UserPlus className="h-4 w-4" />
+                    Adicionar {selected.size > 0 ? `${selected.size} ` : ""}lead
+                    {selected.size !== 1 ? "s" : ""}
+                  </Button>
+                </div>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function ActivateCampaignDialog({
   campaignId,
@@ -1002,41 +1543,7 @@ function ExecutionsDialog({
   );
 }
 
-function stepLabel(step: { type: string | null; config?: any } | null | undefined): string {
-  if (!step || !step.type) return "—";
-  const cfg = (step.config ?? {}) as any;
-  switch (step.type) {
-    case "message_whatsapp": {
-      const body = String(cfg.body ?? "").trim();
-      return body ? `WhatsApp: ${body.slice(0, 40)}${body.length > 40 ? "…" : ""}` : "WhatsApp";
-    }
-    case "message_email": {
-      const subj = String(cfg.subject ?? "").trim();
-      return subj ? `Email: ${subj.slice(0, 40)}` : "Email";
-    }
-    case "wait": {
-      const v = cfg.duration_value ?? 1;
-      const u = cfg.duration_unit ?? "days";
-      const uPt: Record<string, string> = {
-        minutes: "min", hours: "h", days: "dia(s)", weeks: "sem",
-      };
-      return `Espera ${v} ${uPt[u] ?? u}`;
-    }
-    case "wait_for_reply":
-      return `Aguarda resposta (${cfg.timeout_value ?? 3} ${cfg.timeout_unit ?? "days"})`;
-    case "branch":
-    case "condition":
-      return "Condição";
-    case "update_lead":
-      return "Atualizar lead";
-    case "end": {
-      const reason = String(cfg.reason ?? "").trim();
-      return reason ? `Fim: ${reason}` : "Fim do fluxo";
-    }
-    default:
-      return step.type;
-  }
-}
+// stepLabel was extracted to src/lib/flow-step-label.ts
 
 function formatNextRun(iso: string | null | undefined): string {
   if (!iso) return "—";
