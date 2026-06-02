@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Circle, Clock3, Mail, Plug,
-  Loader2, Copy, RefreshCw, type LucideIcon,
+  Loader2, Copy, RefreshCw, Eye, EyeOff, KeyRound, type LucideIcon,
 } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
@@ -26,6 +26,7 @@ import {
 } from "@/lib/integrations.functions";
 import {
   getCalcomConnection, saveCalcomConnection, disconnectCalcom, syncCalcomEventTypes,
+  regenerateCalcomWebhookSecret,
 } from "@/lib/calcom.functions";
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
@@ -446,6 +447,7 @@ function CalcomConnectionDialog({
   const save = useServerFn(saveCalcomConnection);
   const disconnect = useServerFn(disconnectCalcom);
   const sync = useServerFn(syncCalcomEventTypes);
+  const regenSecret = useServerFn(regenerateCalcomWebhookSecret);
 
   const connQuery = useQuery({
     enabled: open,
@@ -454,9 +456,13 @@ function CalcomConnectionDialog({
   });
 
   const [apiKey, setApiKey] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
-    if (open) setApiKey("");
+    if (open) {
+      setApiKey("");
+      setShowSecret(false);
+    }
   }, [open]);
 
   const saveMut = useMutation({
@@ -490,13 +496,27 @@ function CalcomConnectionDialog({
     onError: (e: any) => toast.error(e?.message ?? "Erro ao sincronizar."),
   });
 
+  const regenMut = useMutation({
+    mutationFn: () => regenSecret(),
+    onSuccess: () => {
+      toast.success("Novo secret gerado. Atualize o webhook no Cal.com.");
+      setShowSecret(true);
+      qc.invalidateQueries({ queryKey: ["calcom-org"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao gerar novo secret."),
+  });
+
   const hasKey = connQuery.data?.has_key ?? false;
   const webhookUrl = connQuery.data?.webhook_url ?? "";
+  const webhookSecret = connQuery.data?.webhook_secret ?? "";
+  const hasSecret = connQuery.data?.has_webhook_secret ?? false;
 
   function copy(text: string) {
+    if (!text) return;
     navigator.clipboard?.writeText(text);
     toast.success("Copiado.");
   }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -546,17 +566,54 @@ function CalcomConnectionDialog({
                   </p>
                 </div>
 
-                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span>Webhook secret</span>
-                    <span className={connQuery.data?.has_webhook_secret ? "text-emerald-600" : "text-amber-600"}>
-                      {connQuery.data?.has_webhook_secret ? "gerado" : "ausente"}
+                    <Label>Webhook secret</Label>
+                    <span className={hasSecret ? "text-2xs text-emerald-600" : "text-2xs text-amber-600"}>
+                      {hasSecret ? "gerado" : "ausente"}
                     </span>
                   </div>
-                  <p className="mt-1 text-muted-foreground">
-                    Por segurança, o secret só é exibido na primeira configuração. Se precisar de um novo, desconecte e reconecte.
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      type={showSecret ? "text" : "password"}
+                      value={webhookSecret || (hasSecret ? "" : "—")}
+                      className="font-mono text-xs"
+                      placeholder={hasSecret ? "" : "Nenhum secret ainda"}
+                    />
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => setShowSecret((v) => !v)}
+                      disabled={!hasSecret}
+                      title={showSecret ? "Ocultar" : "Revelar"}
+                    >
+                      {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => copy(webhookSecret)}
+                      disabled={!hasSecret}
+                      title="Copiar"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => {
+                        if (hasSecret && !confirm("Gerar novo secret? O atual será invalidado e você terá que atualizar o webhook no Cal.com.")) return;
+                        regenMut.mutate();
+                      }}
+                      disabled={regenMut.isPending}
+                      title={hasSecret ? "Gerar novo secret" : "Gerar secret"}
+                    >
+                      {regenMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                  <p className="text-2xs text-muted-foreground">
+                    Cole este valor no campo <strong>Secret</strong> do webhook no Cal.com. Ele é usado para validar a assinatura (HMAC SHA-256) de cada chamada.
                   </p>
                 </div>
+
 
                 <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                   <span>Event types sincronizados</span>
