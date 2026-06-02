@@ -154,7 +154,8 @@ function IntegrationsPage() {
                 let status = provider.connection?.status ?? "disconnected";
                 const isResend = provider.slug === "resend";
                 const isWhatsApp = provider.slug === "whatsapp";
-                const isInteractive = isResend || isWhatsApp;
+                const isCalcom = provider.slug === "cal_com";
+                const isInteractive = isResend || isWhatsApp || isCalcom;
 
                 // Hook7-aware override for the WhatsApp card.
                 let operationalLabel: string;
