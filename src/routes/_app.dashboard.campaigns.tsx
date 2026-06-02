@@ -22,8 +22,27 @@ import {
   Archive,
   Pencil,
   Loader2,
+  Activity,
+  PlayCircle,
+  PauseCircle,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  listCampaignEnrollments,
+  pauseEnrollment,
+  resumeEnrollment,
+  activateCampaign,
+  getCampaignExecutorStats,
+} from "@/lib/campaigns.functions";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -281,6 +300,17 @@ function CampaignCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const activateFn = useServerFn(activateCampaign);
+  const activateMutation = useMutation({
+    mutationFn: () => activateFn({ data: { campaign_id: c.id } }),
+    onSuccess: (res: any) => {
+      toast.success(`Campanha ativada — ${res?.enrolled ?? 0} leads enrolados.`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [execOpen, setExecOpen] = useState(false);
   const canStart = c.status === "draft" || c.status === "paused";
   const canPause = c.status === "running";
 
@@ -341,16 +371,30 @@ function CampaignCard({
         <Stat label="Resposta" value={`${replyRate}%`} accent />
       </div>
       <div className="flex items-center justify-between gap-2 p-3 text-xs text-muted-foreground">
-        <EditFlowButton campaignId={c.id} status={c.status} />
+        <div className="flex items-center gap-1">
+          <EditFlowButton campaignId={c.id} status={c.status} />
+          <Button size="sm" variant="ghost" onClick={() => setExecOpen(true)}>
+            <Activity className="h-3.5 w-3.5" /> Execuções
+          </Button>
+        </div>
         <div className="flex items-center gap-1">
           {canStart && (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => statusMutation.mutate("running")}
-              disabled={statusMutation.isPending}
+              onClick={() =>
+                c.status === "draft"
+                  ? activateMutation.mutate()
+                  : statusMutation.mutate("running")
+              }
+              disabled={statusMutation.isPending || activateMutation.isPending}
             >
-              <Play className="h-3.5 w-3.5" /> Iniciar
+              {activateMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5" />
+              )}
+              {c.status === "draft" ? "Ativar" : "Retomar"}
             </Button>
           )}
           {canPause && (
@@ -388,7 +432,182 @@ function CampaignCard({
           </DropdownMenu>
         </div>
       </div>
+      <ExecutionsDialog
+        campaignId={c.id}
+        campaignName={c.name}
+        open={execOpen}
+        onOpenChange={setExecOpen}
+      />
     </div>
+  );
+}
+
+function ExecutionsDialog({
+  campaignId,
+  campaignName,
+  open,
+  onOpenChange,
+}: {
+  campaignId: string;
+  campaignName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const listFn = useServerFn(listCampaignEnrollments);
+  const statsFn = useServerFn(getCampaignExecutorStats);
+  const pauseFn = useServerFn(pauseEnrollment);
+  const resumeFn = useServerFn(resumeEnrollment);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "paused" | "completed" | "failed" | "pending"
+  >("all");
+
+  const { data: rows, isLoading, refetch } = useQuery({
+    enabled: open,
+    queryKey: ["campaign-enrollments", campaignId, statusFilter],
+    queryFn: () =>
+      listFn({ data: { campaign_id: campaignId, status: statusFilter, limit: 200 } }),
+    refetchInterval: open ? 5_000 : false,
+  });
+  const { data: stats } = useQuery({
+    enabled: open,
+    queryKey: ["campaign-exec-stats", campaignId],
+    queryFn: () => statsFn({ data: { campaign_id: campaignId } }),
+    refetchInterval: open ? 5_000 : false,
+  });
+
+  const pauseMut = useMutation({
+    mutationFn: (id: string) => pauseFn({ data: { enrollment_id: id } }),
+    onSuccess: () => {
+      toast.success("Pausado.");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const resumeMut = useMutation({
+    mutationFn: (id: string) => resumeFn({ data: { enrollment_id: id } }),
+    onSuccess: () => {
+      toast.success("Retomado.");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const STATUS_LABEL: Record<string, string> = {
+    pending: "Pendente",
+    active: "Ativo",
+    paused: "Pausado",
+    completed: "Concluído",
+    failed: "Falhou",
+    cancelled: "Cancelado",
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Execuções — {campaignName}</DialogTitle>
+          <DialogDescription>
+            Lista de leads enrolados no fluxo. Atualiza a cada 5s.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+          {(["all", "active", "paused", "completed", "failed", "pending"] as const).map((s) => {
+            const count =
+              s === "all"
+                ? Object.values(stats ?? {}).reduce((a: number, b: any) => a + (b ?? 0), 0)
+                : (stats as any)?.[s] ?? 0;
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                  statusFilter === s
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-surface hover:bg-surface-muted",
+                )}
+              >
+                {s === "all" ? "Todos" : STATUS_LABEL[s]} · {count}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="grid place-items-center py-10 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : !rows || rows.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Nenhuma execução {statusFilter !== "all" && `com status "${STATUS_LABEL[statusFilter]}"`}.
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {rows.map((r: any) => (
+                <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {r.leads?.full_name ?? "Lead sem nome"}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {r.leads?.email ?? r.leads?.phone ?? "—"}
+                    </div>
+                    {r.last_error && (
+                      <div className="mt-1 truncate text-xs text-destructive" title={r.last_error}>
+                        ⚠ {r.last_error}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground">
+                    <div className="font-medium text-foreground">{STATUS_LABEL[r.status] ?? r.status}</div>
+                    {r.next_run_at && r.status === "active" && (
+                      <div>
+                        próximo:{" "}
+                        {formatDistanceToNow(new Date(r.next_run_at), {
+                          locale: ptBR,
+                          addSuffix: true,
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {r.status === "active" && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        title="Pausar"
+                        onClick={() => pauseMut.mutate(r.id)}
+                        disabled={pauseMut.isPending}
+                      >
+                        <PauseCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {(r.status === "paused" || r.status === "failed") && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        title="Retomar"
+                        onClick={() => resumeMut.mutate(r.id)}
+                        disabled={resumeMut.isPending}
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
