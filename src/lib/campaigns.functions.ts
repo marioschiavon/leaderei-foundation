@@ -158,15 +158,35 @@ export const listEligibleLeadsForCampaign = createServerFn({ method: "POST" })
     const eligible = all.filter((l) => isLeadEligibleForChannel(l, campaign.channel));
     const ineligible = all.filter((l) => !isLeadEligibleForChannel(l, campaign.channel));
 
+    // Find leads that already have an active/paused enrollment in this campaign
+    // (so the UI can warn that activating again won't create new enrollments for them).
+    const eligibleIds = eligible.map((l) => l.id);
+    let active_lead_ids: string[] = [];
+    if (eligibleIds.length > 0) {
+      const { data: existing } = await supabase
+        .from("campaign_enrollments")
+        .select("lead_id")
+        .eq("campaign_id", data.campaign_id)
+        .in("lead_id", eligibleIds)
+        .in("status", ["active", "paused"]);
+      active_lead_ids = ((existing ?? []) as Array<{ lead_id: string }>).map((r) => r.lead_id);
+    }
+    const active_set = new Set(active_lead_ids);
+    const new_eligible_count = eligible.filter((l) => !active_set.has(l.id)).length;
+
     return {
       channel: campaign.channel as string,
       total: all.length,
       eligible_count: eligible.length,
       ineligible_count: ineligible.length,
+      active_enrollment_count: active_lead_ids.length,
+      new_eligible_count,
+      active_lead_ids,
       eligible,
       ineligible,
     };
   });
+
 
 // ---------------------------------------------------------------------------
 // Activate campaign — enrolls eligible leads (or a manually-selected subset)
