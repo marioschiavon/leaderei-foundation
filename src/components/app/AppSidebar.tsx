@@ -135,10 +135,15 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {WORKSPACE.map((item) => {
-                const badge = item.url === "/dashboard/leads" && reviewBadge ? reviewBadge : item.badge;
-                const badgeTone = item.url === "/dashboard/leads" && reviewBadge
-                  ? "bg-amber-500/15 text-amber-700"
-                  : "bg-muted text-muted-foreground";
+                let badge = item.badge;
+                let badgeTone = "bg-muted text-muted-foreground";
+                if (item.url === "/dashboard/leads" && reviewBadge) {
+                  badge = reviewBadge;
+                  badgeTone = "bg-amber-500/15 text-amber-700";
+                } else if (item.url === "/dashboard/campaigns" && failedBadge) {
+                  badge = failedBadge;
+                  badgeTone = "bg-destructive/15 text-destructive";
+                }
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
