@@ -476,8 +476,13 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
   }).eq("id", runId);
 
   if (!outcome.next_step_id) {
+    const implicitEnd = step.type !== "end";
     await supabaseAdmin.from("campaign_enrollments").update({
-      status: "completed", completed_at: new Date().toISOString(), next_run_at: null, current_step_id: null,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      next_run_at: null,
+      current_step_id: step.id,
+      last_error: implicitEnd ? "Fluxo sem nó Fim — encerrado automaticamente" : null,
     }).eq("id", en.id);
     await supabaseAdmin.from("scheduled_jobs").update({ status: "completed" }).eq("id", job.id);
     return { ok: true, enrollment_id: en.id };
