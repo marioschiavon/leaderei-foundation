@@ -162,6 +162,27 @@ function newId() {
   });
 }
 
+// Branch label/color helpers shared by edge styling
+function branchLabel(b: string): string | undefined {
+  switch (b) {
+    case "yes": return "Sim";
+    case "no": return "Não";
+    case "failed": return "Falhou";
+    case "no_slots": return "Sem horário";
+    default: return undefined;
+  }
+}
+function branchColor(b: string): string {
+  switch (b) {
+    case "yes": return COLORS.yes;
+    case "no":
+    case "failed":
+    case "no_slots":
+      return COLORS.no;
+    default: return COLORS.edge;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Node Components
 // ---------------------------------------------------------------------------
