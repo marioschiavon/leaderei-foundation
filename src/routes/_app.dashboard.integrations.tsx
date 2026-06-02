@@ -566,17 +566,54 @@ function CalcomConnectionDialog({
                   </p>
                 </div>
 
-                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span>Webhook secret</span>
-                    <span className={connQuery.data?.has_webhook_secret ? "text-emerald-600" : "text-amber-600"}>
-                      {connQuery.data?.has_webhook_secret ? "gerado" : "ausente"}
+                    <Label>Webhook secret</Label>
+                    <span className={hasSecret ? "text-2xs text-emerald-600" : "text-2xs text-amber-600"}>
+                      {hasSecret ? "gerado" : "ausente"}
                     </span>
                   </div>
-                  <p className="mt-1 text-muted-foreground">
-                    Por segurança, o secret só é exibido na primeira configuração. Se precisar de um novo, desconecte e reconecte.
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      type={showSecret ? "text" : "password"}
+                      value={webhookSecret || (hasSecret ? "" : "—")}
+                      className="font-mono text-xs"
+                      placeholder={hasSecret ? "" : "Nenhum secret ainda"}
+                    />
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => setShowSecret((v) => !v)}
+                      disabled={!hasSecret}
+                      title={showSecret ? "Ocultar" : "Revelar"}
+                    >
+                      {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => copy(webhookSecret)}
+                      disabled={!hasSecret}
+                      title="Copiar"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button" variant="outline" size="icon"
+                      onClick={() => {
+                        if (hasSecret && !confirm("Gerar novo secret? O atual será invalidado e você terá que atualizar o webhook no Cal.com.")) return;
+                        regenMut.mutate();
+                      }}
+                      disabled={regenMut.isPending}
+                      title={hasSecret ? "Gerar novo secret" : "Gerar secret"}
+                    >
+                      {regenMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                  <p className="text-2xs text-muted-foreground">
+                    Cole este valor no campo <strong>Secret</strong> do webhook no Cal.com. Ele é usado para validar a assinatura (HMAC SHA-256) de cada chamada.
                   </p>
                 </div>
+
 
                 <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                   <span>Event types sincronizados</span>
