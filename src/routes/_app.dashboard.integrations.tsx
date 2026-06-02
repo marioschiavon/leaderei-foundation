@@ -108,6 +108,7 @@ function IntegrationsPage() {
 
   const [resendOpen, setResendOpen] = useState(false);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
+  const [calcomOpen, setCalcomOpen] = useState(false);
 
   return (
     <div className="space-y-6">
