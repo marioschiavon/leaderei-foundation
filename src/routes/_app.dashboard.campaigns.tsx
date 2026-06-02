@@ -37,8 +37,6 @@ import {
   Workflow as WorkflowIcon,
   type LucideIcon,
 } from "lucide-react";
-  type LucideIcon,
-} from "lucide-react";
 import {
   Dialog,
   DialogContent,
