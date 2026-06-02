@@ -26,7 +26,7 @@ import {
 } from "@/lib/integrations.functions";
 import {
   getCalcomConnection, saveCalcomConnection, disconnectCalcom, syncCalcomEventTypes,
-  regenerateCalcomWebhookSecret,
+  regenerateCalcomWebhookSecret, testCalcomWebhook,
 } from "@/lib/calcom.functions";
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
