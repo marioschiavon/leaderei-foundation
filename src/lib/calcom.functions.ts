@@ -249,21 +249,24 @@ export const saveCalcomConnection = createServerFn({ method: "POST" })
       integration_id = inserted.id;
     }
 
-    // Upsert api_key
-    const { error: credErr } = await supabase
-      .from("integration_credentials")
-      .upsert(
-        {
-          organization_id,
-          integration_id,
-          key: "api_key",
-          value_encrypted: data.api_key,
-          metadata: {} as any,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "integration_id,key" },
-      );
-    if (credErr) throw new Error(credErr.message);
+    // Upsert api_key (only when a new one was provided)
+    if (data.api_key) {
+      const { error: credErr } = await supabase
+        .from("integration_credentials")
+        .upsert(
+          {
+            organization_id,
+            integration_id,
+            key: "api_key",
+            value_encrypted: data.api_key,
+            metadata: {} as any,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "integration_id,key" },
+        );
+      if (credErr) throw new Error(credErr.message);
+    }
+
 
     // Generate webhook secret if missing
     const { data: existingSecret } = await supabase
