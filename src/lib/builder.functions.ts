@@ -13,6 +13,10 @@ const STEP_TYPES = [
   "wait",
   "condition_replied",
   "action",
+  "calcom_check_availability",
+  "calcom_book_meeting",
+  "calcom_cancel_booking",
+  "calcom_reschedule_booking",
   "end",
 ] as const;
 export type StepType = (typeof STEP_TYPES)[number];
@@ -54,6 +58,25 @@ const EndConfig = z.object({
   reason: z.string().max(160).optional(),
 });
 
+const CalCheckAvailabilityConfig = z.object({
+  event_type_id: z.number().int().positive(),
+  window_days: z.number().int().min(1).max(60).default(7),
+  business_hours_only: z.boolean().default(true),
+});
+const CalBookMeetingConfig = z.object({
+  event_type_id: z.number().int().positive(),
+  slot_strategy: z.enum(["first_available", "ai_decided", "lead_picks_link"]).default("first_available"),
+  fallback_link_text: z.string().max(500).optional(),
+  cancel_retry_business_days: z.number().int().min(0).max(60).default(3),
+});
+const CalCancelBookingConfig = z.object({
+  reason_template: z.string().max(300).optional(),
+});
+const CalRescheduleBookingConfig = z.object({
+  event_type_id: z.number().int().positive(),
+  strategy: z.enum(["first_available", "lead_picks_link"]).default("first_available"),
+});
+
 function validateConfigForType(type: StepType, config: unknown): unknown {
   switch (type) {
     case "message_email":
@@ -68,6 +91,14 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return ConditionRepliedConfig.parse(config ?? {});
     case "action":
       return ActionConfig.parse(config ?? {});
+    case "calcom_check_availability":
+      return CalCheckAvailabilityConfig.parse(config ?? {});
+    case "calcom_book_meeting":
+      return CalBookMeetingConfig.parse(config ?? {});
+    case "calcom_cancel_booking":
+      return CalCancelBookingConfig.parse(config ?? {});
+    case "calcom_reschedule_booking":
+      return CalRescheduleBookingConfig.parse(config ?? {});
     case "end":
       return EndConfig.parse(config ?? {});
   }
