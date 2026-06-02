@@ -915,6 +915,8 @@ function ExecutionsDialog({
                                   "bg-destructive/10 text-destructive",
                                 blockerLabel.tone === "muted" &&
                                   "bg-surface-muted text-muted-foreground",
+                                blockerLabel.tone === "success" &&
+                                  "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
                               )}
                               title={blockerLabel.title}
                             >
