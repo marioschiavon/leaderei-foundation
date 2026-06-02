@@ -13,6 +13,7 @@ const STEP_TYPES = [
   "wait",
   "condition_replied",
   "action",
+  "end",
 ] as const;
 export type StepType = (typeof STEP_TYPES)[number];
 
