@@ -804,3 +804,95 @@ export const archiveCampaign = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return row;
   });
+
+export const restoreCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { data: existing, error: e0 } = await context.supabase
+      .from("campaigns")
+      .select("id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (e0) throw new Error(e0.message);
+    if (!existing) throw new Error("Campanha não encontrada.");
+    if (existing.status !== "archived") {
+      throw new Error("Apenas campanhas arquivadas podem ser restauradas.");
+    }
+    const { data: row, error } = await context.supabase
+      .from("campaigns")
+      .update({
+        status: "draft",
+        started_at: null,
+        completed_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+// Hard delete an archived campaign. Guards against deleting live campaigns —
+// the only way to call this is after archiving first. Wipes downstream rows
+// (enrollments, scheduled jobs, step runs) and soft-archives the builder
+// document so flow history isn't completely lost.
+export const deleteCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { data: campaign, error: e0 } = await supabase
+      .from("campaigns")
+      .select("id, organization_id, status, name")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (e0) throw new Error(e0.message);
+    if (!campaign) throw new Error("Campanha não encontrada.");
+    if (campaign.status !== "archived") {
+      throw new Error("Arquive a campanha antes de excluir definitivamente.");
+    }
+
+    // Collect enrollment ids so we can cascade cleanups.
+    const { data: enrollRows } = await supabase
+      .from("campaign_enrollments")
+      .select("id")
+      .eq("campaign_id", data.id);
+    const enrollmentIds = (enrollRows ?? []).map((r) => r.id);
+
+    if (enrollmentIds.length > 0) {
+      // Cancel pending jobs (do not delete — keep audit trail).
+      await supabase
+        .from("scheduled_jobs")
+        .update({ status: "cancelled" })
+        .in("enrollment_id", enrollmentIds)
+        .eq("status", "pending");
+      // Delete step runs tied to these enrollments.
+      await supabase.from("flow_step_runs").delete().in("enrollment_id", enrollmentIds);
+      // Delete enrollments themselves.
+      await supabase.from("campaign_enrollments").delete().eq("campaign_id", data.id);
+    }
+
+    // Soft-archive any builder document(s) linked to this campaign.
+    await supabase
+      .from("builder_documents")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("campaign_id", data.id)
+      .is("archived_at", null);
+
+    const { error: delErr } = await supabase.from("campaigns").delete().eq("id", data.id);
+    if (delErr) throw new Error(delErr.message);
+
+    await supabase.from("audit_logs").insert({
+      organization_id: campaign.organization_id,
+      actor_user_id: userId,
+      action: "campaign.deleted",
+      entity_type: "campaign",
+      entity_id: data.id,
+      before: { name: campaign.name, status: campaign.status },
+      after: null,
+    });
+
+    return { ok: true };
+  });
