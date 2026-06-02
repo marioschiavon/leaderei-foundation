@@ -806,20 +806,42 @@ function ExecutionsDialog({
                 Lista de leads enrolados no fluxo. Atualiza a cada 5s.
               </DialogDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => tickMut.mutate()}
-              disabled={tickMut.isPending}
-              title="Roda o worker manualmente — útil para testar sem esperar o cron."
-            >
-              {tickMut.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-2">
+              {((stats as any)?.completed ?? 0) > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm(`Reiniciar todos os ${(stats as any).completed} leads concluídos a partir do passo inicial?`)) {
+                      resetBulkMut.mutate("completed");
+                    }
+                  }}
+                  disabled={resetBulkMut.isPending}
+                  title="Reinicia todos os leads concluídos a partir do nó inicial do fluxo."
+                >
+                  {resetBulkMut.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                  Reiniciar concluídos
+                </Button>
               )}
-              Forçar tick
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => tickMut.mutate()}
+                disabled={tickMut.isPending}
+                title="Roda o worker manualmente — útil para testar sem esperar o cron."
+              >
+                {tickMut.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Forçar tick
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
