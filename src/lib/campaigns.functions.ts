@@ -288,7 +288,45 @@ export const listCampaignEnrollments = createServerFn({ method: "POST" })
     if (data.status !== "all") q = q.eq("status", data.status);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const list = (rows ?? []) as Array<any>;
+
+    const stepIds = Array.from(new Set(list.map((r) => r.current_step_id).filter(Boolean))) as string[];
+    const stepsById: Record<string, { id: string; type: string; config: any }> = {};
+    const transitionsByFrom: Record<string, Array<{ from_step_id: string; to_step_id: string; branch: string }>> = {};
+    if (stepIds.length > 0) {
+      const { data: steps } = await supabase
+        .from("flow_steps").select("id, type, config").in("id", stepIds);
+      for (const s of (steps ?? []) as Array<any>) stepsById[s.id] = s;
+
+      const { data: trans } = await supabase
+        .from("flow_transitions").select("from_step_id, to_step_id, branch").in("from_step_id", stepIds);
+      for (const t of (trans ?? []) as Array<any>) (transitionsByFrom[t.from_step_id] ||= []).push(t);
+
+      const nextIds = Array.from(new Set((trans ?? []).map((t: any) => t.to_step_id))).filter(Boolean) as string[];
+      if (nextIds.length > 0) {
+        const { data: nextSteps } = await supabase
+          .from("flow_steps").select("id, type, config").in("id", nextIds);
+        for (const s of (nextSteps ?? []) as Array<any>) stepsById[s.id] = s;
+      }
+    }
+
+    const nowMs = Date.now();
+    return list.map((r) => {
+      const cur = r.current_step_id ? stepsById[r.current_step_id] : null;
+      const trs = (r.current_step_id ? transitionsByFrom[r.current_step_id] : null) ?? [];
+      const next_steps = trs.map((t) => {
+        const s = stepsById[t.to_step_id];
+        return { id: t.to_step_id, branch: t.branch, type: s?.type ?? null, config: s?.config ?? null };
+      });
+      const overdueMs = r.next_run_at ? nowMs - new Date(r.next_run_at).getTime() : 0;
+      const is_overdue = r.status === "active" && overdueMs > 2 * 60 * 1000;
+      return {
+        ...r,
+        current_step: cur ? { id: cur.id, type: cur.type, config: cur.config } : null,
+        next_steps,
+        is_overdue,
+      };
+    });
   });
 
 export const getEnrollmentRuns = createServerFn({ method: "POST" })
@@ -303,7 +341,14 @@ export const getEnrollmentRuns = createServerFn({ method: "POST" })
       .order("started_at", { ascending: true })
       .limit(200);
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const list = (rows ?? []) as Array<any>;
+    const stepIds = Array.from(new Set(list.map((r) => r.step_id).filter(Boolean))) as string[];
+    const stepsById: Record<string, { type: string; config: any }> = {};
+    if (stepIds.length > 0) {
+      const { data: steps } = await supabase.from("flow_steps").select("id, type, config").in("id", stepIds);
+      for (const s of (steps ?? []) as Array<any>) stepsById[s.id] = { type: s.type, config: s.config };
+    }
+    return list.map((r) => ({ ...r, step: stepsById[r.step_id] ?? null }));
   });
 
 export const pauseEnrollment = createServerFn({ method: "POST" })

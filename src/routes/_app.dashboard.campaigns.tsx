@@ -27,6 +27,8 @@ import {
   PauseCircle,
   RefreshCw,
   Users,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -46,6 +48,7 @@ import {
   getCampaignExecutorStats,
   listEligibleLeadsForCampaign,
   forceFlowTick,
+  getEnrollmentRuns,
 } from "@/lib/campaigns.functions";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -763,6 +766,9 @@ function ExecutionsDialog({
     cancelled: "Cancelado",
   };
 
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -825,68 +831,209 @@ function ExecutionsDialog({
             </div>
           ) : (
             <ul className="divide-y">
-              {rows.map((r: any) => (
-                <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      {r.leads?.full_name ?? "Lead sem nome"}
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {r.leads?.email ?? r.leads?.phone ?? "—"}
-                    </div>
-                    {r.last_error && (
-                      <div className="mt-1 truncate text-xs text-destructive" title={r.last_error}>
-                        ⚠ {r.last_error}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    <div className="font-medium text-foreground">{STATUS_LABEL[r.status] ?? r.status}</div>
-                    {r.next_run_at && r.status === "active" && (
-                      <div>
-                        próximo:{" "}
-                        {formatDistanceToNow(new Date(r.next_run_at), {
-                          locale: ptBR,
-                          addSuffix: true,
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {r.status === "active" && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Pausar"
-                        onClick={() => pauseMut.mutate(r.id)}
-                        disabled={pauseMut.isPending}
+              {rows.map((r: any) => {
+                const isOpen = expanded === r.id;
+                const blockerLabel = computeBlocker(r);
+                return (
+                  <li key={r.id} className="py-2">
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        className="mt-0.5 rounded p-0.5 hover:bg-surface-muted"
+                        onClick={() => setExpanded(isOpen ? null : r.id)}
+                        title={isOpen ? "Recolher" : "Ver histórico"}
                       >
-                        <PauseCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {(r.status === "paused" || r.status === "failed") && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Retomar"
-                        onClick={() => resumeMut.mutate(r.id)}
-                        disabled={resumeMut.isPending}
-                      >
-                        <PlayCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="truncate text-sm font-medium">
+                            {r.leads?.full_name ?? "Lead sem nome"}
+                          </div>
+                          <span className="rounded bg-surface-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+                            {STATUS_LABEL[r.status] ?? r.status}
+                          </span>
+                          {blockerLabel && (
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-2xs font-medium",
+                                blockerLabel.tone === "warn" &&
+                                  "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+                                blockerLabel.tone === "danger" &&
+                                  "bg-destructive/10 text-destructive",
+                                blockerLabel.tone === "muted" &&
+                                  "bg-surface-muted text-muted-foreground",
+                              )}
+                              title={blockerLabel.title}
+                            >
+                              {blockerLabel.text}
+                            </span>
+                          )}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {r.leads?.email ?? r.leads?.phone ?? "—"}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                          <span className="text-muted-foreground">
+                            Nó atual:{" "}
+                            <span className="text-foreground">
+                              {r.current_step ? stepLabel(r.current_step) : "—"}
+                            </span>
+                          </span>
+                          {r.next_steps && r.next_steps.length > 0 && (
+                            <span className="text-muted-foreground">
+                              → Próximo:{" "}
+                              <span className="text-foreground">
+                                {r.next_steps
+                                  .map((n: any) =>
+                                    n.branch && n.branch !== "next"
+                                      ? `[${n.branch}] ${stepLabel(n)}`
+                                      : stepLabel(n),
+                                  )
+                                  .join(" | ")}
+                              </span>
+                            </span>
+                          )}
+                          <span className="text-muted-foreground">
+                            next_run: <span className="text-foreground">{formatNextRun(r.next_run_at)}</span>
+                          </span>
+                        </div>
+                        {r.last_error && (
+                          <div className="mt-1 break-words text-xs text-destructive" title={r.last_error}>
+                            ⚠ {r.last_error}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {r.status === "active" && (
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7" title="Pausar"
+                            onClick={() => pauseMut.mutate(r.id)} disabled={pauseMut.isPending}
+                          >
+                            <PauseCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(r.status === "paused" || r.status === "failed") && (
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7" title="Retomar"
+                            onClick={() => resumeMut.mutate(r.id)} disabled={resumeMut.isPending}
+                          >
+                            <PlayCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {isOpen && <EnrollmentTimeline enrollmentId={r.id} />}
+                  </li>
+                );
+              })}
             </ul>
+
           )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
+function stepLabel(step: { type: string | null; config?: any } | null | undefined): string {
+  if (!step || !step.type) return "—";
+  const cfg = (step.config ?? {}) as any;
+  switch (step.type) {
+    case "message_whatsapp": {
+      const body = String(cfg.body ?? "").trim();
+      return body ? `WhatsApp: ${body.slice(0, 40)}${body.length > 40 ? "…" : ""}` : "WhatsApp";
+    }
+    case "message_email": {
+      const subj = String(cfg.subject ?? "").trim();
+      return subj ? `Email: ${subj.slice(0, 40)}` : "Email";
+    }
+    case "wait": {
+      const v = cfg.duration_value ?? 1;
+      const u = cfg.duration_unit ?? "days";
+      const uPt: Record<string, string> = {
+        minutes: "min", hours: "h", days: "dia(s)", weeks: "sem",
+      };
+      return `Espera ${v} ${uPt[u] ?? u}`;
+    }
+    case "wait_for_reply":
+      return `Aguarda resposta (${cfg.timeout_value ?? 3} ${cfg.timeout_unit ?? "days"})`;
+    case "branch":
+    case "condition":
+      return "Condição";
+    case "update_lead":
+      return "Atualizar lead";
+    default:
+      return step.type;
+  }
+}
+
+function formatNextRun(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const diff = d.getTime() - Date.now();
+  if (Math.abs(diff) < 60_000) return "agora";
+  return formatDistanceToNow(d, { locale: ptBR, addSuffix: true });
+}
+
+function computeBlocker(r: any): { text: string; tone: "warn" | "danger" | "muted"; title?: string } | null {
+  if (r.status === "failed") return { text: "Falhou", tone: "danger", title: r.last_error ?? undefined };
+  if (r.status === "paused") return { text: "Pausado manualmente", tone: "muted" };
+  if (r.status === "completed") return null;
+  if (r.status === "active") {
+    if (!r.current_step_id) return { text: "Sem passo atual", tone: "danger" };
+    if (r.is_overdue) return { text: "Aguardando worker", tone: "warn", title: "next_run_at vencido — cron não processou ainda" };
+  }
+  return null;
+}
+
+function EnrollmentTimeline({ enrollmentId }: { enrollmentId: string }) {
+  const runsFn = useServerFn(getEnrollmentRuns);
+  const { data, isLoading } = useQuery({
+    queryKey: ["enrollment-runs", enrollmentId],
+    queryFn: () => runsFn({ data: { enrollment_id: enrollmentId } }),
+  });
+  if (isLoading) {
+    return (
+      <div className="ml-6 mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> carregando histórico…
+      </div>
+    );
+  }
+  if (!data || data.length === 0) {
+    return <div className="ml-6 mt-2 text-xs text-muted-foreground">Sem execuções registradas ainda.</div>;
+  }
+  return (
+    <ol className="ml-6 mt-2 space-y-1 border-l pl-3 text-xs">
+      {(data as any[]).map((run) => (
+        <li key={run.id} className="relative">
+          <span className="text-muted-foreground">
+            {new Date(run.started_at).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+          </span>{" "}
+          <span className="font-medium">{stepLabel(run.step)}</span>{" "}
+          <span
+            className={cn(
+              "rounded px-1 py-0.5 text-2xs",
+              run.status === "completed" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+              run.status === "failed" && "bg-destructive/10 text-destructive",
+              run.status === "running" && "bg-amber-100 text-amber-800",
+              run.status === "pending" && "bg-surface-muted text-muted-foreground",
+            )}
+          >
+            {run.status}
+          </span>
+          {run.branch_taken && <span className="ml-1 text-muted-foreground">→ {run.branch_taken}</span>}
+          {run.error && <div className="mt-0.5 text-destructive">⚠ {run.error}</div>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 
 function Stat({
   label,
