@@ -346,3 +346,14 @@ export const getFailedEnrollmentsCount = createServerFn({ method: "GET" })
       .eq("status", "failed");
     return { count: count ?? 0 };
   });
+
+// ---------------------------------------------------------------------------
+// Force a single tick of the flow worker (useful for "Run now" buttons)
+// ---------------------------------------------------------------------------
+
+export const forceFlowTick = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const out = await runFlowTick(25);
+    return { ok: true, ...out };
+  });
