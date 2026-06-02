@@ -766,6 +766,9 @@ function ExecutionsDialog({
     cancelled: "Cancelado",
   };
 
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
