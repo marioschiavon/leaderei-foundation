@@ -447,6 +447,7 @@ function CalcomConnectionDialog({
   const save = useServerFn(saveCalcomConnection);
   const disconnect = useServerFn(disconnectCalcom);
   const sync = useServerFn(syncCalcomEventTypes);
+  const regenSecret = useServerFn(regenerateCalcomWebhookSecret);
 
   const connQuery = useQuery({
     enabled: open,
@@ -455,9 +456,13 @@ function CalcomConnectionDialog({
   });
 
   const [apiKey, setApiKey] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
-    if (open) setApiKey("");
+    if (open) {
+      setApiKey("");
+      setShowSecret(false);
+    }
   }, [open]);
 
   const saveMut = useMutation({
@@ -491,13 +496,27 @@ function CalcomConnectionDialog({
     onError: (e: any) => toast.error(e?.message ?? "Erro ao sincronizar."),
   });
 
+  const regenMut = useMutation({
+    mutationFn: () => regenSecret(),
+    onSuccess: () => {
+      toast.success("Novo secret gerado. Atualize o webhook no Cal.com.");
+      setShowSecret(true);
+      qc.invalidateQueries({ queryKey: ["calcom-org"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao gerar novo secret."),
+  });
+
   const hasKey = connQuery.data?.has_key ?? false;
   const webhookUrl = connQuery.data?.webhook_url ?? "";
+  const webhookSecret = connQuery.data?.webhook_secret ?? "";
+  const hasSecret = connQuery.data?.has_webhook_secret ?? false;
 
   function copy(text: string) {
+    if (!text) return;
     navigator.clipboard?.writeText(text);
     toast.success("Copiado.");
   }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
