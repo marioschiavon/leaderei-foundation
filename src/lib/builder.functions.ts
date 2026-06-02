@@ -162,7 +162,14 @@ function validateGraph(
   }
   for (const s of steps) {
     const out = outgoing.get(s.id) ?? new Set();
-    if (s.type === "condition_replied") {
+    if (s.type === "end") {
+      if (out.size > 0) {
+        errors.push({
+          step_id: s.id,
+          message: 'O nó "Fim" não pode ter saídas.',
+        });
+      }
+    } else if (s.type === "condition_replied") {
       if (out.size !== 0 && !(out.has("yes") && out.has("no") && out.size === 2)) {
         errors.push({
           step_id: s.id,
@@ -174,6 +181,12 @@ function validateGraph(
         errors.push({
           step_id: s.id,
           message: 'Passo linear só pode ter 1 saída "next".',
+        });
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({
+          step_id: s.id,
+          message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.',
         });
       }
     }
