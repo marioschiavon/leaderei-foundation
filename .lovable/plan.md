@@ -1,84 +1,126 @@
+# Integração Cal.com v2
 
-## Diagnóstico atual (relevante)
+## Decisões já fechadas
 
-- `listCampaigns` (`src/lib/tenant.functions.ts:227`) **não filtra `status='archived'`** — arquivadas aparecem misturadas com ativas.
-- Existe `archiveCampaign` (soft, marca `status='archived'`), mas **não há exclusão definitiva** nem rota para listar/restaurar arquivadas.
-- Após ativada, **não há tela para adicionar/remover leads** — o `ActivateCampaignDialog` só funciona na ativação inicial. Daí "só o mesmo lead aparece".
-- No card de campanha (`CampaignCard` em `_app.dashboard.campaigns.tsx`) mostra-se status/canal/totais, mas **não o nó atual de execução**, mesmo já existindo `current_step` no payload de `listCampaignEnrollments`.
+- **Escopo**: leitura + escrita (consultar disponibilidade e criar/cancelar/reagendar).
+- **Autenticação**: 1 API key por organização (configurada em **Integrações**).
+- **API**: Cal.com v2 (`https://api.cal.com/v2`).
+- **Match de lead**: por email; se não existir, **ignora** o booking (não cria lead novo).
+- **Webhooks ouvidos**: `BOOKING_CREATED`, `BOOKING_RESCHEDULED`, `BOOKING_CANCELLED`.
 
 ---
 
-## Plano
+## 1. Banco de dados (1 migration)
 
-### 1. Toggle "Ativas | Arquivadas" na faixa de busca
+### 1.1 `lead_bookings` — controle dos agendamentos
+Campos relevantes: `organization_id`, `lead_id`, `campaign_id` (opcional), `enrollment_id` (opcional), `cal_booking_id` (uid do Cal), `cal_booking_uid`, `event_type_id`, `event_type_slug`, `title`, `start_at`, `end_at`, `attendee_email`, `attendee_name`, `organizer_email`, `meeting_url`, `location`, `status` (enum: `confirmed | rescheduled | cancelled | no_show`), `reschedule_count`, `cancellation_reason`, `rescheduled_from_uid`, `raw_payload` (jsonb), timestamps.
+- RLS: org members veem/gerenciam; master admin tudo.
+- GRANTs: `authenticated` + `service_role`.
+- Índices: `(organization_id, status)`, `(lead_id)`, `(cal_booking_uid)` único, `(campaign_id)`.
 
-**UI (`src/routes/_app.dashboard.campaigns.tsx`)** — ao lado do campo de busca, segmented control de 2 estados:
-- **Ativas** (default) — mostra tudo exceto `archived`.
-- **Arquivadas** — mostra apenas `archived`, com contador no botão.
+### 1.2 `cal_event_types_cache` — cache local de event types
+Para o builder mostrar dropdown sem chamar API toda hora.
+Campos: `organization_id`, `cal_event_type_id`, `slug`, `title`, `length_minutes`, `scheduling_type`, `synced_at`. Refrescado sob demanda (botão "Sincronizar" + automático a cada 24h na primeira chamada).
 
-Trocar o scope reseta a query (`queryKey` inclui o scope).
+### 1.3 Sem nova credencial table
+A API key reaproveita `integration_credentials` (já existe, criptografada). Provider `cal_com` em `integration_providers`.
 
-**Backend (`tenant.functions.ts` → `listCampaigns`)** — aceitar `inputValidator` com `{ scope: "active" | "archived" }` (default `"active"`). Filtrar `status != 'archived'` ou `status = 'archived'`. Retornar também `archived_count` para o badge.
+---
 
-### 2. Exclusão definitiva e restauração de arquivadas
+## 2. Configuração em Integrações
 
-**Backend** — em `tenant.functions.ts`:
-- `deleteCampaign({ campaign_id })`: exige `status='archived'` (guard). Em transação lógica:
-  1. Cancela `scheduled_jobs` pendentes (`status='cancelled'` onde `enrollment_id` pertence à campanha).
-  2. Apaga `flow_step_runs` dos enrollments.
-  3. Apaga `campaign_enrollments`.
-  4. Arquiva `builder_documents` ligados (`archived_at = now()`) — não apaga, preserva auditoria do fluxo.
-  5. `DELETE FROM campaigns WHERE id = ...`.
-  6. Insere `audit_logs` (`action='campaign.deleted'`).
-- `restoreCampaign({ campaign_id })`: `status='archived' → 'draft'`, limpa `started_at/completed_at`.
+Nova tela/card "Cal.com" em `_app.dashboard.integrations.tsx`:
+- Campo: **API Key** (criptografada via `set_platform_secret`-style em `integration_credentials`).
+- Campo: **Webhook secret** (gerado pelo CRM, exibido para o usuário colar no Cal.com).
+- Botão **Testar conexão** → chama `/v2/me`.
+- Botão **Sincronizar event types** → popula `cal_event_types_cache`.
+- Painel mostra: URL do webhook a ser cadastrada no Cal.com (`/api/public/hooks/calcom`), eventos a marcar (`BOOKING_CREATED`, `BOOKING_RESCHEDULED`, `BOOKING_CANCELLED`).
 
-**UI** — no card quando scope = Arquivadas:
-- Botão "Restaurar" (volta para Ativas como `draft`).
-- Botão "Excluir definitivamente" → `AlertDialog` com confirmação por digitação do nome da campanha (proteção contra clique acidental).
+---
 
-### 3. Gestão de leads em campanhas ativas
+## 3. Server functions (`src/lib/calcom.functions.ts` + `calcom.server.ts`)
 
-Novo botão "Leads" no `CampaignCard` (ao lado de "Execuções") abre `ManageLeadsDialog` com Tabs:
+Helper `calcomFetch(orgId, path, init)` que descriptografa a key e injeta `Authorization: Bearer <key>` + `cal-api-version: 2024-08-13`.
 
-- **Inscritos**: lista `campaign_enrollments` (reusa `listCampaignEnrollments`) com nome, status, nó atual, próximo `run_at`. Cada linha tem botão **Remover** → chama nova função `cancelEnrollment({ enrollment_id })` que:
-  - Seta `status='cancelled'`, `next_run_at=null`.
-  - Cancela `scheduled_jobs` pendentes do enrollment.
-- **Adicionar leads**: reusa `listEligibleLeadsForCampaign`, filtra excluindo `active_lead_ids` (já retornado pela função), mostra apenas leads ainda não inscritos. Seleção múltipla → `activateCampaign({ campaign_id, lead_ids })` (já idempotente via upsert).
+Funções expostas:
+- `testCalcomConnection({})` → GET `/v2/me`.
+- `syncCalcomEventTypes({})` → GET `/v2/event-types` → upsert cache.
+- `getCalcomAvailability({ event_type_id, date_from, date_to, attendee_timezone? })` → GET `/v2/slots` (usado pelo nó "Consultar agenda" e, futuramente, pela IA).
+- `createCalcomBooking({ event_type_id, start, attendee:{email,name,timezone}, metadata })` → POST `/v2/bookings`.
+- `cancelCalcomBooking({ booking_uid, reason })` → POST `/v2/bookings/:uid/cancel`.
+- `rescheduleCalcomBooking({ booking_uid, new_start, reason })` → POST `/v2/bookings/:uid/reschedule`.
+- `listLeadBookings({ lead_id? , campaign_id?, status?, scope })` → leitura.
 
-Isso resolve o "só o mesmo lead aparece" — agora você vê todos inscritos e adiciona novos a qualquer momento.
+---
 
-### 4. Mostrar o "Nó atual" no card da campanha
+## 4. Nós novos no builder (`src/components/builder/FlowEditor.tsx` + `builder.functions.ts`)
 
-Hoje `listCampaigns` retorna só metadados. Para o card mostrar o nó atual, vamos agregar dados de execução:
+Adicionar 4 tipos em `STEP_TYPES`:
 
-**Backend (`tenant.functions.ts` → `listCampaigns`)** — após buscar campanhas, para as que estão `running` ou `paused`:
-1. Buscar `campaign_enrollments` ativos agrupados por `current_step_id` (limit razoável, ex: 500 por campanha).
-2. Resolver `flow_steps` desses IDs (id, type, config) — para extrair label legível (mesma lógica que o `ExecutionsDialog` usa para gerar `STEP_LABEL`).
-3. Retornar em cada campanha um array `current_nodes: [{ step_id, type, label, count }]` ordenado por `count` desc.
+| Tipo | Função no fluxo | Config |
+|------|-----------------|--------|
+| `calcom_check_availability` | Consulta horários livres (preparado para IA decidir depois). Sai com `next` se há slots, `no_slots` se não. | `event_type_id`, `window_days` (default 7), `business_hours_only` |
+| `calcom_book_meeting` | **Nó principal** — cria booking. Normalmente último nó útil antes do `end`. Usa email do lead. | `event_type_id`, `slot_strategy` (`first_available` \| `ai_decided` \| `lead_picks_link`), `fallback_link_text` |
+| `calcom_cancel_booking` | Cancela o booking ativo do lead na campanha. | `reason_template` |
+| `calcom_reschedule_booking` | Reagenda usando próximo slot disponível ou link enviado ao lead. | `event_type_id`, `strategy` |
 
-**UI (`CampaignCard`)** — abaixo da linha de status/canal, nova seção compacta "Nó atual" só quando a campanha está em execução:
-- Se 1 nó: badge único `▶ Aguardando 24h · 12 leads`.
-- Se N nós: até 3 chips `Enviar email · 8`, `Aguardando · 4`, `Decisão · 2`, e overflow `+N`.
-- Se nenhum enrollment ativo (mas status running): chip cinza `Sem leads em execução`.
+Validações (em `validateConfigForType` + `validateGraph`):
+- `event_type_id` obrigatório nos 3 que precisam.
+- `calcom_book_meeting` pode ter saídas `next` (sucesso) e `failed` (sem slots/erro API).
+- Helper `stepLabelShort` em `flow-step-label.ts` aprende esses tipos (chips no card da campanha continuam funcionando).
 
-A formatação do label do nó (`Enviar email`, `Aguardando 24h`, `Webhook`, `Fim`, etc.) reusa o helper que já existe no `ExecutionsDialog` — vamos extraí-lo para `src/lib/flow-step-label.ts` para reuso.
+Executor (`flow-executor.server.ts`): adiciona handlers que chamam as server fns acima, persiste resultado em `lead_bookings`, registra em `lead_activities` (tipo `booking_created` / `_cancelled` / `_rescheduled`).
 
-### Detalhes técnicos resumidos
+---
 
-**Sem migration** — todas as mudanças usam colunas/estruturas existentes (`status='archived'`, `current_step_id`, etc.).
+## 5. Webhook receiver
 
-**Server functions a adicionar/alterar** (`tenant.functions.ts` + `campaigns.functions.ts`):
-- `listCampaigns` — aceita `scope`, retorna `archived_count` e `current_nodes[]` por campanha.
-- `deleteCampaign` — hard delete com guard.
-- `restoreCampaign` — archived → draft.
-- `cancelEnrollment` — remove lead de campanha ativa.
+`src/routes/api/public/hooks/calcom.ts` — rota pública:
+1. Lê body cru, valida HMAC com `cal_webhook_secret` da org (header `X-Cal-Signature-256`).
+2. Identifica `organization_id` (rota com `?org=<id>` ou pelo secret matching).
+3. Switch por `triggerEvent`:
+   - `BOOKING_CREATED`: match lead por `attendees[0].email`. Se existir → insert em `lead_bookings`, atualiza `lead.last_contact_at`, pausa enrollment ativo (`status='paused'`) e avança nó se o atual for `calcom_book_meeting` aguardando confirmação, registra `lead_activities`.
+   - `BOOKING_RESCHEDULED`: localiza booking pelo `rescheduledFromUid` ou `bookingUid`, atualiza `start_at/end_at`, incrementa `reschedule_count`, registra activity, dispara notificação ao `owner_user_id` (insert em `conversations`/badge ou usar `lead_activities`).
+   - `BOOKING_CANCELLED`: marca booking `cancelled` + `cancellation_reason`, registra activity, **reativa enrollment** se a campanha tinha sido pausada por esse booking (volta `status='active'`, `next_run_at = now() + retry_delay`), permitindo o fluxo continuar (ex: nova tentativa).
+4. Sempre retorna `200` rápido; processamento idempotente via `cal_booking_uid` único.
 
-**Componentes novos / alterados** em `src/routes/_app.dashboard.campaigns.tsx`:
-- `ScopeToggle` na faixa de busca.
-- `CurrentNodesStrip` dentro de `CampaignCard`.
-- `DeleteCampaignDialog` com confirmação textual.
-- `ManageLeadsDialog` (Tabs: Inscritos / Adicionar).
+---
 
-**Refator** — extrair `getStepLabel(step)` para `src/lib/flow-step-label.ts`, usado pelo card, pelo `ExecutionsDialog` e pelo novo `ManageLeadsDialog`.
+## 6. UI — visibilidade dos bookings
 
-Posso seguir com a implementação?
+Sem tela dedicada (decisão sua). Em vez disso:
+- **Card da campanha**: nova linha "Reuniões agendadas: X" usando count em `lead_bookings` por `campaign_id` com `status='confirmed'`.
+- **Tela do lead** (`_app.dashboard.leads.tsx` painel lateral / drawer): seção "Agendamentos" listando os bookings do lead (data, link, status, botões cancelar/reagendar que chamam as server fns).
+- **Timeline do lead** (`lead_activities`) recebe os eventos automaticamente.
+
+---
+
+## 7. Notificações sobre eventos (sugestões — confirmar)
+
+Para você ter "visão melhor" sem criar tela nova:
+- **Toast/badge no topbar** quando webhook chega (Realtime em `lead_activities`).
+- **Resumo diário** (cron) com: bookings criados, cancelados, reagendados nas últimas 24h — enviado por email ao owner da org.
+- **Ícone de "reunião marcada"** ao lado do lead em listagens quando houver booking `confirmed` futuro.
+
+Posso incluir as 3, ou só as que você marcar depois.
+
+---
+
+## 8. Out of scope (próxima fase)
+
+- Decisão de slot pela IA (`slot_strategy='ai_decided'` fica como enum mas executor usa `first_available` por enquanto).
+- OAuth por usuário, MEETING_ENDED / NO_SHOW, tela dedicada de "Calendário".
+
+---
+
+## Arquivos afetados
+
+**Novos**: `src/lib/calcom.functions.ts`, `src/lib/calcom.server.ts`, `src/routes/api/public/hooks/calcom.ts`, migration única.
+
+**Modificados**: `integration_providers` (seed `cal_com`), `src/routes/_app.dashboard.integrations.tsx` (card + sync), `src/components/builder/FlowEditor.tsx` (paleta + node renderers + config panels), `src/lib/builder.functions.ts` (`STEP_TYPES` + validações), `src/lib/flow-executor.server.ts` (handlers), `src/lib/flow-step-label.ts` (labels), `src/routes/_app.dashboard.campaigns.tsx` (contador de reuniões), `src/routes/_app.dashboard.leads.tsx` (seção agendamentos).
+
+---
+
+Confirmar 2 pontos antes de partir para a implementação:
+1. As 3 notificações da seção 7 entram todas, ou só toast + ícone no lead?
+2. Quando `BOOKING_CANCELLED` chega, o lead volta ao fluxo após quanto tempo? (sugestão: 3 dias úteis, configurável no nó `calcom_book_meeting`).
