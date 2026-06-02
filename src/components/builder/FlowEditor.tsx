@@ -660,7 +660,6 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         label: branchLabel(branch),
         style: { stroke: branchColor(branch), strokeWidth: 2 },
         labelStyle: { fill: branchColor(branch), fontWeight: 600 },
-        },
       };
       setEdges((eds) => addEdge(newEdge, eds));
       markDirty();
@@ -733,17 +732,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
           target: id,
           sourceHandle: branch === "next" ? null : branch,
           type: "smoothstep",
-          label: branch === "yes" ? "Sim" : branch === "no" ? "Não" : undefined,
-          style: {
-            stroke:
-              branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-            strokeWidth: 2,
-          },
-          labelStyle: {
-            fill:
-              branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-            fontWeight: 600,
-          },
+          label: branchLabel(branch),
+          style: { stroke: branchColor(branch), strokeWidth: 2 },
+          labelStyle: { fill: branchColor(branch), fontWeight: 600 },
         };
         setEdges((eds) => [...eds, newEdge]);
 
