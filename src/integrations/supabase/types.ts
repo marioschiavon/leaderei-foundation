@@ -209,6 +209,42 @@ export type Database = {
         }
         Relationships: []
       }
+      cal_event_types_cache: {
+        Row: {
+          cal_event_type_id: number
+          created_at: string
+          id: string
+          length_minutes: number | null
+          organization_id: string
+          scheduling_type: string | null
+          slug: string
+          synced_at: string
+          title: string
+        }
+        Insert: {
+          cal_event_type_id: number
+          created_at?: string
+          id?: string
+          length_minutes?: number | null
+          organization_id: string
+          scheduling_type?: string | null
+          slug: string
+          synced_at?: string
+          title: string
+        }
+        Update: {
+          cal_event_type_id?: number
+          created_at?: string
+          id?: string
+          length_minutes?: number | null
+          organization_id?: string
+          scheduling_type?: string | null
+          slug?: string
+          synced_at?: string
+          title?: string
+        }
+        Relationships: []
+      }
       campaign_enrollments: {
         Row: {
           campaign_id: string
@@ -1251,6 +1287,87 @@ export type Database = {
           },
         ]
       }
+      lead_bookings: {
+        Row: {
+          attendee_email: string | null
+          attendee_name: string | null
+          cal_booking_id: string | null
+          cal_booking_uid: string
+          campaign_id: string | null
+          cancellation_reason: string | null
+          created_at: string
+          end_at: string | null
+          enrollment_id: string | null
+          event_type_id: number | null
+          event_type_slug: string | null
+          id: string
+          lead_id: string
+          location: string | null
+          meeting_url: string | null
+          organization_id: string
+          organizer_email: string | null
+          raw_payload: Json
+          reschedule_count: number
+          rescheduled_from_uid: string | null
+          start_at: string
+          status: Database["public"]["Enums"]["lead_booking_status"]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          attendee_email?: string | null
+          attendee_name?: string | null
+          cal_booking_id?: string | null
+          cal_booking_uid: string
+          campaign_id?: string | null
+          cancellation_reason?: string | null
+          created_at?: string
+          end_at?: string | null
+          enrollment_id?: string | null
+          event_type_id?: number | null
+          event_type_slug?: string | null
+          id?: string
+          lead_id: string
+          location?: string | null
+          meeting_url?: string | null
+          organization_id: string
+          organizer_email?: string | null
+          raw_payload?: Json
+          reschedule_count?: number
+          rescheduled_from_uid?: string | null
+          start_at: string
+          status?: Database["public"]["Enums"]["lead_booking_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attendee_email?: string | null
+          attendee_name?: string | null
+          cal_booking_id?: string | null
+          cal_booking_uid?: string
+          campaign_id?: string | null
+          cancellation_reason?: string | null
+          created_at?: string
+          end_at?: string | null
+          enrollment_id?: string | null
+          event_type_id?: number | null
+          event_type_slug?: string | null
+          id?: string
+          lead_id?: string
+          location?: string | null
+          meeting_url?: string | null
+          organization_id?: string
+          organizer_email?: string | null
+          raw_payload?: Json
+          reschedule_count?: number
+          rescheduled_from_uid?: string | null
+          start_at?: string
+          status?: Database["public"]["Enums"]["lead_booking_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lead_enrichment: {
         Row: {
           confidence: number | null
@@ -2288,6 +2405,7 @@ export type Database = {
         | "message_received"
         | "enrichment"
         | "system"
+      lead_booking_status: "confirmed" | "rescheduled" | "cancelled" | "no_show"
       lead_status:
         | "new"
         | "contacted"
@@ -2516,6 +2634,7 @@ export const Constants = {
         "enrichment",
         "system",
       ],
+      lead_booking_status: ["confirmed", "rescheduled", "cancelled", "no_show"],
       lead_status: [
         "new",
         "contacted",

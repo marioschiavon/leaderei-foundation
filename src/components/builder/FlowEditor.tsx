@@ -40,6 +40,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Flag,
+  CalendarCheck,
+  CalendarSearch,
+  CalendarX,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +93,10 @@ type StepType =
   | "wait"
   | "condition_replied"
   | "action"
+  | "calcom_check_availability"
+  | "calcom_book_meeting"
+  | "calcom_cancel_booking"
+  | "calcom_reschedule_booking"
   | "end";
 
 type StepData = {
@@ -122,6 +130,10 @@ const PALETTE: Array<{
   { type: "wait", label: "Aguardar", icon: Clock, enabled: true },
   { type: "condition_replied", label: "Condição: respondeu?", icon: GitBranch, enabled: true },
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
+  { type: "calcom_check_availability", label: "Consultar agenda", icon: CalendarSearch, enabled: true },
+  { type: "calcom_book_meeting", label: "Agendar reunião", icon: CalendarCheck, enabled: true },
+  { type: "calcom_reschedule_booking", label: "Reagendar reunião", icon: CalendarClock, enabled: true },
+  { type: "calcom_cancel_booking", label: "Cancelar reunião", icon: CalendarX, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
   { type: "end", label: "Fim do fluxo", icon: Flag, enabled: true },
@@ -134,6 +146,10 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   wait: { duration_value: 1, duration_unit: "days" },
   condition_replied: { scope: "any_channel", timeout_value: 3, timeout_unit: "days" },
   action: { action_type: "set_status", params: {} },
+  calcom_check_availability: { event_type_id: 0, window_days: 7, business_hours_only: true },
+  calcom_book_meeting: { event_type_id: 0, slot_strategy: "first_available", cancel_retry_business_days: 3 },
+  calcom_cancel_booking: { reason_template: "" },
+  calcom_reschedule_booking: { event_type_id: 0, strategy: "first_available" },
   end: { reason: "" },
 };
 
@@ -144,6 +160,27 @@ function newId() {
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+// Branch label/color helpers shared by edge styling
+function branchLabel(b: string): string | undefined {
+  switch (b) {
+    case "yes": return "Sim";
+    case "no": return "Não";
+    case "failed": return "Falhou";
+    case "no_slots": return "Sem horário";
+    default: return undefined;
+  }
+}
+function branchColor(b: string): string {
+  switch (b) {
+    case "yes": return COLORS.yes;
+    case "no":
+    case "failed":
+    case "no_slots":
+      return COLORS.no;
+    default: return COLORS.edge;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -439,11 +476,87 @@ function EndStepNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+// ---- Cal.com nodes -------------------------------------------------------
+
+function CalSimpleNode({
+  data, selected, icon: Icon, label, helper,
+}: NodeProps<StepNode> & { icon: any; label: string; helper?: string }) {
+  const cfg = data.config as { event_type_id?: number };
+  const hasEvent = !!(cfg.event_type_id && cfg.event_type_id > 0);
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Icon} label={label} />
+      <div style={{ padding: "10px 12px", fontSize: 12 }}>
+        <div style={{ color: hasEvent ? COLORS.text : COLORS.muted, fontStyle: hasEvent ? "normal" : "italic" }}>
+          {hasEvent ? `Event type #${cfg.event_type_id}` : helper ?? "Configure o event type"}
+        </div>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
+function CalCheckAvailabilityNode(props: NodeProps<StepNode>) {
+  return (
+    <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={CalendarSearch} label="Consultar agenda" />
+      <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
+        Janela: {(props.data.config as any).window_days ?? 7} dias · event #{(props.data.config as any).event_type_id ?? "—"}
+      </div>
+      <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
+          Tem horário
+          <Handle type="source" id="next" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.yes, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+        <div style={{ position: "relative", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
+          Sem horário
+          <Handle type="source" id="no_slots" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.no, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+      </div>
+    </NodeShell>
+  );
+}
+
+function CalBookMeetingNode(props: NodeProps<StepNode>) {
+  return (
+    <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={CalendarCheck} label="Agendar reunião" />
+      <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
+        event #{(props.data.config as any).event_type_id ?? "—"} · {(props.data.config as any).slot_strategy ?? "first_available"}
+      </div>
+      <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
+          Agendado
+          <Handle type="source" id="next" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.yes, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+        <div style={{ position: "relative", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
+          Falhou
+          <Handle type="source" id="failed" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.no, border: "2px solid #fff", width: 12, height: 12 }} />
+        </div>
+      </div>
+    </NodeShell>
+  );
+}
+
+function CalCancelNode(props: NodeProps<StepNode>) {
+  return <CalSimpleNode {...props} icon={CalendarX} label="Cancelar reunião" helper="Cancela a reunião ativa do lead" />;
+}
+function CalRescheduleNode(props: NodeProps<StepNode>) {
+  return <CalSimpleNode {...props} icon={CalendarClock} label="Reagendar reunião" helper="Move para o próximo horário disponível" />;
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
+  calcom_check_availability: CalCheckAvailabilityNode,
+  calcom_book_meeting: CalBookMeetingNode,
+  calcom_cancel_booking: CalCancelNode,
+  calcom_reschedule_booking: CalRescheduleNode,
   end: EndStepNode,
 } as any;
 
@@ -508,20 +621,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         target: t.to_step_id,
         sourceHandle: t.branch === "next" ? null : t.branch,
         type: "smoothstep",
-        label: t.branch === "yes" ? "Sim" : t.branch === "no" ? "Não" : undefined,
-        style: {
-          stroke:
-            t.branch === "yes"
-              ? COLORS.yes
-              : t.branch === "no"
-              ? COLORS.no
-              : COLORS.edge,
-          strokeWidth: 2,
-        },
-        labelStyle: {
-          fill: t.branch === "yes" ? COLORS.yes : t.branch === "no" ? COLORS.no : COLORS.edge,
-          fontWeight: 600,
-        },
+        label: branchLabel(t.branch),
+        style: { stroke: branchColor(t.branch), strokeWidth: 2 },
+        labelStyle: { fill: branchColor(t.branch), fontWeight: 600 },
       })),
     );
     setDirty(false);
@@ -556,10 +658,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         return;
       }
       const sourceNode = nodes.find((n) => n.id === conn.source);
-      const isCondition = sourceNode?.type === "condition_replied";
-      let branch: "next" | "yes" | "no" = "next";
-      if (isCondition) {
-        branch = (conn.sourceHandle as "yes" | "no") ?? "yes";
+      let branch: string = (conn.sourceHandle as string) ?? "next";
+      if (sourceNode?.type === "condition_replied" && branch === "next") {
+        branch = "yes";
       }
       // Check if branch already used
       const existing = edges.find(
@@ -577,16 +678,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         target: conn.target,
         sourceHandle: branch === "next" ? null : branch,
         type: "smoothstep",
-        label: branch === "yes" ? "Sim" : branch === "no" ? "Não" : undefined,
-        style: {
-          stroke:
-            branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-          strokeWidth: 2,
-        },
-        labelStyle: {
-          fill: branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-          fontWeight: 600,
-        },
+        label: branchLabel(branch),
+        style: { stroke: branchColor(branch), strokeWidth: 2 },
+        labelStyle: { fill: branchColor(branch), fontWeight: 600 },
       };
       setEdges((eds) => addEdge(newEdge, eds));
       markDirty();
@@ -659,17 +753,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
           target: id,
           sourceHandle: branch === "next" ? null : branch,
           type: "smoothstep",
-          label: branch === "yes" ? "Sim" : branch === "no" ? "Não" : undefined,
-          style: {
-            stroke:
-              branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-            strokeWidth: 2,
-          },
-          labelStyle: {
-            fill:
-              branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-            fontWeight: 600,
-          },
+          label: branchLabel(branch),
+          style: { stroke: branchColor(branch), strokeWidth: 2 },
+          labelStyle: { fill: branchColor(branch), fontWeight: 600 },
         };
         setEdges((eds) => [...eds, newEdge]);
 
@@ -1135,8 +1221,125 @@ function ConfigPanel({
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
+  if (node.type === "calcom_check_availability")
+    return <CalEventTypePanel node={node} onChange={onChange} kind="check" />;
+  if (node.type === "calcom_book_meeting")
+    return <CalBookMeetingPanel node={node} onChange={onChange} />;
+  if (node.type === "calcom_cancel_booking")
+    return <CalCancelPanel node={node} onChange={onChange} />;
+  if (node.type === "calcom_reschedule_booking")
+    return <CalEventTypePanel node={node} onChange={onChange} kind="reschedule" />;
   if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
+}
+
+function CalEventTypePanel({
+  node, onChange, kind,
+}: { node: StepNode; onChange: (p: Record<string, any>) => void; kind: "check" | "reschedule" }) {
+  const cfg = node.data.config as any;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-et">ID do event type (Cal.com)</Label>
+        <Input
+          id="cal-et"
+          type="number"
+          min={1}
+          value={cfg.event_type_id ?? 0}
+          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
+          placeholder="Ex.: 123456"
+        />
+        <p className="text-xs text-muted-foreground">
+          Em Integrações → Cal.com, clique em "Sincronizar event types" para listar os disponíveis.
+        </p>
+      </div>
+      {kind === "check" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cal-window">Janela de busca (dias)</Label>
+          <Input
+            id="cal-window"
+            type="number"
+            min={1}
+            max={60}
+            value={cfg.window_days ?? 7}
+            onChange={(e) => onChange({ window_days: Number(e.target.value) })}
+          />
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Saída <strong>Tem horário</strong>: segue o fluxo. Saída <strong>Sem horário</strong>: ramo alternativo (ex.: avisar lead).
+      </p>
+    </div>
+  );
+}
+
+function CalBookMeetingPanel({
+  node, onChange,
+}: { node: StepNode; onChange: (p: Record<string, any>) => void }) {
+  const cfg = node.data.config as any;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-bt-et">ID do event type (Cal.com)</Label>
+        <Input
+          id="cal-bt-et"
+          type="number"
+          min={1}
+          value={cfg.event_type_id ?? 0}
+          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Estratégia de escolha do horário</Label>
+        <Select value={cfg.slot_strategy ?? "first_available"} onValueChange={(v) => onChange({ slot_strategy: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="first_available">Primeiro horário disponível</SelectItem>
+            <SelectItem value="ai_decided">IA decide (futuro — usa primeiro disponível)</SelectItem>
+            <SelectItem value="lead_picks_link">Lead escolhe via link</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-retry">Se reunião for cancelada, retomar fluxo após (dias úteis)</Label>
+        <Input
+          id="cal-retry"
+          type="number"
+          min={0}
+          max={60}
+          value={cfg.cancel_retry_business_days ?? 3}
+          onChange={(e) => onChange({ cancel_retry_business_days: Number(e.target.value) })}
+        />
+        <p className="text-xs text-muted-foreground">0 = retoma imediatamente.</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Usa o email do lead. Saída <strong>Agendado</strong>: continua. Saída <strong>Falhou</strong>: sem slot/erro.
+      </p>
+    </div>
+  );
+}
+
+function CalCancelPanel({
+  node, onChange,
+}: { node: StepNode; onChange: (p: Record<string, any>) => void }) {
+  const cfg = node.data.config as any;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-reason">Motivo do cancelamento (template)</Label>
+        <Textarea
+          id="cal-reason"
+          rows={3}
+          value={cfg.reason_template ?? ""}
+          onChange={(e) => onChange({ reason_template: e.target.value })}
+          placeholder="Ex.: Reunião cancelada por inatividade do lead."
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Cancela a reunião ativa mais recente do lead. Suporta variáveis tipo <code>{`{{ lead.first_name }}`}</code>.
+      </p>
+    </div>
+  );
 }
 
 function EndPanel({

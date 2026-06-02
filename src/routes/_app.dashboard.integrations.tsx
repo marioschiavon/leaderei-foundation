@@ -5,11 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Circle, Clock3, Mail, Plug,
-  Loader2, type LucideIcon,
+  Loader2, Copy, RefreshCw, type LucideIcon,
 } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
-  SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar,
+  SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar, SiCalendly,
 } from "react-icons/si";
 import { FaLinkedin } from "react-icons/fa";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -24,6 +24,9 @@ import { listIntegrations } from "@/lib/tenant.functions";
 import {
   getOrgResendConnection, saveOrgResendConnection, disconnectOrgResend,
 } from "@/lib/integrations.functions";
+import {
+  getCalcomConnection, saveCalcomConnection, disconnectCalcom, syncCalcomEventTypes,
+} from "@/lib/calcom.functions";
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
 
@@ -54,6 +57,7 @@ const SLUG_BRAND: Record<string, Brand> = {
   pipedrive:         { Icon: PipedriveIcon,     tint: "text-[#1A1A1A] dark:text-foreground" },
   apollo:            { Icon: ApolloIcon,        tint: "text-[#1B116E]" },
   "google-calendar": { Icon: SiGooglecalendar,  tint: "text-[#4285F4]" },
+  cal_com:           { Icon: SiCalendly,        tint: "text-[#292929] dark:text-foreground" },
 };
 
 const STATUS_META: Record<string, { label: string; icon: LucideIcon; className: string; helper: string }> = {
@@ -104,6 +108,7 @@ function IntegrationsPage() {
 
   const [resendOpen, setResendOpen] = useState(false);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
+  const [calcomOpen, setCalcomOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -149,7 +154,8 @@ function IntegrationsPage() {
                 let status = provider.connection?.status ?? "disconnected";
                 const isResend = provider.slug === "resend";
                 const isWhatsApp = provider.slug === "whatsapp";
-                const isInteractive = isResend || isWhatsApp;
+                const isCalcom = provider.slug === "cal_com";
+                const isInteractive = isResend || isWhatsApp || isCalcom;
 
                 // Hook7-aware override for the WhatsApp card.
                 let operationalLabel: string;
@@ -243,6 +249,7 @@ function IntegrationsPage() {
                       onClick={() => {
                         if (isResend) setResendOpen(true);
                         else if (isWhatsApp) setWhatsAppOpen(true);
+                        else if (isCalcom) setCalcomOpen(true);
                       }}
                       title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
@@ -257,6 +264,7 @@ function IntegrationsPage() {
 
       <ResendConnectionDialog open={resendOpen} onOpenChange={setResendOpen} />
       <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
+      <CalcomConnectionDialog open={calcomOpen} onOpenChange={setCalcomOpen} />
     </div>
   );
 }
@@ -423,5 +431,178 @@ function SummaryCard({
         {loading ? "..." : value}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cal.com per-org dialog
+// ---------------------------------------------------------------------------
+
+function CalcomConnectionDialog({
+  open, onOpenChange,
+}: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const qc = useQueryClient();
+  const fetchConn = useServerFn(getCalcomConnection);
+  const save = useServerFn(saveCalcomConnection);
+  const disconnect = useServerFn(disconnectCalcom);
+  const sync = useServerFn(syncCalcomEventTypes);
+
+  const connQuery = useQuery({
+    enabled: open,
+    queryKey: ["calcom-org"],
+    queryFn: () => fetchConn(),
+  });
+
+  const [apiKey, setApiKey] = useState("");
+
+  useEffect(() => {
+    if (open) setApiKey("");
+  }, [open]);
+
+  const saveMut = useMutation({
+    mutationFn: () => save({ data: { api_key: apiKey } }),
+    onSuccess: () => {
+      toast.success("Cal.com conectado.");
+      qc.invalidateQueries({ queryKey: ["integrations"] });
+      qc.invalidateQueries({ queryKey: ["calcom-org"] });
+      setApiKey("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao conectar Cal.com."),
+  });
+
+  const disconnectMut = useMutation({
+    mutationFn: () => disconnect(),
+    onSuccess: () => {
+      toast.success("Cal.com desconectado.");
+      qc.invalidateQueries({ queryKey: ["integrations"] });
+      qc.invalidateQueries({ queryKey: ["calcom-org"] });
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao desconectar."),
+  });
+
+  const syncMut = useMutation({
+    mutationFn: () => sync(),
+    onSuccess: (r: any) => {
+      toast.success(`${r?.count ?? 0} event types sincronizados.`);
+      qc.invalidateQueries({ queryKey: ["calcom-org"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao sincronizar."),
+  });
+
+  const hasKey = connQuery.data?.has_key ?? false;
+  const webhookUrl = connQuery.data?.webhook_url ?? "";
+
+  function copy(text: string) {
+    navigator.clipboard?.writeText(text);
+    toast.success("Copiado.");
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Conectar Cal.com</DialogTitle>
+          <DialogDescription>
+            Conecte sua conta Cal.com (API v2) para criar, consultar, cancelar e reagendar reuniões a partir das campanhas.
+          </DialogDescription>
+        </DialogHeader>
+
+        {connQuery.isLoading ? (
+          <div className="grid place-items-center py-8 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="cal-key">
+                API Key Cal.com {hasKey && <span className="text-2xs text-muted-foreground">(deixe em branco para manter a atual)</span>}
+              </Label>
+              <Input
+                id="cal-key"
+                type="password"
+                placeholder="cal_live_..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="off"
+              />
+              <p className="text-2xs text-muted-foreground">
+                Crie em <span className="font-mono">cal.com/settings/developer/api-keys</span>.
+              </p>
+            </div>
+
+            {hasKey && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Webhook URL para colar no Cal.com</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={webhookUrl} className="font-mono text-xs" />
+                    <Button type="button" variant="outline" size="icon" onClick={() => copy(webhookUrl)}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <p className="text-2xs text-muted-foreground">
+                    Em Cal.com → Settings → Developer → Webhooks. Marque os eventos: <strong>BOOKING_CREATED</strong>, <strong>BOOKING_RESCHEDULED</strong>, <strong>BOOKING_CANCELLED</strong>. Use o secret abaixo no campo "Secret".
+                  </p>
+                </div>
+
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Webhook secret</span>
+                    <span className={connQuery.data?.has_webhook_secret ? "text-emerald-600" : "text-amber-600"}>
+                      {connQuery.data?.has_webhook_secret ? "gerado" : "ausente"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">
+                    Por segurança, o secret só é exibido na primeira configuração. Se precisar de um novo, desconecte e reconecte.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <span>Event types sincronizados</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{connQuery.data?.event_types_count ?? 0}</span>
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      disabled={syncMut.isPending}
+                      onClick={() => syncMut.mutate()}
+                    >
+                      {syncMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                      Sincronizar
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          {hasKey && (
+            <Button
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              disabled={disconnectMut.isPending}
+              onClick={() => {
+                if (confirm("Desconectar Cal.com? Os agendamentos automáticos pararão até reconectar.")) {
+                  disconnectMut.mutate();
+                }
+              }}
+            >
+              {disconnectMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Desconectar
+            </Button>
+          )}
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Fechar</Button>
+          <Button
+            disabled={saveMut.isPending || (!apiKey.trim() && !hasKey)}
+            onClick={() => saveMut.mutate()}
+          >
+            {saveMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {hasKey ? (apiKey.trim() ? "Atualizar chave" : "OK") : "Conectar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

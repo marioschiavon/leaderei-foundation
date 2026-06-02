@@ -336,6 +336,178 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
     }
 
     // -----------------------------------------------------------------------
+    case "calcom_check_availability": {
+      const cfg = step.config as { event_type_id?: number; window_days?: number };
+      const { loadCalcomConnection, getAvailableSlots, firstSlotFromResponse } =
+        await import("@/lib/calcom.server");
+      const conn = await loadCalcomConnection(en.organization_id);
+      if (!conn || !cfg.event_type_id) {
+        const noSlots = await findNextStep(step.document_id, step.id, "no_slots");
+        return { kind: "advance", next_step_id: noSlots, delay_until: now, branch: "no_slots", output: { reason: !conn ? "no_connection" : "no_event_type" } };
+      }
+      const now2 = new Date();
+      const end = new Date(now2.getTime() + (cfg.window_days ?? 7) * 86400_000);
+      try {
+        const r = await getAvailableSlots(conn, cfg.event_type_id, now2.toISOString(), end.toISOString());
+        const slot = firstSlotFromResponse(r);
+        if (slot) {
+          const next = await findNextStep(step.document_id, step.id, "next");
+          return { kind: "advance", next_step_id: next, delay_until: now, output: { first_slot: slot } };
+        }
+        const noSlots = await findNextStep(step.document_id, step.id, "no_slots");
+        return { kind: "advance", next_step_id: noSlots, delay_until: now, branch: "no_slots", output: { reason: "no_slots_in_window" } };
+      } catch (e: any) {
+        const noSlots = await findNextStep(step.document_id, step.id, "no_slots");
+        return { kind: "advance", next_step_id: noSlots, delay_until: now, branch: "no_slots", output: { error: String(e?.message ?? e).slice(0, 200) } };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    case "calcom_book_meeting": {
+      const cfg = step.config as { event_type_id?: number; slot_strategy?: string };
+      if (!lead.email) {
+        const failed = await findNextStep(step.document_id, step.id, "failed");
+        return { kind: "advance", next_step_id: failed, delay_until: now, branch: "failed", output: { skipped: "no_email" } };
+      }
+      const {
+        loadCalcomConnection, getAvailableSlots, firstSlotFromResponse,
+        createBookingViaApi,
+      } = await import("@/lib/calcom.server");
+      const conn = await loadCalcomConnection(en.organization_id);
+      if (!conn || !cfg.event_type_id) {
+        const failed = await findNextStep(step.document_id, step.id, "failed");
+        return { kind: "advance", next_step_id: failed, delay_until: now, branch: "failed", output: { reason: !conn ? "no_connection" : "no_event_type" } };
+      }
+
+      try {
+        // Find first available slot (ai_decided defaults to first_available for now)
+        const now2 = new Date();
+        const end = new Date(now2.getTime() + 14 * 86400_000);
+        const slotsRes = await getAvailableSlots(conn, cfg.event_type_id, now2.toISOString(), end.toISOString());
+        const startIso = firstSlotFromResponse(slotsRes);
+        if (!startIso) {
+          const failed = await findNextStep(step.document_id, step.id, "failed");
+          return { kind: "advance", next_step_id: failed, delay_until: now, branch: "failed", output: { reason: "no_slots" } };
+        }
+        const booking = await createBookingViaApi({
+          conn,
+          event_type_id: cfg.event_type_id,
+          start_iso: startIso,
+          attendee: { email: lead.email, name: lead.full_name ?? lead.email },
+          metadata: { enrollment_id: en.id, lead_id: lead.id, campaign_id: en.campaign_id },
+        });
+        const data = booking?.data ?? booking;
+        const uid = String(data?.uid ?? data?.id ?? "");
+        const startAt = data?.startTime ?? startIso;
+        const endAt = data?.endTime ?? null;
+        const meetingUrl = data?.videoCallData?.url ?? data?.meetingUrl ?? null;
+
+        // Persist booking (webhook may also write it; cal_booking_uid unique)
+        if (uid) {
+          await supabaseAdmin.from("lead_bookings").upsert({
+            organization_id: en.organization_id,
+            lead_id: lead.id,
+            campaign_id: en.campaign_id,
+            enrollment_id: en.id,
+            cal_booking_id: String(data?.id ?? uid),
+            cal_booking_uid: uid,
+            event_type_id: cfg.event_type_id,
+            title: data?.title ?? null,
+            start_at: startAt,
+            end_at: endAt,
+            attendee_email: lead.email,
+            attendee_name: lead.full_name ?? null,
+            meeting_url: meetingUrl,
+            status: "confirmed",
+            raw_payload: data as any,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "cal_booking_uid" });
+        }
+
+        await supabaseAdmin.from("lead_activities").insert({
+          organization_id: en.organization_id,
+          lead_id: lead.id,
+          type: "meeting" as any,
+          title: "Reunião agendada via fluxo",
+          description: `Início: ${startAt}`,
+          payload: { enrollment_id: en.id, step_id: step.id, booking_uid: uid } as any,
+        });
+
+        const next = await findNextStep(step.document_id, step.id, "next");
+        return { kind: "advance", next_step_id: next, delay_until: now, output: { booking_uid: uid, start_at: startAt } };
+      } catch (e: any) {
+        const failed = await findNextStep(step.document_id, step.id, "failed");
+        return { kind: "advance", next_step_id: failed, delay_until: now, branch: "failed", output: { error: String(e?.message ?? e).slice(0, 200) } };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    case "calcom_cancel_booking": {
+      const cfg = step.config as { reason_template?: string };
+      const { loadCalcomConnection, cancelBookingViaApi } = await import("@/lib/calcom.server");
+      const conn = await loadCalcomConnection(en.organization_id);
+      const { data: active } = await supabaseAdmin
+        .from("lead_bookings")
+        .select("id, cal_booking_uid")
+        .eq("organization_id", en.organization_id)
+        .eq("lead_id", lead.id)
+        .eq("status", "confirmed")
+        .order("start_at", { ascending: false })
+        .limit(1);
+      const booking = active?.[0];
+      if (conn && booking) {
+        try {
+          const reason = renderTemplate(cfg.reason_template ?? "Cancelado via fluxo", vars);
+          await cancelBookingViaApi(conn, booking.cal_booking_uid, reason);
+          await supabaseAdmin.from("lead_bookings").update({
+            status: "cancelled",
+            cancellation_reason: reason,
+            updated_at: new Date().toISOString(),
+          }).eq("id", booking.id);
+        } catch (e: any) {
+          console.error("[calcom_cancel_booking]", e?.message);
+        }
+      }
+      const next = await findNextStep(step.document_id, step.id, "next");
+      return { kind: "advance", next_step_id: next, delay_until: now, output: { cancelled_uid: booking?.cal_booking_uid ?? null } };
+    }
+
+    // -----------------------------------------------------------------------
+    case "calcom_reschedule_booking": {
+      const cfg = step.config as { event_type_id?: number };
+      const { loadCalcomConnection, getAvailableSlots, firstSlotFromResponse, rescheduleBookingViaApi } =
+        await import("@/lib/calcom.server");
+      const conn = await loadCalcomConnection(en.organization_id);
+      const { data: active } = await supabaseAdmin
+        .from("lead_bookings")
+        .select("id, cal_booking_uid, event_type_id")
+        .eq("organization_id", en.organization_id)
+        .eq("lead_id", lead.id)
+        .eq("status", "confirmed")
+        .order("start_at", { ascending: false })
+        .limit(1);
+      const booking = active?.[0];
+      if (conn && booking) {
+        try {
+          const eventTypeId = cfg.event_type_id ?? booking.event_type_id;
+          if (eventTypeId) {
+            const now2 = new Date();
+            const end = new Date(now2.getTime() + 14 * 86400_000);
+            const r = await getAvailableSlots(conn, eventTypeId, now2.toISOString(), end.toISOString());
+            const slot = firstSlotFromResponse(r);
+            if (slot) {
+              await rescheduleBookingViaApi(conn, booking.cal_booking_uid, slot, "Reagendado via fluxo");
+            }
+          }
+        } catch (e: any) {
+          console.error("[calcom_reschedule_booking]", e?.message);
+        }
+      }
+      const next = await findNextStep(step.document_id, step.id, "next");
+      return { kind: "advance", next_step_id: next, delay_until: now, output: { rescheduled_uid: booking?.cal_booking_uid ?? null } };
+    }
+
+    // -----------------------------------------------------------------------
     case "end": {
       const cfg = step.config as { reason?: string };
       return { kind: "complete", output: { reason: cfg.reason ?? null, ended_at: now.toISOString() } };
