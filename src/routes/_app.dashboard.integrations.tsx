@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Circle, Clock3, Mail, Plug,
-  Loader2, Copy, RefreshCw, type LucideIcon,
+  Loader2, Copy, RefreshCw, Eye, EyeOff, KeyRound, type LucideIcon,
 } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
