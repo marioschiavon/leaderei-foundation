@@ -224,17 +224,31 @@ export const getLeadDetail = createServerFn({ method: "GET" })
     };
   });
 
-export const listCampaigns = createServerFn({ method: "GET" })
+const ListCampaignsSchema = z.object({
+  scope: z.enum(["active", "archived"]).default("active"),
+}).default({ scope: "active" });
+
+export const listCampaigns = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data: campaigns, error } = await context.supabase
+  .inputValidator((input: unknown) => ListCampaignsSchema.parse(input ?? {}))
+  .handler(async ({ context, data }) => {
+    const scope = data.scope;
+    // Count of archived (always returned so the toggle badge shows the right number)
+    const { count: archivedCount } = await context.supabase
+      .from("campaigns")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "archived");
+
+    let q = context.supabase
       .from("campaigns")
       .select("id, name, description, status, channel, total_enrolled, total_sent, total_replied, created_at, scheduled_at")
       .order("created_at", { ascending: false })
       .limit(100);
+    q = scope === "archived" ? q.eq("status", "archived") : q.neq("status", "archived");
+    const { data: campaigns, error } = await q;
     if (error) throw new Error(error.message);
     const list = campaigns ?? [];
-    if (list.length === 0) return [];
+    if (list.length === 0) return { items: [], archived_count: archivedCount ?? 0 };
 
     const campaignIds = list.map((c) => c.id);
     const { data: docs, error: docsErr } = await context.supabase
@@ -259,14 +273,60 @@ export const listCampaigns = createServerFn({ method: "GET" })
     }
     const docByCampaign = new Map(docList.map((d) => [d.campaign_id, d]));
 
-    return list.map((c) => {
+    // For running/paused campaigns, aggregate enrollments by current_step_id so
+    // the card can show which node leads are sitting on right now.
+    const liveCampaignIds = list
+      .filter((c) => c.status === "running" || c.status === "paused")
+      .map((c) => c.id);
+    const currentNodesByCampaign = new Map<string, Array<{ step_id: string; type: string; config: any; count: number }>>();
+    if (liveCampaignIds.length > 0) {
+      const { data: enrolls } = await context.supabase
+        .from("campaign_enrollments")
+        .select("campaign_id, current_step_id")
+        .in("campaign_id", liveCampaignIds)
+        .eq("status", "active")
+        .not("current_step_id", "is", null)
+        .limit(5000);
+      const grouped = new Map<string, Map<string, number>>();
+      for (const row of (enrolls ?? []) as Array<{ campaign_id: string; current_step_id: string }>) {
+        let byStep = grouped.get(row.campaign_id);
+        if (!byStep) { byStep = new Map(); grouped.set(row.campaign_id, byStep); }
+        byStep.set(row.current_step_id, (byStep.get(row.current_step_id) ?? 0) + 1);
+      }
+      const stepIds = Array.from(new Set(
+        Array.from(grouped.values()).flatMap((m) => Array.from(m.keys())),
+      ));
+      const stepsById = new Map<string, { type: string; config: any }>();
+      if (stepIds.length > 0) {
+        const { data: stepsRows } = await context.supabase
+          .from("flow_steps")
+          .select("id, type, config")
+          .in("id", stepIds);
+        for (const s of (stepsRows ?? []) as Array<{ id: string; type: string; config: any }>) {
+          stepsById.set(s.id, { type: s.type, config: s.config });
+        }
+      }
+      for (const [campId, byStep] of grouped.entries()) {
+        const arr = Array.from(byStep.entries())
+          .map(([step_id, count]) => {
+            const s = stepsById.get(step_id);
+            return { step_id, type: s?.type ?? "unknown", config: s?.config ?? {}, count };
+          })
+          .sort((a, b) => b.count - a.count);
+        currentNodesByCampaign.set(campId, arr);
+      }
+    }
+
+    const items = list.map((c) => {
       const doc = docByCampaign.get(c.id);
       return {
         ...c,
         flow_step_count: doc ? stepCountByDoc.get(doc.id) ?? 0 : null,
         flow_status: (doc?.status as string | undefined) ?? null,
+        current_nodes: currentNodesByCampaign.get(c.id) ?? [],
       };
     });
+    return { items, archived_count: archivedCount ?? 0 };
   });
 
 export const listConversations = createServerFn({ method: "GET" })
