@@ -506,10 +506,29 @@ function CalcomConnectionDialog({
     onError: (e: any) => toast.error(e?.message ?? "Erro ao gerar novo secret."),
   });
 
+  const testWebhookFn = useServerFn(testCalcomWebhook);
+  const [webhookTest, setWebhookTest] = useState<
+    { state: "idle" } | { state: "ok"; status: number } | { state: "error"; message: string }
+  >({ state: "idle" });
+  const testWebhookMut = useMutation({
+    mutationFn: () => testWebhookFn(),
+    onMutate: () => setWebhookTest({ state: "idle" }),
+    onSuccess: (r: any) => {
+      setWebhookTest({ state: "ok", status: r?.status ?? 200 });
+      toast.success("Webhook verificado com sucesso.");
+    },
+    onError: (e: any) => {
+      const msg = e?.message ?? "Falha ao testar webhook.";
+      setWebhookTest({ state: "error", message: msg });
+      toast.error(msg);
+    },
+  });
+
   const hasKey = connQuery.data?.has_key ?? false;
   const webhookUrl = connQuery.data?.webhook_url ?? "";
   const webhookSecret = connQuery.data?.webhook_secret ?? "";
   const hasSecret = connQuery.data?.has_webhook_secret ?? false;
+
 
   function copy(text: string) {
     if (!text) return;
