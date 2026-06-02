@@ -5,11 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Circle, Clock3, Mail, Plug,
-  Loader2, type LucideIcon,
+  Loader2, Copy, RefreshCw, type LucideIcon,
 } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
-  SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar,
+  SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar, SiCalendly,
 } from "react-icons/si";
 import { FaLinkedin } from "react-icons/fa";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -24,6 +24,9 @@ import { listIntegrations } from "@/lib/tenant.functions";
 import {
   getOrgResendConnection, saveOrgResendConnection, disconnectOrgResend,
 } from "@/lib/integrations.functions";
+import {
+  getCalcomConnection, saveCalcomConnection, disconnectCalcom, syncCalcomEventTypes,
+} from "@/lib/calcom.functions";
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
 
@@ -54,6 +57,7 @@ const SLUG_BRAND: Record<string, Brand> = {
   pipedrive:         { Icon: PipedriveIcon,     tint: "text-[#1A1A1A] dark:text-foreground" },
   apollo:            { Icon: ApolloIcon,        tint: "text-[#1B116E]" },
   "google-calendar": { Icon: SiGooglecalendar,  tint: "text-[#4285F4]" },
+  cal_com:           { Icon: SiCalendly,        tint: "text-[#292929] dark:text-foreground" },
 };
 
 const STATUS_META: Record<string, { label: string; icon: LucideIcon; className: string; helper: string }> = {
