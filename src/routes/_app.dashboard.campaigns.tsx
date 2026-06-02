@@ -542,11 +542,18 @@ function ActivateCampaignDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <Stat label="Total na org" value={data?.total ?? 0} />
               <Stat label="Elegíveis" value={data?.eligible_count ?? 0} accent />
+              <Stat label="Já em execução" value={data?.active_enrollment_count ?? 0} />
               <Stat label="Sem dado válido" value={data?.ineligible_count ?? 0} />
             </div>
+
+            {(data?.active_enrollment_count ?? 0) > 0 && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-700 dark:text-amber-300">
+                {data?.active_enrollment_count} lead(s) já têm enrollment ativo/pausado nesta campanha — ativar novamente apenas reinicia esses fluxos do passo inicial.
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button
@@ -561,9 +568,10 @@ function ActivateCampaignDialog({
                   <Users className="h-4 w-4" /> Todos os elegíveis
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  Enrolla os {data?.eligible_count ?? 0} leads de uma vez.
+                  Enrolla os {data?.eligible_count ?? 0} leads ({data?.new_eligible_count ?? 0} novos).
                 </div>
               </button>
+
               <button
                 type="button"
                 onClick={() => setMode("manual")}
