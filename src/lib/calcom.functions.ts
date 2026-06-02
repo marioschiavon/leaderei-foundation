@@ -190,15 +190,11 @@ export const saveCalcomConnection = createServerFn({ method: "POST" })
       .select("id")
       .eq("slug", "cal_com")
       .maybeSingle();
-    if (pErr) throw new Error(pErr.message);
-    if (!provider) throw new Error("Provider 'cal_com' não cadastrado.");
 
-    const { data: existing } = await supabase
-      .from("organization_integrations")
-      .select("id, config")
-      .eq("organization_id", organization_id)
-      .eq("provider_id", provider.id)
-      .maybeSingle();
+    if (!data.api_key && !existing) {
+      throw new Error("Informe a API key do Cal.com para conectar.");
+    }
+
 
     const cfg: Record<string, unknown> = {
       ...((existing?.config ?? {}) as any),
