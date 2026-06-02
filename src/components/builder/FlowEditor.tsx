@@ -118,7 +118,7 @@ const PALETTE: Array<{
   { type: "message_email", label: "Email", icon: Mail, enabled: true },
   { type: "wait", label: "Aguardar", icon: Clock, enabled: true },
   { type: "condition_replied", label: "Condição: respondeu?", icon: GitBranch, enabled: true },
-  { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: false },
+  { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
 ];
