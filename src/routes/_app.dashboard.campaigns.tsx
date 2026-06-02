@@ -640,8 +640,13 @@ function ActivateCampaignDialog({
                           >
                             <Checkbox checked={checked} />
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium">
-                                {l.full_name ?? "Sem nome"}
+                              <div className="flex items-center gap-2 truncate text-sm font-medium">
+                                <span className="truncate">{l.full_name ?? "Sem nome"}</span>
+                                {data?.active_lead_ids?.includes(l.id) && (
+                                  <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-normal text-amber-700 dark:text-amber-300">
+                                    já em execução
+                                  </span>
+                                )}
                               </div>
                               <div className="truncate text-xs text-muted-foreground">
                                 {channel === "email"
@@ -655,6 +660,7 @@ function ActivateCampaignDialog({
                           </li>
                         );
                       })}
+
                     </ul>
                   )}
                 </div>
