@@ -403,7 +403,28 @@ export const resumeEnrollment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Cancel a single enrollment — removes the lead from a live campaign. Keeps
+// flow_step_runs intact for audit; sets enrollment status to 'cancelled' and
+// cancels any pending scheduled jobs.
+export const cancelEnrollment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ enrollment_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    await supabase
+      .from("campaign_enrollments")
+      .update({ status: "cancelled", next_run_at: null, updated_at: new Date().toISOString() })
+      .eq("id", data.enrollment_id);
+    await supabase
+      .from("scheduled_jobs")
+      .update({ status: "cancelled" })
+      .eq("enrollment_id", data.enrollment_id)
+      .eq("status", "pending");
+    return { ok: true };
+  });
+
 // ---------------------------------------------------------------------------
+
 // Reset enrollment — moves a finished/paused lead back to the entry step so
 // the user can re-run the whole flow after editing it.
 // ---------------------------------------------------------------------------
