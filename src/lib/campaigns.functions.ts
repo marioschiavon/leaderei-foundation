@@ -310,6 +310,23 @@ export const listCampaignEnrollments = createServerFn({ method: "POST" })
       }
     }
 
+    // Fetch end reasons for completed enrollments that ended on an `end` node
+    const endReasonByEnrollment: Record<string, string | null> = {};
+    const completedIds = list.filter((r) => r.status === "completed" && r.current_step_id && stepsById[r.current_step_id]?.type === "end").map((r) => r.id);
+    if (completedIds.length > 0) {
+      const { data: endRuns } = await supabase
+        .from("flow_step_runs")
+        .select("enrollment_id, output, finished_at")
+        .in("enrollment_id", completedIds)
+        .order("finished_at", { ascending: false })
+        .limit(500);
+      for (const run of (endRuns ?? []) as Array<any>) {
+        if (endReasonByEnrollment[run.enrollment_id] !== undefined) continue;
+        const reason = (run.output as any)?.reason ?? null;
+        endReasonByEnrollment[run.enrollment_id] = reason;
+      }
+    }
+
     const nowMs = Date.now();
     return list.map((r) => {
       const cur = r.current_step_id ? stepsById[r.current_step_id] : null;
@@ -325,6 +342,8 @@ export const listCampaignEnrollments = createServerFn({ method: "POST" })
         current_step: cur ? { id: cur.id, type: cur.type, config: cur.config } : null,
         next_steps,
         is_overdue,
+        end_reason: endReasonByEnrollment[r.id] ?? null,
+        ended_on_end_node: cur?.type === "end",
       };
     });
   });
