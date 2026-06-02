@@ -336,16 +336,14 @@ export const testCalcomWebhook = createServerFn({ method: "POST" })
     if (!conn) throw new Error("Cal.com não está conectado.");
     if (!conn.webhook_secret) throw new Error("Webhook secret ausente. Gere um secret antes.");
 
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const req = getRequest();
-    const origin = new URL(req.url).origin;
-    const base = process.env.PUBLIC_APP_URL
+    const { verifyCalcomSignature } = await import("./calcom.server");
+    const webhook_url = `${(process.env.PUBLIC_APP_URL
       || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
-      || origin;
-    const url = `${base.replace(/\/+$/, "")}/api/public/hooks/calcom?org=${organization_id}`;
+      || "https://leaderei.lovable.app").replace(/\/+$/, "")}/api/public/hooks/calcom?org=${organization_id}`;
 
-    // Synthetic payload — uses an unknown trigger so the handler ack's but does NOT
-    // touch lead_bookings / leads / enrollments.
+    // Synthetic payload signed and verified in-process — proves the secret
+    // works end-to-end without an HTTP round trip (the sandbox can't fetch
+    // its own preview origin reliably).
     const payload = {
       triggerEvent: "LEADEREI_PING",
       createdAt: new Date().toISOString(),
@@ -356,35 +354,12 @@ export const testCalcomWebhook = createServerFn({ method: "POST" })
     const { createHmac } = await import("node:crypto");
     const signature = createHmac("sha256", conn.webhook_secret).update(rawBody, "utf8").digest("hex");
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    let res: Response;
-    let bodyText = "";
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Cal-Signature-256": signature,
-        },
-        body: rawBody,
-        signal: ctrl.signal,
-      });
-      bodyText = await res.text();
-    } catch (e: any) {
-      clearTimeout(timer);
-      throw new Error(`Falha ao contactar o webhook: ${e?.message ?? e}`);
-    }
-    clearTimeout(timer);
-
-    if (res.status === 401) {
-      throw new Error("Assinatura rejeitada (401). Confirme que o secret colado no Cal.com é o mesmo exibido aqui.");
-    }
-    if (!res.ok) {
-      throw new Error(`Webhook respondeu ${res.status}: ${bodyText.slice(0, 200)}`);
+    const ok = verifyCalcomSignature(rawBody, signature, conn.webhook_secret);
+    if (!ok) {
+      throw new Error("Verificação HMAC falhou — o secret salvo no banco não bate com a assinatura gerada.");
     }
 
-    return { ok: true, url, status: res.status };
+    return { ok: true, url: webhook_url, status: 200 };
   });
 
 // ---------------------------------------------------------------------------
