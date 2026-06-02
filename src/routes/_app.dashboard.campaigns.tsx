@@ -945,10 +945,23 @@ function ExecutionsDialog({
                         )}
                         {(r.status === "paused" || r.status === "failed") && (
                           <Button
-                            size="icon" variant="ghost" className="h-7 w-7" title="Retomar"
+                            size="icon" variant="ghost" className="h-7 w-7" title="Retomar do passo atual"
                             onClick={() => resumeMut.mutate(r.id)} disabled={resumeMut.isPending}
                           >
                             <PlayCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(r.status === "completed" || r.status === "failed" || r.status === "paused") && (
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7" title="Reiniciar fluxo do começo"
+                            onClick={() => {
+                              if (confirm("Reiniciar este lead a partir do passo inicial do fluxo? O histórico será mantido.")) {
+                                resetMut.mutate(r.id);
+                              }
+                            }}
+                            disabled={resetMut.isPending}
+                          >
+                            <RotateCcw className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
