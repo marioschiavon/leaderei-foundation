@@ -50,6 +50,9 @@ const ActionConfig = z.object({
   ]),
   params: z.record(z.string(), z.any()).default({}),
 });
+const EndConfig = z.object({
+  reason: z.string().max(160).optional(),
+});
 
 function validateConfigForType(type: StepType, config: unknown): unknown {
   switch (type) {
@@ -65,6 +68,8 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return ConditionRepliedConfig.parse(config ?? {});
     case "action":
       return ActionConfig.parse(config ?? {});
+    case "end":
+      return EndConfig.parse(config ?? {});
   }
 }
 
