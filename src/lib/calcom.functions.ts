@@ -336,9 +336,12 @@ export const testCalcomWebhook = createServerFn({ method: "POST" })
     if (!conn) throw new Error("Cal.com não está conectado.");
     if (!conn.webhook_secret) throw new Error("Webhook secret ausente. Gere um secret antes.");
 
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const req = getRequest();
+    const origin = new URL(req.url).origin;
     const base = process.env.PUBLIC_APP_URL
       || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
-      || "https://leaderei.lovable.app";
+      || origin;
     const url = `${base.replace(/\/+$/, "")}/api/public/hooks/calcom?org=${organization_id}`;
 
     // Synthetic payload — uses an unknown trigger so the handler ack's but does NOT
