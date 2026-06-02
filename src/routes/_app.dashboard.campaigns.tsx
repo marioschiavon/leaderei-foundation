@@ -142,6 +142,13 @@ const CHANNEL_LABEL: Record<(typeof CHANNELS)[number], string> = {
   multi: "Multicanal",
 };
 
+type CurrentNode = {
+  step_id: string;
+  type: string;
+  config: any;
+  count: number;
+};
+
 type Campaign = {
   id: string;
   name: string;
@@ -155,23 +162,33 @@ type Campaign = {
   scheduled_at: string | null;
   flow_step_count: number | null;
   flow_status: string | null;
+  current_nodes: CurrentNode[];
+};
+
+type ListCampaignsResponse = {
+  items: Campaign[];
+  archived_count: number;
 };
 
 function CampaignsPage() {
   const fetchFn = useServerFn(listCampaigns);
+  const [scope, setScope] = useState<"active" | "archived">("active");
   const { data, isLoading, error } = useQuery({
-    queryKey: ["campaigns"],
-    queryFn: () => fetchFn(),
+    queryKey: ["campaigns", scope],
+    queryFn: () => fetchFn({ data: { scope } }) as Promise<ListCampaignsResponse>,
   });
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
 
+  const items = data?.items ?? [];
+  const archivedCount = data?.archived_count ?? 0;
+
   const filtered = useMemo(() => {
-    return ((data ?? []) as Campaign[]).filter(
+    return items.filter(
       (c) => !query || c.name.toLowerCase().includes(query.toLowerCase()),
     );
-  }, [data, query]);
+  }, [items, query]);
 
   return (
     <div className="space-y-6">
@@ -185,7 +202,7 @@ function CampaignsPage() {
         }
       />
 
-      <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-surface p-3">
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -194,6 +211,45 @@ function CampaignsPage() {
             placeholder="Buscar campanha…"
             className="h-9 pl-9"
           />
+        </div>
+        <div className="inline-flex rounded-md border bg-surface p-0.5 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setScope("active")}
+            className={cn(
+              "rounded px-3 py-1 transition-colors",
+              scope === "active"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Ativas
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("archived")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded px-3 py-1 transition-colors",
+              scope === "archived"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Arquivadas
+            {archivedCount > 0 && (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-2xs font-semibold",
+                  scope === "archived"
+                    ? "bg-background/20 text-background"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                {archivedCount}
+              </span>
+            )}
+          </button>
         </div>
         <div className="ml-auto text-xs text-muted-foreground">
           {isLoading
@@ -214,11 +270,23 @@ function CampaignsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={Megaphone}
-          title={query ? "Nenhuma campanha encontrada" : "Nenhuma campanha ainda"}
-          description={query ? "Ajuste a busca." : "Crie a primeira sequência multicanal."}
+          icon={scope === "archived" ? Archive : Megaphone}
+          title={
+            query
+              ? "Nenhuma campanha encontrada"
+              : scope === "archived"
+                ? "Nenhuma campanha arquivada"
+                : "Nenhuma campanha ainda"
+          }
+          description={
+            query
+              ? "Ajuste a busca."
+              : scope === "archived"
+                ? "Campanhas arquivadas aparecerão aqui."
+                : "Crie a primeira sequência multicanal."
+          }
           action={
-            !query && (
+            !query && scope === "active" && (
               <Button onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" /> Criar campanha
               </Button>
@@ -228,10 +296,16 @@ function CampaignsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
-            <CampaignCard key={c.id} campaign={c} onEdit={() => setEditing(c)} />
+            <CampaignCard
+              key={c.id}
+              campaign={c}
+              scope={scope}
+              onEdit={() => setEditing(c)}
+            />
           ))}
         </div>
       )}
+
 
       <CampaignFormSheet
         open={createOpen}
