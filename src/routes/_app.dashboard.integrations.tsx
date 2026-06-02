@@ -634,6 +634,39 @@ function CalcomConnectionDialog({
                   </p>
                 </div>
 
+                <div className="rounded-md border px-3 py-2 text-sm space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div>Testar verificação do webhook</div>
+                      <p className="text-2xs text-muted-foreground">
+                        Envia um POST assinado para a URL pública para confirmar que a assinatura HMAC é aceita.
+                      </p>
+                    </div>
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      disabled={testWebhookMut.isPending || !hasSecret}
+                      onClick={() => testWebhookMut.mutate()}
+                    >
+                      {testWebhookMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Testar
+                    </Button>
+                  </div>
+                  {webhookTest.state === "ok" && (
+                    <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 px-2 py-1.5 text-2xs text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Sucesso — webhook respondeu {webhookTest.status}. A assinatura está válida.
+                    </div>
+                  )}
+                  {webhookTest.state === "error" && (
+                    <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-2 py-1.5 text-2xs text-destructive">
+                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <span className="break-words">{webhookTest.message}</span>
+                    </div>
+                  )}
+                </div>
+
+
+
 
                 <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                   <span>Event types sincronizados</span>
