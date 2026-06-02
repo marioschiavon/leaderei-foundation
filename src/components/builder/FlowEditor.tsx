@@ -252,6 +252,51 @@ function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function WhatsAppStepNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { body?: string };
+  const isComplete = !!cfg.body?.trim();
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={MessageCircle} label="WhatsApp" />
+      <div style={{ padding: "10px 12px", fontSize: 12, color: COLORS.text }}>
+        <div
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            color: cfg.body ? COLORS.text : COLORS.muted,
+            fontStyle: cfg.body ? "normal" : "italic",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            minHeight: 32,
+          }}
+        >
+          {cfg.body || "Sem mensagem"}
+        </div>
+        <div
+          style={{
+            marginTop: 8,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 11,
+            padding: "2px 6px",
+            borderRadius: 4,
+            background: isComplete ? "#dcfce7" : "#fef3c7",
+            color: isComplete ? "#166534" : "#92400e",
+          }}
+        >
+          {isComplete ? "✓ Pronto" : "⚠ Incompleto"}
+        </div>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
 function WaitStepNode({ data, selected }: NodeProps<StepNode>) {
   const cfg = data.config as { duration_value?: number; duration_unit?: string };
   const unitLabel: Record<string, string> = {
@@ -361,6 +406,7 @@ function ConditionRepliedNode({ data, selected }: NodeProps<StepNode>) {
 
 const nodeTypes = {
   message_email: EmailStepNode,
+  message_whatsapp: WhatsAppStepNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
 } as any;
