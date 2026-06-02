@@ -398,7 +398,7 @@ export const syncCalcomEventTypes = createServerFn({ method: "POST" })
     const conn = await loadCalcomConnection(organization_id);
     if (!conn) throw new Error("Cal.com não está conectado.");
 
-    const res = await calcomFetch(conn, "/event-types", { method: "GET" });
+    const res = await calcomFetch(conn, "/event-types", { method: "GET", apiVersion: "2024-06-14" });
     // v2: { status, data: { eventTypeGroups: [{ eventTypes: [...] }] } } OR { data: [...] }
     const eventTypes: any[] = [];
     const data = res?.data ?? res;

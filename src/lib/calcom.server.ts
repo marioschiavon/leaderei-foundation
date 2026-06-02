@@ -59,12 +59,12 @@ export async function loadCalcomConnection(
 export async function calcomFetch(
   conn: CalConn,
   path: string,
-  init: RequestInit = {},
+  init: RequestInit & { apiVersion?: string } = {},
 ): Promise<any> {
   const url = path.startsWith("http") ? path : `${CAL_API_BASE}${path}`;
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${conn.api_key}`);
-  headers.set("cal-api-version", CAL_API_VERSION);
+  headers.set("cal-api-version", init.apiVersion ?? CAL_API_VERSION);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   headers.set("Accept", "application/json");
 
