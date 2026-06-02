@@ -335,6 +335,12 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       return { kind: "advance", next_step_id: next, delay_until: now, output: { action: cfg.action_type, applied: updates } };
     }
 
+    // -----------------------------------------------------------------------
+    case "end": {
+      const cfg = step.config as { reason?: string };
+      return { kind: "complete", output: { reason: cfg.reason ?? null, ended_at: now.toISOString() } };
+    }
+
     default:
       return { kind: "fail", error: `tipo de passo desconhecido: ${step.type}` };
   }
@@ -444,6 +450,7 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
     }).eq("id", runId);
     await supabaseAdmin.from("campaign_enrollments").update({
       status: "completed", completed_at: new Date().toISOString(), next_run_at: null,
+      current_step_id: step.id, last_error: null,
     }).eq("id", en.id);
     await supabaseAdmin.from("scheduled_jobs").update({ status: "completed" }).eq("id", job.id);
     return { ok: true, enrollment_id: en.id };
@@ -470,8 +477,13 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
   }).eq("id", runId);
 
   if (!outcome.next_step_id) {
+    const implicitEnd = step.type !== "end";
     await supabaseAdmin.from("campaign_enrollments").update({
-      status: "completed", completed_at: new Date().toISOString(), next_run_at: null, current_step_id: null,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      next_run_at: null,
+      current_step_id: step.id,
+      last_error: implicitEnd ? "Fluxo sem nó Fim — encerrado automaticamente" : null,
     }).eq("id", en.id);
     await supabaseAdmin.from("scheduled_jobs").update({ status: "completed" }).eq("id", job.id);
     return { ok: true, enrollment_id: en.id };

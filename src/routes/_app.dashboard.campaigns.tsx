@@ -29,6 +29,7 @@ import {
   Users,
   ChevronDown,
   ChevronRight,
+  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -44,6 +45,8 @@ import {
   listCampaignEnrollments,
   pauseEnrollment,
   resumeEnrollment,
+  resetEnrollment,
+  resetEnrollmentsBulk,
   activateCampaign,
   getCampaignExecutorStats,
   listEligibleLeadsForCampaign,
@@ -746,6 +749,28 @@ function ExecutionsDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const resetFn = useServerFn(resetEnrollment);
+  const resetBulkFn = useServerFn(resetEnrollmentsBulk);
+  const resetMut = useMutation({
+    mutationFn: (id: string) => resetFn({ data: { enrollment_id: id } }),
+    onSuccess: () => {
+      toast.success("Lead reiniciado no fluxo.");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const resetBulkMut = useMutation({
+    mutationFn: (scope: "completed" | "failed" | "all_finished") =>
+      resetBulkFn({ data: { campaign_id: campaignId, scope } }),
+    onSuccess: (res: any) => {
+      toast.success(`${res?.reset ?? 0} leads reiniciados${res?.failed ? ` (${res.failed} falharam)` : ""}.`);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const tickFn = useServerFn(forceFlowTick);
   const tickMut = useMutation({
     mutationFn: () => tickFn(),
@@ -780,20 +805,42 @@ function ExecutionsDialog({
                 Lista de leads enrolados no fluxo. Atualiza a cada 5s.
               </DialogDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => tickMut.mutate()}
-              disabled={tickMut.isPending}
-              title="Roda o worker manualmente — útil para testar sem esperar o cron."
-            >
-              {tickMut.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-2">
+              {((stats as any)?.completed ?? 0) > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm(`Reiniciar todos os ${(stats as any).completed} leads concluídos a partir do passo inicial?`)) {
+                      resetBulkMut.mutate("completed");
+                    }
+                  }}
+                  disabled={resetBulkMut.isPending}
+                  title="Reinicia todos os leads concluídos a partir do nó inicial do fluxo."
+                >
+                  {resetBulkMut.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                  Reiniciar concluídos
+                </Button>
               )}
-              Forçar tick
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => tickMut.mutate()}
+                disabled={tickMut.isPending}
+                title="Roda o worker manualmente — útil para testar sem esperar o cron."
+              >
+                {tickMut.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Forçar tick
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -867,6 +914,8 @@ function ExecutionsDialog({
                                   "bg-destructive/10 text-destructive",
                                 blockerLabel.tone === "muted" &&
                                   "bg-surface-muted text-muted-foreground",
+                                blockerLabel.tone === "success" &&
+                                  "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
                               )}
                               title={blockerLabel.title}
                             >
@@ -919,10 +968,23 @@ function ExecutionsDialog({
                         )}
                         {(r.status === "paused" || r.status === "failed") && (
                           <Button
-                            size="icon" variant="ghost" className="h-7 w-7" title="Retomar"
+                            size="icon" variant="ghost" className="h-7 w-7" title="Retomar do passo atual"
                             onClick={() => resumeMut.mutate(r.id)} disabled={resumeMut.isPending}
                           >
                             <PlayCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(r.status === "completed" || r.status === "failed" || r.status === "paused") && (
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7" title="Reiniciar fluxo do começo"
+                            onClick={() => {
+                              if (confirm("Reiniciar este lead a partir do passo inicial do fluxo? O histórico será mantido.")) {
+                                resetMut.mutate(r.id);
+                              }
+                            }}
+                            disabled={resetMut.isPending}
+                          >
+                            <RotateCcw className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -967,6 +1029,10 @@ function stepLabel(step: { type: string | null; config?: any } | null | undefine
       return "Condição";
     case "update_lead":
       return "Atualizar lead";
+    case "end": {
+      const reason = String(cfg.reason ?? "").trim();
+      return reason ? `Fim: ${reason}` : "Fim do fluxo";
+    }
     default:
       return step.type;
   }
@@ -980,10 +1046,18 @@ function formatNextRun(iso: string | null | undefined): string {
   return formatDistanceToNow(d, { locale: ptBR, addSuffix: true });
 }
 
-function computeBlocker(r: any): { text: string; tone: "warn" | "danger" | "muted"; title?: string } | null {
+function computeBlocker(r: any): { text: string; tone: "warn" | "danger" | "muted" | "success"; title?: string } | null {
   if (r.status === "failed") return { text: "Falhou", tone: "danger", title: r.last_error ?? undefined };
   if (r.status === "paused") return { text: "Pausado manualmente", tone: "muted" };
-  if (r.status === "completed") return null;
+  if (r.status === "completed") {
+    if (r.ended_on_end_node) {
+      return { text: r.end_reason ? `Concluído · ${r.end_reason}` : "Concluído", tone: "success" };
+    }
+    if (r.last_error && /sem nó Fim/i.test(r.last_error)) {
+      return { text: "Encerrado sem nó Fim", tone: "warn", title: "O fluxo terminou porque o passo atual não tem próximo nó. Adicione um nó Fim no Builder." };
+    }
+    return { text: "Concluído", tone: "success" };
+  }
   if (r.status === "active") {
     if (!r.current_step_id) return { text: "Sem passo atual", tone: "danger" };
     if (r.is_overdue) return { text: "Aguardando worker", tone: "warn", title: "next_run_at vencido — cron não processou ainda" };

@@ -13,6 +13,7 @@ const STEP_TYPES = [
   "wait",
   "condition_replied",
   "action",
+  "end",
 ] as const;
 export type StepType = (typeof STEP_TYPES)[number];
 
@@ -49,6 +50,9 @@ const ActionConfig = z.object({
   ]),
   params: z.record(z.string(), z.any()).default({}),
 });
+const EndConfig = z.object({
+  reason: z.string().max(160).optional(),
+});
 
 function validateConfigForType(type: StepType, config: unknown): unknown {
   switch (type) {
@@ -64,6 +68,8 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return ConditionRepliedConfig.parse(config ?? {});
     case "action":
       return ActionConfig.parse(config ?? {});
+    case "end":
+      return EndConfig.parse(config ?? {});
   }
 }
 
@@ -156,7 +162,14 @@ function validateGraph(
   }
   for (const s of steps) {
     const out = outgoing.get(s.id) ?? new Set();
-    if (s.type === "condition_replied") {
+    if (s.type === "end") {
+      if (out.size > 0) {
+        errors.push({
+          step_id: s.id,
+          message: 'O nó "Fim" não pode ter saídas.',
+        });
+      }
+    } else if (s.type === "condition_replied") {
       if (out.size !== 0 && !(out.has("yes") && out.has("no") && out.size === 2)) {
         errors.push({
           step_id: s.id,
@@ -168,6 +181,12 @@ function validateGraph(
         errors.push({
           step_id: s.id,
           message: 'Passo linear só pode ter 1 saída "next".',
+        });
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({
+          step_id: s.id,
+          message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.',
         });
       }
     }

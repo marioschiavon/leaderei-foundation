@@ -39,6 +39,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,7 +88,8 @@ type StepType =
   | "message_linkedin"
   | "wait"
   | "condition_replied"
-  | "action";
+  | "action"
+  | "end";
 
 type StepData = {
   config: Record<string, any>;
@@ -107,6 +109,7 @@ const COLORS = {
   borderError: "#ef4444",
   text: "#0f172a",
   muted: "#64748b",
+  end: "#475569",
 };
 
 const PALETTE: Array<{
@@ -121,6 +124,7 @@ const PALETTE: Array<{
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
+  { type: "end", label: "Fim do fluxo", icon: Flag, enabled: true },
 ];
 
 const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
@@ -130,6 +134,7 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   wait: { duration_value: 1, duration_unit: "days" },
   condition_replied: { scope: "any_channel", timeout_value: 3, timeout_unit: "days" },
   action: { action_type: "set_status", params: {} },
+  end: { reason: "" },
 };
 
 function newId() {
@@ -404,11 +409,42 @@ function ConditionRepliedNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function EndStepNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { reason?: string };
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 12px",
+          borderBottom: `1px solid ${COLORS.border}`,
+          background: "#f1f5f9",
+          color: COLORS.end,
+          fontSize: 13,
+          fontWeight: 600,
+          borderTopLeftRadius: 10,
+          borderTopRightRadius: 10,
+        }}
+      >
+        <Flag size={14} />
+        <span>Fim do fluxo</span>
+      </div>
+      <div style={{ padding: "10px 12px", fontSize: 12, color: COLORS.muted, fontStyle: cfg.reason ? "normal" : "italic" }}>
+        {cfg.reason ? cfg.reason : "Encerra a jornada. Sem saídas."}
+      </div>
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
+  end: EndStepNode,
 } as any;
 
 // ---------------------------------------------------------------------------
@@ -1099,7 +1135,48 @@ function ConfigPanel({
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
+  if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
+}
+
+function EndPanel({
+  node,
+  onChange,
+}: {
+  node: StepNode;
+  onChange: (patch: Record<string, any>) => void;
+}) {
+  const cfg = node.data.config as { reason?: string };
+  const presets = ["Convertido", "Sem resposta", "Desinteresse", "Reagendar mais tarde"];
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="end-reason">Motivo do encerramento (opcional)</Label>
+        <Input
+          id="end-reason"
+          value={cfg.reason ?? ""}
+          onChange={(e) => onChange({ reason: e.target.value })}
+          placeholder="Ex.: Convertido"
+          maxLength={160}
+        />
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {presets.map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange({ reason: p })}
+            className="rounded-md border bg-background px-2 py-0.5 text-xs hover:bg-muted"
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Quando o lead chega aqui, a execução termina. Você pode reiniciá-la depois pelo diálogo de Execuções.
+      </p>
+    </div>
+  );
 }
 
 function WhatsAppPanel({

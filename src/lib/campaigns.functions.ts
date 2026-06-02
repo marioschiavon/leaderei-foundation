@@ -310,6 +310,23 @@ export const listCampaignEnrollments = createServerFn({ method: "POST" })
       }
     }
 
+    // Fetch end reasons for completed enrollments that ended on an `end` node
+    const endReasonByEnrollment: Record<string, string | null> = {};
+    const completedIds = list.filter((r) => r.status === "completed" && r.current_step_id && stepsById[r.current_step_id]?.type === "end").map((r) => r.id);
+    if (completedIds.length > 0) {
+      const { data: endRuns } = await supabase
+        .from("flow_step_runs")
+        .select("enrollment_id, output, finished_at")
+        .in("enrollment_id", completedIds)
+        .order("finished_at", { ascending: false })
+        .limit(500);
+      for (const run of (endRuns ?? []) as Array<any>) {
+        if (endReasonByEnrollment[run.enrollment_id] !== undefined) continue;
+        const reason = (run.output as any)?.reason ?? null;
+        endReasonByEnrollment[run.enrollment_id] = reason;
+      }
+    }
+
     const nowMs = Date.now();
     return list.map((r) => {
       const cur = r.current_step_id ? stepsById[r.current_step_id] : null;
@@ -325,6 +342,8 @@ export const listCampaignEnrollments = createServerFn({ method: "POST" })
         current_step: cur ? { id: cur.id, type: cur.type, config: cur.config } : null,
         next_steps,
         is_overdue,
+        end_reason: endReasonByEnrollment[r.id] ?? null,
+        ended_on_end_node: cur?.type === "end",
       };
     });
   });
@@ -382,6 +401,82 @@ export const resumeEnrollment = createServerFn({ method: "POST" })
       scope: "org",
     });
     return { ok: true };
+  });
+
+// ---------------------------------------------------------------------------
+// Reset enrollment — moves a finished/paused lead back to the entry step so
+// the user can re-run the whole flow after editing it.
+// ---------------------------------------------------------------------------
+
+async function resetOne(supabase: any, enrollment_id: string) {
+  const { data: en } = await supabase
+    .from("campaign_enrollments")
+    .select("id, organization_id, campaign_id, status")
+    .eq("id", enrollment_id)
+    .maybeSingle();
+  if (!en) throw new Error("Enrollment não encontrado.");
+  if (!["completed", "failed", "paused"].includes(en.status)) {
+    throw new Error(`Só é possível reiniciar leads concluídos, pausados ou com falha (atual: ${en.status}).`);
+  }
+  const { document_id, entry_step_id } = await resolveDocumentAndEntry(supabase, en.campaign_id);
+  const now = new Date().toISOString();
+  await supabase.from("campaign_enrollments").update({
+    status: "active",
+    current_step_id: entry_step_id,
+    document_id,
+    next_run_at: now,
+    last_error: null,
+    completed_at: null,
+    context: {},
+  }).eq("id", en.id);
+  // Cancel any pending jobs first
+  await supabase.from("scheduled_jobs").update({ status: "cancelled" })
+    .eq("enrollment_id", en.id).eq("status", "pending");
+  await supabase.from("scheduled_jobs").insert({
+    organization_id: en.organization_id,
+    kind: "flow_step",
+    payload: { enrollment_id: en.id },
+    enrollment_id: en.id,
+    run_at: now,
+    scope: "org",
+  });
+  return en.id as string;
+}
+
+export const resetEnrollment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ enrollment_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await resetOne(context.supabase, data.enrollment_id);
+    return { ok: true };
+  });
+
+export const resetEnrollmentsBulk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      campaign_id: z.string().uuid(),
+      scope: z.enum(["completed", "failed", "all_finished"]).default("completed"),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const statuses = (data.scope === "all_finished"
+      ? ["completed", "failed", "paused"]
+      : data.scope === "failed" ? ["failed"] : ["completed"]) as Array<"completed" | "failed" | "paused">;
+    const { data: rows } = await supabase
+      .from("campaign_enrollments")
+      .select("id")
+      .eq("campaign_id", data.campaign_id)
+      .in("status", statuses)
+      .limit(500);
+    let done = 0;
+    let failed = 0;
+    for (const r of (rows ?? []) as Array<{ id: string }>) {
+      try { await resetOne(supabase, r.id); done += 1; }
+      catch { failed += 1; }
+    }
+    return { ok: true, reset: done, failed };
   });
 
 export const getCampaignExecutorStats = createServerFn({ method: "POST" })
