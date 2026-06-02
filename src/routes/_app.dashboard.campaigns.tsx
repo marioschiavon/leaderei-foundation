@@ -750,6 +750,28 @@ function ExecutionsDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const resetFn = useServerFn(resetEnrollment);
+  const resetBulkFn = useServerFn(resetEnrollmentsBulk);
+  const resetMut = useMutation({
+    mutationFn: (id: string) => resetFn({ data: { enrollment_id: id } }),
+    onSuccess: () => {
+      toast.success("Lead reiniciado no fluxo.");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const resetBulkMut = useMutation({
+    mutationFn: (scope: "completed" | "failed" | "all_finished") =>
+      resetBulkFn({ data: { campaign_id: campaignId, scope } }),
+    onSuccess: (res: any) => {
+      toast.success(`${res?.reset ?? 0} leads reiniciados${res?.failed ? ` (${res.failed} falharam)` : ""}.`);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["campaign-exec-stats", campaignId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const tickFn = useServerFn(forceFlowTick);
   const tickMut = useMutation({
     mutationFn: () => tickFn(),
