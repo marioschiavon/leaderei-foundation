@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/brand/Logo";
 import { signOut, useAuthSession, useIsMaster } from "@/lib/auth";
 import { getMyContext, getLeadsNeedingReviewCount } from "@/lib/tenant.functions";
+import { getFailedEnrollmentsCount } from "@/lib/campaigns.functions";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
