@@ -1028,6 +1028,10 @@ function stepLabel(step: { type: string | null; config?: any } | null | undefine
       return "Condição";
     case "update_lead":
       return "Atualizar lead";
+    case "end": {
+      const reason = String(cfg.reason ?? "").trim();
+      return reason ? `Fim: ${reason}` : "Fim do fluxo";
+    }
     default:
       return step.type;
   }
@@ -1041,10 +1045,18 @@ function formatNextRun(iso: string | null | undefined): string {
   return formatDistanceToNow(d, { locale: ptBR, addSuffix: true });
 }
 
-function computeBlocker(r: any): { text: string; tone: "warn" | "danger" | "muted"; title?: string } | null {
+function computeBlocker(r: any): { text: string; tone: "warn" | "danger" | "muted" | "success"; title?: string } | null {
   if (r.status === "failed") return { text: "Falhou", tone: "danger", title: r.last_error ?? undefined };
   if (r.status === "paused") return { text: "Pausado manualmente", tone: "muted" };
-  if (r.status === "completed") return null;
+  if (r.status === "completed") {
+    if (r.ended_on_end_node) {
+      return { text: r.end_reason ? `Concluído · ${r.end_reason}` : "Concluído", tone: "success" };
+    }
+    if (r.last_error && /sem nó Fim/i.test(r.last_error)) {
+      return { text: "Encerrado sem nó Fim", tone: "warn", title: "O fluxo terminou porque o passo atual não tem próximo nó. Adicione um nó Fim no Builder." };
+    }
+    return { text: "Concluído", tone: "success" };
+  }
   if (r.status === "active") {
     if (!r.current_step_id) return { text: "Sem passo atual", tone: "danger" };
     if (r.is_overdue) return { text: "Aguardando worker", tone: "warn", title: "next_run_at vencido — cron não processou ainda" };
