@@ -1221,8 +1221,125 @@ function ConfigPanel({
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
+  if (node.type === "calcom_check_availability")
+    return <CalEventTypePanel node={node} onChange={onChange} kind="check" />;
+  if (node.type === "calcom_book_meeting")
+    return <CalBookMeetingPanel node={node} onChange={onChange} />;
+  if (node.type === "calcom_cancel_booking")
+    return <CalCancelPanel node={node} onChange={onChange} />;
+  if (node.type === "calcom_reschedule_booking")
+    return <CalEventTypePanel node={node} onChange={onChange} kind="reschedule" />;
   if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
+}
+
+function CalEventTypePanel({
+  node, onChange, kind,
+}: { node: StepNode; onChange: (p: Record<string, any>) => void; kind: "check" | "reschedule" }) {
+  const cfg = node.data.config as any;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-et">ID do event type (Cal.com)</Label>
+        <Input
+          id="cal-et"
+          type="number"
+          min={1}
+          value={cfg.event_type_id ?? 0}
+          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
+          placeholder="Ex.: 123456"
+        />
+        <p className="text-xs text-muted-foreground">
+          Em Integrações → Cal.com, clique em "Sincronizar event types" para listar os disponíveis.
+        </p>
+      </div>
+      {kind === "check" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cal-window">Janela de busca (dias)</Label>
+          <Input
+            id="cal-window"
+            type="number"
+            min={1}
+            max={60}
+            value={cfg.window_days ?? 7}
+            onChange={(e) => onChange({ window_days: Number(e.target.value) })}
+          />
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Saída <strong>Tem horário</strong>: segue o fluxo. Saída <strong>Sem horário</strong>: ramo alternativo (ex.: avisar lead).
+      </p>
+    </div>
+  );
+}
+
+function CalBookMeetingPanel({
+  node, onChange,
+}: { node: StepNode; onChange: (p: Record<string, any>) => void }) {
+  const cfg = node.data.config as any;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-bt-et">ID do event type (Cal.com)</Label>
+        <Input
+          id="cal-bt-et"
+          type="number"
+          min={1}
+          value={cfg.event_type_id ?? 0}
+          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Estratégia de escolha do horário</Label>
+        <Select value={cfg.slot_strategy ?? "first_available"} onValueChange={(v) => onChange({ slot_strategy: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="first_available">Primeiro horário disponível</SelectItem>
+            <SelectItem value="ai_decided">IA decide (futuro — usa primeiro disponível)</SelectItem>
+            <SelectItem value="lead_picks_link">Lead escolhe via link</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-retry">Se reunião for cancelada, retomar fluxo após (dias úteis)</Label>
+        <Input
+          id="cal-retry"
+          type="number"
+          min={0}
+          max={60}
+          value={cfg.cancel_retry_business_days ?? 3}
+          onChange={(e) => onChange({ cancel_retry_business_days: Number(e.target.value) })}
+        />
+        <p className="text-xs text-muted-foreground">0 = retoma imediatamente.</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Usa o email do lead. Saída <strong>Agendado</strong>: continua. Saída <strong>Falhou</strong>: sem slot/erro.
+      </p>
+    </div>
+  );
+}
+
+function CalCancelPanel({
+  node, onChange,
+}: { node: StepNode; onChange: (p: Record<string, any>) => void }) {
+  const cfg = node.data.config as any;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="cal-reason">Motivo do cancelamento (template)</Label>
+        <Textarea
+          id="cal-reason"
+          rows={3}
+          value={cfg.reason_template ?? ""}
+          onChange={(e) => onChange({ reason_template: e.target.value })}
+          placeholder="Ex.: Reunião cancelada por inatividade do lead."
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Cancela a reunião ativa mais recente do lead. Suporta variáveis tipo <code>{`{{ lead.first_name }}`}</code>.
+      </p>
+    </div>
+  );
 }
 
 function EndPanel({
