@@ -600,20 +600,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         target: t.to_step_id,
         sourceHandle: t.branch === "next" ? null : t.branch,
         type: "smoothstep",
-        label: t.branch === "yes" ? "Sim" : t.branch === "no" ? "Não" : undefined,
-        style: {
-          stroke:
-            t.branch === "yes"
-              ? COLORS.yes
-              : t.branch === "no"
-              ? COLORS.no
-              : COLORS.edge,
-          strokeWidth: 2,
-        },
-        labelStyle: {
-          fill: t.branch === "yes" ? COLORS.yes : t.branch === "no" ? COLORS.no : COLORS.edge,
-          fontWeight: 600,
-        },
+        label: branchLabel(t.branch),
+        style: { stroke: branchColor(t.branch), strokeWidth: 2 },
+        labelStyle: { fill: branchColor(t.branch), fontWeight: 600 },
       })),
     );
     setDirty(false);
@@ -648,10 +637,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         return;
       }
       const sourceNode = nodes.find((n) => n.id === conn.source);
-      const isCondition = sourceNode?.type === "condition_replied";
-      let branch: "next" | "yes" | "no" = "next";
-      if (isCondition) {
-        branch = (conn.sourceHandle as "yes" | "no") ?? "yes";
+      let branch: string = (conn.sourceHandle as string) ?? "next";
+      if (sourceNode?.type === "condition_replied" && branch === "next") {
+        branch = "yes";
       }
       // Check if branch already used
       const existing = edges.find(
@@ -669,15 +657,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         target: conn.target,
         sourceHandle: branch === "next" ? null : branch,
         type: "smoothstep",
-        label: branch === "yes" ? "Sim" : branch === "no" ? "Não" : undefined,
-        style: {
-          stroke:
-            branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-          strokeWidth: 2,
-        },
-        labelStyle: {
-          fill: branch === "yes" ? COLORS.yes : branch === "no" ? COLORS.no : COLORS.edge,
-          fontWeight: 600,
+        label: branchLabel(branch),
+        style: { stroke: branchColor(branch), strokeWidth: 2 },
+        labelStyle: { fill: branchColor(branch), fontWeight: 600 },
         },
       };
       setEdges((eds) => addEdge(newEdge, eds));
