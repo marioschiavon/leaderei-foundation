@@ -1135,7 +1135,48 @@ function ConfigPanel({
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
+  if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
+}
+
+function EndPanel({
+  node,
+  onChange,
+}: {
+  node: StepNode;
+  onChange: (patch: Record<string, any>) => void;
+}) {
+  const cfg = node.data.config as { reason?: string };
+  const presets = ["Convertido", "Sem resposta", "Desinteresse", "Reagendar mais tarde"];
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="end-reason">Motivo do encerramento (opcional)</Label>
+        <Input
+          id="end-reason"
+          value={cfg.reason ?? ""}
+          onChange={(e) => onChange({ reason: e.target.value })}
+          placeholder="Ex.: Convertido"
+          maxLength={160}
+        />
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {presets.map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange({ reason: p })}
+            className="rounded-md border bg-background px-2 py-0.5 text-xs hover:bg-muted"
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Quando o lead chega aqui, a execução termina. Você pode reiniciá-la depois pelo diálogo de Execuções.
+      </p>
+    </div>
+  );
 }
 
 function WhatsAppPanel({
