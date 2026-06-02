@@ -44,6 +44,8 @@ import {
   listCampaignEnrollments,
   pauseEnrollment,
   resumeEnrollment,
+  resetEnrollment,
+  resetEnrollmentsBulk,
   activateCampaign,
   getCampaignExecutorStats,
   listEligibleLeadsForCampaign,
