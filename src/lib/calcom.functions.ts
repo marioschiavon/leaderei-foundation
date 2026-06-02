@@ -37,6 +37,7 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
         connection: null,
         has_key: false,
         has_webhook_secret: false,
+        webhook_secret: null as string | null,
         webhook_url: null,
         event_types_count: 0,
       };
@@ -55,6 +56,7 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
         connection: null,
         has_key: false,
         has_webhook_secret: false,
+        webhook_secret: null as string | null,
         webhook_url: webhookUrlFor(organization_id),
         event_types_count: 0,
       };
@@ -67,7 +69,8 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
       .eq("integration_id", conn.id);
 
     const hasKey = (creds ?? []).some((c) => c.key === "api_key" && !!c.value_encrypted);
-    const hasSecret = (creds ?? []).some((c) => c.key === "webhook_secret" && !!c.value_encrypted);
+    const secretRow = (creds ?? []).find((c) => c.key === "webhook_secret");
+    const webhookSecret = (secretRow?.value_encrypted as string | null) ?? null;
 
     const { count } = await supabase
       .from("cal_event_types_cache")
@@ -78,10 +81,56 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
       provider_id: provider.id,
       connection: conn,
       has_key: hasKey,
-      has_webhook_secret: hasSecret,
+      has_webhook_secret: !!webhookSecret,
+      webhook_secret: webhookSecret,
       webhook_url: webhookUrlFor(organization_id),
       event_types_count: count ?? 0,
     };
+  });
+
+// ---------------------------------------------------------------------------
+// Regenerate webhook secret
+// ---------------------------------------------------------------------------
+
+export const regenerateCalcomWebhookSecret = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const organization_id = await getActiveOrgId(supabase, userId);
+
+    const { data: provider } = await supabase
+      .from("integration_providers")
+      .select("id")
+      .eq("slug", "cal_com")
+      .maybeSingle();
+    if (!provider) throw new Error("Provider 'cal_com' não cadastrado.");
+
+    const { data: conn } = await supabase
+      .from("organization_integrations")
+      .select("id")
+      .eq("organization_id", organization_id)
+      .eq("provider_id", provider.id)
+      .maybeSingle();
+    if (!conn) throw new Error("Cal.com não está conectado. Salve a API key antes.");
+
+    const bytes = new Uint8Array(32);
+    (globalThis.crypto as Crypto).getRandomValues(bytes);
+    const secret = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const { error } = await supabase.from("integration_credentials").upsert(
+      {
+        organization_id,
+        integration_id: conn.id,
+        key: "webhook_secret",
+        value_encrypted: secret,
+        metadata: {} as any,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "integration_id,key" },
+    );
+    if (error) throw new Error(error.message);
+
+    return { ok: true, webhook_secret: secret };
   });
 
 function webhookUrlFor(org: string): string {
