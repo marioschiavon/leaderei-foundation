@@ -108,9 +108,10 @@ async function findNextStep(
 async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
   const now = new Date();
   const lead = await loadLead(en.lead_id);
+  const first_name = (lead.full_name ?? "").split(" ")[0];
   const vars = {
-    lead,
-    first_name: (lead.full_name ?? "").split(" ")[0],
+    lead: { ...lead, first_name },
+    first_name,
     full_name: lead.full_name,
     company: lead.company_name,
     job_title: lead.job_title,
