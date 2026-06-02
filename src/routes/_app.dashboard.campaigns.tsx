@@ -27,6 +27,8 @@ import {
   PauseCircle,
   RefreshCw,
   Users,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import {
