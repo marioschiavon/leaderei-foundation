@@ -34,7 +34,6 @@ import {
   ArchiveRestore,
   UserMinus,
   UserPlus,
-  Workflow as WorkflowIcon,
   type LucideIcon,
 } from "lucide-react";
 import {
