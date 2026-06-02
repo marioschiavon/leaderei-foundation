@@ -145,7 +145,10 @@ function webhookUrlFor(org: string): string {
 // ---------------------------------------------------------------------------
 
 const SaveSchema = z.object({
-  api_key: z.string().trim().min(10).max(400),
+  api_key: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().trim().min(10).max(400).optional(),
+  ),
   default_event_type_id: z.number().int().positive().optional(),
 });
 
