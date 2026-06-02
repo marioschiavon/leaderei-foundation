@@ -30,6 +30,11 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
+  Trash2,
+  ArchiveRestore,
+  UserMinus,
+  UserPlus,
+  Workflow as WorkflowIcon,
   type LucideIcon,
 } from "lucide-react";
 import {
