@@ -462,6 +462,7 @@ function CalcomConnectionDialog({
     if (open) {
       setApiKey("");
       setShowSecret(false);
+      setWebhookTest({ state: "idle" });
     }
   }, [open]);
 
