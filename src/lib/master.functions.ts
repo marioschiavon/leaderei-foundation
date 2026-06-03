@@ -401,7 +401,8 @@ export const listWebhookEventsForMaster = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
-    const orgIds = Array.from(new Set((rows ?? []).map((r) => r.organization_id).filter(Boolean)));
+    const orgIds = Array.from(new Set((rows ?? []).map((r) => r.organization_id).filter(Boolean))) as string[];
+
     const orgsRes = orgIds.length
       ? await supabaseAdmin.from("organizations").select("id, name").in("id", orgIds)
       : { data: [] as any[], error: null };
