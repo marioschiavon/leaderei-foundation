@@ -486,19 +486,21 @@ function CalSimpleNode({
 }: NodeProps<StepNode> & { icon: any; label: string; helper?: string }) {
   const cfg = data.config as { event_type_id?: number };
   const hasEvent = !!(cfg.event_type_id && cfg.event_type_id > 0);
+  const etLabel = useEventTypeLabel(cfg.event_type_id);
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={Icon} label={label} />
       <div style={{ padding: "10px 12px", fontSize: 12 }}>
         <div style={{ color: hasEvent ? COLORS.text : COLORS.muted, fontStyle: hasEvent ? "normal" : "italic" }}>
-          {hasEvent ? `Event type #${cfg.event_type_id}` : helper ?? "Configure o event type"}
+          {hasEvent ? (etLabel ?? `Reunião #${cfg.event_type_id}`) : helper ?? "Selecione a reunião"}
         </div>
       </div>
       <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
     </NodeShell>
   );
 }
+
 
 function useEventTypeLabel(eventTypeId: number | undefined | null) {
   const listFn = useServerFn(listCalcomEventTypes);
