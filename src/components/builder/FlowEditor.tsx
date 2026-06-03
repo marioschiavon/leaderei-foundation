@@ -72,6 +72,9 @@ import {
   renameBuilderDocument,
   deleteBuilderDocument,
 } from "@/lib/builder.functions";
+import { listCalcomEventTypes, syncCalcomEventTypes } from "@/lib/calcom.functions";
+import { Link } from "@tanstack/react-router";
+
 
 export default function BuilderEditorPage({ documentId }: { documentId: string }) {
   return (
@@ -483,13 +486,14 @@ function CalSimpleNode({
 }: NodeProps<StepNode> & { icon: any; label: string; helper?: string }) {
   const cfg = data.config as { event_type_id?: number };
   const hasEvent = !!(cfg.event_type_id && cfg.event_type_id > 0);
+  const etLabel = useEventTypeLabel(cfg.event_type_id);
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={Icon} label={label} />
       <div style={{ padding: "10px 12px", fontSize: 12 }}>
         <div style={{ color: hasEvent ? COLORS.text : COLORS.muted, fontStyle: hasEvent ? "normal" : "italic" }}>
-          {hasEvent ? `Event type #${cfg.event_type_id}` : helper ?? "Configure o event type"}
+          {hasEvent ? (etLabel ?? `Reunião #${cfg.event_type_id}`) : helper ?? "Selecione a reunião"}
         </div>
       </div>
       <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
@@ -497,13 +501,29 @@ function CalSimpleNode({
   );
 }
 
+
+function useEventTypeLabel(eventTypeId: number | undefined | null) {
+  const listFn = useServerFn(listCalcomEventTypes);
+  const { data } = useQuery({
+    queryKey: ["calcom-event-types"],
+    queryFn: () => listFn(),
+    staleTime: 60_000,
+  });
+  if (!eventTypeId || eventTypeId <= 0) return null;
+  const match = (data ?? []).find((et: any) => Number(et.cal_event_type_id) === Number(eventTypeId));
+  if (!match) return `Reunião #${eventTypeId}`;
+  return match.length_minutes ? `${match.title} · ${match.length_minutes}min` : match.title;
+}
+
 function CalCheckAvailabilityNode(props: NodeProps<StepNode>) {
+  const cfg = props.data.config as any;
+  const label = useEventTypeLabel(cfg.event_type_id);
   return (
     <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={CalendarSearch} label="Consultar agenda" />
       <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
-        Janela: {(props.data.config as any).window_days ?? 7} dias · event #{(props.data.config as any).event_type_id ?? "—"}
+        Janela: {cfg.window_days ?? 7} dias{label ? ` · ${label}` : " · selecione a reunião"}
       </div>
       <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
@@ -520,12 +540,14 @@ function CalCheckAvailabilityNode(props: NodeProps<StepNode>) {
 }
 
 function CalBookMeetingNode(props: NodeProps<StepNode>) {
+  const cfg = props.data.config as any;
+  const label = useEventTypeLabel(cfg.event_type_id);
   return (
     <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={CalendarCheck} label="Agendar reunião" />
       <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
-        event #{(props.data.config as any).event_type_id ?? "—"} · {(props.data.config as any).slot_strategy ?? "first_available"}
+        {label ?? "Selecione a reunião"} · {cfg.slot_strategy ?? "first_available"}
       </div>
       <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
@@ -535,6 +557,7 @@ function CalBookMeetingNode(props: NodeProps<StepNode>) {
         <div style={{ position: "relative", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
           Falhou
           <Handle type="source" id="failed" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.no, border: "2px solid #fff", width: 12, height: 12 }} />
+
         </div>
       </div>
     </NodeShell>
@@ -1233,6 +1256,113 @@ function ConfigPanel({
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
+function CalEventTypeSelect({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (id: number) => void;
+}) {
+  const listFn = useServerFn(listCalcomEventTypes);
+  const syncFn = useServerFn(syncCalcomEventTypes);
+  const qc = useQueryClient();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["calcom-event-types"],
+    queryFn: () => listFn(),
+    staleTime: 60_000,
+  });
+  const syncMutation = useMutation({
+    mutationFn: () => syncFn(),
+    onSuccess: (res: any) => {
+      toast.success(`Sincronizados ${res?.count ?? 0} tipo(s) de reunião`);
+      qc.invalidateQueries({ queryKey: ["calcom-event-types"] });
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? "Falha ao sincronizar. Conecte o Cal.com em Integrações.");
+    },
+  });
+
+  const list = data ?? [];
+  const notConnected = !!error;
+  const latestSync = list.length > 0 ? list[0].synced_at : null;
+
+  // Auto-select if only one event type and value not set
+  useEffect(() => {
+    if ((!value || value <= 0) && list.length === 1) {
+      onChange(Number(list[0].cal_event_type_id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.length]);
+
+  if (notConnected) {
+    return (
+      <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        <p className="font-medium">Cal.com não conectado.</p>
+        <Link to="/dashboard/integrations" className="inline-flex underline">
+          Ir para Integrações →
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <div className="text-xs text-muted-foreground">Carregando reuniões…</div>;
+  }
+
+  if (list.length === 0) {
+    return (
+      <div className="space-y-2 rounded-md border border-dashed bg-muted/30 p-3 text-xs">
+        <p>Nenhum tipo de reunião sincronizado ainda.</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={syncMutation.isPending}
+          onClick={() => syncMutation.mutate()}
+        >
+          {syncMutation.isPending ? "Sincronizando…" : "Sincronizar agora"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Select
+        value={value && value > 0 ? String(value) : ""}
+        onValueChange={(v) => onChange(Number(v))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione o tipo de reunião" />
+        </SelectTrigger>
+        <SelectContent>
+          {list.map((et: any) => (
+            <SelectItem key={et.cal_event_type_id} value={String(et.cal_event_type_id)}>
+              {et.title}
+              {et.length_minutes ? ` · ${et.length_minutes}min` : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>
+          {latestSync
+            ? `Sincronizado ${new Date(latestSync).toLocaleString("pt-BR")}`
+            : "Lista sincronizada do Cal.com"}
+        </span>
+        <button
+          type="button"
+          className="underline disabled:opacity-50"
+          disabled={syncMutation.isPending}
+          onClick={() => syncMutation.mutate()}
+        >
+          {syncMutation.isPending ? "Sincronizando…" : "Re-sincronizar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CalEventTypePanel({
   node, onChange, kind,
 }: { node: StepNode; onChange: (p: Record<string, any>) => void; kind: "check" | "reschedule" }) {
@@ -1240,18 +1370,11 @@ function CalEventTypePanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label htmlFor="cal-et">ID do event type (Cal.com)</Label>
-        <Input
-          id="cal-et"
-          type="number"
-          min={1}
+        <Label>Tipo de reunião</Label>
+        <CalEventTypeSelect
           value={cfg.event_type_id ?? 0}
-          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
-          placeholder="Ex.: 123456"
+          onChange={(id) => onChange({ event_type_id: id })}
         />
-        <p className="text-xs text-muted-foreground">
-          Em Integrações → Cal.com, clique em "Sincronizar event types" para listar os disponíveis.
-        </p>
       </div>
       {kind === "check" && (
         <div className="space-y-1.5">
@@ -1280,13 +1403,10 @@ function CalBookMeetingPanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label htmlFor="cal-bt-et">ID do event type (Cal.com)</Label>
-        <Input
-          id="cal-bt-et"
-          type="number"
-          min={1}
+        <Label>Tipo de reunião</Label>
+        <CalEventTypeSelect
           value={cfg.event_type_id ?? 0}
-          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
+          onChange={(id) => onChange({ event_type_id: id })}
         />
       </div>
       <div className="space-y-1.5">
@@ -1318,6 +1438,7 @@ function CalBookMeetingPanel({
     </div>
   );
 }
+
 
 function CalCancelPanel({
   node, onChange,
