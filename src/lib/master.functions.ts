@@ -431,8 +431,9 @@ export const listAuditLogsForMaster = createServerFn({ method: "POST" })
       .limit(100);
     if (error) throw new Error(error.message);
 
-    const userIds = Array.from(new Set((rows ?? []).map((r) => r.actor_user_id).filter(Boolean)));
-    const orgIds = Array.from(new Set((rows ?? []).map((r) => r.organization_id).filter(Boolean)));
+    const userIds = Array.from(new Set((rows ?? []).map((r) => r.actor_user_id).filter(Boolean))) as string[];
+    const orgIds = Array.from(new Set((rows ?? []).map((r) => r.organization_id).filter(Boolean))) as string[];
+
     const [profilesRes, orgsRes] = await Promise.all([
       userIds.length
         ? supabaseAdmin.from("profiles").select("user_id, full_name").in("user_id", userIds)
