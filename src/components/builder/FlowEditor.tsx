@@ -72,6 +72,9 @@ import {
   renameBuilderDocument,
   deleteBuilderDocument,
 } from "@/lib/builder.functions";
+import { listCalcomEventTypes, syncCalcomEventTypes } from "@/lib/calcom.functions";
+import { Link } from "@tanstack/react-router";
+
 
 export default function BuilderEditorPage({ documentId }: { documentId: string }) {
   return (
