@@ -1,36 +1,41 @@
-## Problema
+## Mudança
 
-O secret do webhook é gerado e gravado em `integration_credentials`, mas a UI nunca mostra o valor — só exibe "gerado/ausente". Sem o valor, não há como colar no campo "Secret" do Cal.com, então a verificação HMAC (`verifyCalcomSignature`) falha e o webhook não funciona.
+Trocar o campo **"ID do event type"** (input numérico) por um **Select amigável** que lista os event types já sincronizados da conta Cal.com, mostrando título + duração (ex.: "Reunião 30min · 30min"). Internamente continua salvando o `event_type_id` no `config` do nó — zero mudança no executor.
 
-O comentário atual ("Por segurança, o secret só é exibido na primeira configuração") é falso — ele nunca foi exibido.
+## Onde
 
-## Correção
+Nó por nó, no `ConfigPanel` do `src/components/builder/FlowEditor.tsx`:
 
-### 1. `src/lib/calcom.functions.ts` — `getCalcomConnection`
-- Retornar o valor do `webhook_secret` junto com `has_webhook_secret`.
-- Continua atrás de `requireSupabaseAuth` + filtro por org ativa, então só membros da organização leem.
+1. **Consultar agenda** (`calcom_check_availability`) — troca input por Select.
+2. **Agendar reunião** (`calcom_book_meeting`) — troca input por Select.
+3. **Reagendar reunião** (`calcom_reschedule_booking`) — troca input por Select.
+4. **Cancelar reunião** (`calcom_cancel_booking`) — não tem event type, sem mudança.
 
-### 2. Nova server function `regenerateCalcomWebhookSecret`
-- Gera novo secret (`makeWebhookSecret()`), faz upsert em `integration_credentials` (`key = webhook_secret`).
-- Útil quando o usuário suspeita que o atual vazou ou quando o webhook nunca foi configurado no Cal.com.
+Os campos **Estratégia de escolha do horário**, **Janela de busca (dias)** e **Retomar fluxo após (dias úteis)** ficam como estão.
 
-### 3. `CalcomConnectionDialog` (`src/routes/_app.dashboard.integrations.tsx`)
-- Trocar o bloco "gerado/ausente" por um campo real:
-  - `Input` readOnly com `type="password"` e botão olho para revelar.
-  - Botão de copiar (clipboard) ao lado.
-  - Botão "Gerar novo" chamando `regenerateCalcomWebhookSecret` (com `confirm()` avisando que invalida o atual).
-- Atualizar o texto de ajuda: explicar passo a passo (Cal.com → Settings → Developer → Webhooks → New Webhook → cola URL, cola Secret, marca os 3 eventos `BOOKING_CREATED/RESCHEDULED/CANCELLED`).
-- Se `has_webhook_secret` for false logo após salvar a API key (caso raro), mostrar botão "Gerar secret agora".
+## UX do Select
 
-### 4. Sem mudanças em
-- `src/routes/api/public/hooks/calcom.ts` — verificação HMAC já está correta (hex, timing-safe).
-- Migration / RLS — `integration_credentials` já está protegido por org.
-- Fluxo de salvar a API key — secret continua sendo gerado automaticamente na primeira conexão.
+- **Vazio (nenhum event type sincronizado)**: Select desabilitado + alerta inline com botão **"Sincronizar agora"** que chama `syncCalcomEventTypes` e refaz o `listCalcomEventTypes`.
+- **Cal.com não conectado**: alerta "Conecte o Cal.com em Integrações" com link pra `/dashboard/integrations`.
+- **Lista carregada**: cada opção mostra `título · Xmin` (ex.: "Demo · 45min"). Valor selecionado = `cal_event_type_id`.
+- **Pré-seleção**: se `cfg.event_type_id` ainda for `0` (padrão) e existir só 1 event type, pré-seleciona ele automaticamente ao abrir o painel.
+- Pequeno texto auxiliar: "Sincronizado em <data>. [Re-sincronizar]" (link que chama `syncCalcomEventTypes`).
+
+## Implementação
+
+- Novo componente local `CalEventTypeSelect` em `FlowEditor.tsx` que:
+  - Usa `useQuery(['calcom-event-types'], () => listCalcomEventTypes())` para carregar a lista (cache compartilhado entre os 3 painéis).
+  - Trata os 3 estados: não-conectado / vazio / com dados.
+  - Aceita `value: number`, `onChange: (id: number) => void`.
+- Refatora `CalEventTypePanel` e `CalBookMeetingPanel` para usar `CalEventTypeSelect` no lugar do `<Input type="number">`.
+- Reaproveita a mutation de sync via `useMutation(syncCalcomEventTypes)` com invalidate da query.
 
 ## Fora deste plano
 
-O erro `Cal.com [404] /v2/event-types` na sincronização é um bug separado do endpoint v2 (path/headers do `syncCalcomEventTypes`). Posso tratar em seguida; me avise se quer incluir agora.
+- "Padrão global" em Integrações — não é necessário, o Select cobre o caso.
+- Edição/criação de event types dentro do app — continua sendo no Cal.com.
 
 ## Arquivos tocados
-- `src/lib/calcom.functions.ts` (modificado)
-- `src/routes/_app.dashboard.integrations.tsx` (modificado, só o `CalcomConnectionDialog`)
+
+- `src/components/builder/FlowEditor.tsx` (substitui inputs dos 3 painéis Cal.com, adiciona componente `CalEventTypeSelect`).
+- Nenhuma migration. Nenhuma mudança em server functions (já existem `listCalcomEventTypes` e `syncCalcomEventTypes`).
