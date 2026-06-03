@@ -144,12 +144,15 @@ export const listEligibleLeadsForCampaign = createServerFn({ method: "POST" })
 
     const { data: campaign } = await supabase
       .from("campaigns").select("id, organization_id, channel").eq("id", data.campaign_id).maybeSingle();
-    if (!campaign || campaign.organization_id !== orgId) throw new Error("Campanha não encontrada.");
+    if (!campaign) throw new Error("Campanha não encontrada.");
+    // Use the campaign's org (RLS already validated membership) — avoids false negatives
+    // when the user belongs to multiple orgs and getCallerOrgId returned a different one.
+    const campaignOrgId = campaign.organization_id as string;
 
     const { data: leads } = await supabase
       .from("leads")
       .select("id, full_name, email, phone, company_name")
-      .eq("organization_id", orgId)
+      .eq("organization_id", campaignOrgId)
       .is("archived_at", null)
       .order("full_name", { ascending: true })
       .limit(5000);
