@@ -325,3 +325,38 @@ function formatBR(iso?: string): string {
     return iso;
   }
 }
+
+function safeParse(raw: string): any {
+  try { return JSON.parse(raw); } catch { return { raw: raw?.slice(0, 2000) ?? null }; }
+}
+
+async function logWebhook(input: {
+  source: string;
+  organization_id: string | null;
+  status: "received" | "processed" | "failed" | "ignored";
+  http_status: number;
+  payload: any;
+  headers: any;
+  event_type: string | null;
+  error?: string;
+  cal_booking_uid?: string | null;
+  instance_id?: string | null;
+}) {
+  try {
+    await supabaseAdmin.from("webhook_events").insert({
+      source: input.source,
+      organization_id: input.organization_id,
+      status: input.status,
+      http_status: input.http_status,
+      event_type: input.event_type,
+      error: input.error ?? null,
+      cal_booking_uid: input.cal_booking_uid ?? null,
+      instance_id: input.instance_id ?? null,
+      payload: input.payload ?? {},
+      headers: input.headers ?? {},
+    });
+  } catch (e) {
+    console.error("[webhook_events insert]", e);
+  }
+}
+
