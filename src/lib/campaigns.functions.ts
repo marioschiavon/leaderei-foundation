@@ -152,7 +152,7 @@ export const listEligibleLeadsForCampaign = createServerFn({ method: "POST" })
     const { data: leads } = await supabase
       .from("leads")
       .select("id, full_name, email, phone, company_name")
-      .eq("organization_id", orgId)
+      .eq("organization_id", campaignOrgId)
       .is("archived_at", null)
       .order("full_name", { ascending: true })
       .limit(5000);
