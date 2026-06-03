@@ -1256,6 +1256,113 @@ function ConfigPanel({
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
+function CalEventTypeSelect({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (id: number) => void;
+}) {
+  const listFn = useServerFn(listCalcomEventTypes);
+  const syncFn = useServerFn(syncCalcomEventTypes);
+  const qc = useQueryClient();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["calcom-event-types"],
+    queryFn: () => listFn(),
+    staleTime: 60_000,
+  });
+  const syncMutation = useMutation({
+    mutationFn: () => syncFn(),
+    onSuccess: (res: any) => {
+      toast.success(`Sincronizados ${res?.count ?? 0} tipo(s) de reunião`);
+      qc.invalidateQueries({ queryKey: ["calcom-event-types"] });
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? "Falha ao sincronizar. Conecte o Cal.com em Integrações.");
+    },
+  });
+
+  const list = data ?? [];
+  const notConnected = !!error;
+  const latestSync = list.length > 0 ? list[0].synced_at : null;
+
+  // Auto-select if only one event type and value not set
+  useEffect(() => {
+    if ((!value || value <= 0) && list.length === 1) {
+      onChange(Number(list[0].cal_event_type_id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.length]);
+
+  if (notConnected) {
+    return (
+      <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        <p className="font-medium">Cal.com não conectado.</p>
+        <Link to="/dashboard/integrations" className="inline-flex underline">
+          Ir para Integrações →
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <div className="text-xs text-muted-foreground">Carregando reuniões…</div>;
+  }
+
+  if (list.length === 0) {
+    return (
+      <div className="space-y-2 rounded-md border border-dashed bg-muted/30 p-3 text-xs">
+        <p>Nenhum tipo de reunião sincronizado ainda.</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={syncMutation.isPending}
+          onClick={() => syncMutation.mutate()}
+        >
+          {syncMutation.isPending ? "Sincronizando…" : "Sincronizar agora"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Select
+        value={value && value > 0 ? String(value) : ""}
+        onValueChange={(v) => onChange(Number(v))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione o tipo de reunião" />
+        </SelectTrigger>
+        <SelectContent>
+          {list.map((et: any) => (
+            <SelectItem key={et.cal_event_type_id} value={String(et.cal_event_type_id)}>
+              {et.title}
+              {et.length_minutes ? ` · ${et.length_minutes}min` : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>
+          {latestSync
+            ? `Sincronizado ${new Date(latestSync).toLocaleString("pt-BR")}`
+            : "Lista sincronizada do Cal.com"}
+        </span>
+        <button
+          type="button"
+          className="underline disabled:opacity-50"
+          disabled={syncMutation.isPending}
+          onClick={() => syncMutation.mutate()}
+        >
+          {syncMutation.isPending ? "Sincronizando…" : "Re-sincronizar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CalEventTypePanel({
   node, onChange, kind,
 }: { node: StepNode; onChange: (p: Record<string, any>) => void; kind: "check" | "reschedule" }) {
@@ -1263,18 +1370,11 @@ function CalEventTypePanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label htmlFor="cal-et">ID do event type (Cal.com)</Label>
-        <Input
-          id="cal-et"
-          type="number"
-          min={1}
+        <Label>Tipo de reunião</Label>
+        <CalEventTypeSelect
           value={cfg.event_type_id ?? 0}
-          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
-          placeholder="Ex.: 123456"
+          onChange={(id) => onChange({ event_type_id: id })}
         />
-        <p className="text-xs text-muted-foreground">
-          Em Integrações → Cal.com, clique em "Sincronizar event types" para listar os disponíveis.
-        </p>
       </div>
       {kind === "check" && (
         <div className="space-y-1.5">
@@ -1303,13 +1403,10 @@ function CalBookMeetingPanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label htmlFor="cal-bt-et">ID do event type (Cal.com)</Label>
-        <Input
-          id="cal-bt-et"
-          type="number"
-          min={1}
+        <Label>Tipo de reunião</Label>
+        <CalEventTypeSelect
           value={cfg.event_type_id ?? 0}
-          onChange={(e) => onChange({ event_type_id: Number(e.target.value) })}
+          onChange={(id) => onChange({ event_type_id: id })}
         />
       </div>
       <div className="space-y-1.5">
@@ -1341,6 +1438,7 @@ function CalBookMeetingPanel({
     </div>
   );
 }
+
 
 function CalCancelPanel({
   node, onChange,
