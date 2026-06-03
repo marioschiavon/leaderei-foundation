@@ -37,11 +37,20 @@ export const Route = createFileRoute("/api/public/hooks/calcom")({
       POST: async ({ request }) => {
         const url = new URL(request.url);
         const orgId = url.searchParams.get("org");
-        if (!orgId) return jres({ ok: false, error: "missing org" }, 400);
+        if (!orgId) {
+          await logWebhook({ source: "calcom", organization_id: null, status: "failed", http_status: 400, error: "missing org", payload: {}, headers: {}, event_type: null });
+          return jres({ ok: false, error: "missing org" }, 400);
+        }
 
         const rawBody = await request.text();
+        const headersSnapshot = {
+          "x-cal-signature-256": request.headers.get("x-cal-signature-256") ?? request.headers.get("X-Cal-Signature-256"),
+          "user-agent": request.headers.get("user-agent"),
+        };
+
         const conn = await loadCalcomConnection(orgId);
         if (!conn || !conn.webhook_secret) {
+          await logWebhook({ source: "calcom", organization_id: orgId, status: "failed", http_status: 401, error: "cal_com not configured", payload: safeParse(rawBody), headers: headersSnapshot, event_type: null });
           return jres({ ok: false, error: "cal_com not configured" }, 401);
         }
         const sig =
@@ -50,31 +59,43 @@ export const Route = createFileRoute("/api/public/hooks/calcom")({
           ?? request.headers.get("x-cal-signature");
 
         const ok = verifyCalcomSignature(rawBody, sig, conn.webhook_secret);
-        if (!ok) return jres({ ok: false, error: "invalid signature" }, 401);
+        if (!ok) {
+          await logWebhook({ source: "calcom", organization_id: orgId, status: "failed", http_status: 401, error: "invalid signature", payload: safeParse(rawBody), headers: headersSnapshot, event_type: null });
+          return jres({ ok: false, error: "invalid signature" }, 401);
+        }
 
         let body: any = null;
-        try { body = JSON.parse(rawBody); } catch { return jres({ ok: false, error: "bad json" }, 400); }
+        try { body = JSON.parse(rawBody); } catch {
+          await logWebhook({ source: "calcom", organization_id: orgId, status: "failed", http_status: 400, error: "bad json", payload: {}, headers: headersSnapshot, event_type: null });
+          return jres({ ok: false, error: "bad json" }, 400);
+        }
 
         const trigger: string = String(body?.triggerEvent ?? body?.event ?? "").toUpperCase();
         const payload: CalBookingPayload = body?.payload ?? body?.data ?? body ?? {};
+        const calBookingUid = String((payload as any)?.uid ?? (payload as any)?.bookingId ?? "") || null;
 
         try {
           if (trigger === "BOOKING_CREATED") {
             await handleBookingCreated(orgId, payload);
+            await logWebhook({ source: "calcom", organization_id: orgId, status: "processed", http_status: 200, payload: body, headers: headersSnapshot, event_type: trigger, cal_booking_uid: calBookingUid });
           } else if (trigger === "BOOKING_RESCHEDULED") {
             await handleBookingRescheduled(orgId, payload);
+            await logWebhook({ source: "calcom", organization_id: orgId, status: "processed", http_status: 200, payload: body, headers: headersSnapshot, event_type: trigger, cal_booking_uid: calBookingUid });
           } else if (trigger === "BOOKING_CANCELLED" || trigger === "BOOKING_CANCELED") {
             await handleBookingCancelled(orgId, payload);
+            await logWebhook({ source: "calcom", organization_id: orgId, status: "processed", http_status: 200, payload: body, headers: headersSnapshot, event_type: trigger, cal_booking_uid: calBookingUid });
           } else {
-            // ignore other triggers but ack
+            await logWebhook({ source: "calcom", organization_id: orgId, status: "ignored", http_status: 200, payload: body, headers: headersSnapshot, event_type: trigger || null, cal_booking_uid: calBookingUid });
           }
         } catch (e: any) {
           console.error("[calcom webhook]", trigger, e?.message);
+          await logWebhook({ source: "calcom", organization_id: orgId, status: "failed", http_status: 200, error: String(e?.message ?? e).slice(0, 500), payload: body, headers: headersSnapshot, event_type: trigger || null, cal_booking_uid: calBookingUid });
           // Still 200 so Cal.com doesn't keep retrying. Log only.
           return jres({ ok: false, error: String(e?.message ?? e).slice(0, 300) });
         }
         return jres({ ok: true });
       },
+
     },
   },
 });
@@ -304,3 +325,38 @@ function formatBR(iso?: string): string {
     return iso;
   }
 }
+
+function safeParse(raw: string): any {
+  try { return JSON.parse(raw); } catch { return { raw: raw?.slice(0, 2000) ?? null }; }
+}
+
+async function logWebhook(input: {
+  source: string;
+  organization_id: string | null;
+  status: "received" | "processed" | "failed" | "ignored";
+  http_status: number;
+  payload: any;
+  headers: any;
+  event_type: string | null;
+  error?: string;
+  cal_booking_uid?: string | null;
+  instance_id?: string | null;
+}) {
+  try {
+    await supabaseAdmin.from("webhook_events").insert({
+      source: input.source,
+      organization_id: input.organization_id,
+      status: input.status,
+      http_status: input.http_status,
+      event_type: input.event_type,
+      error: input.error ?? null,
+      cal_booking_uid: input.cal_booking_uid ?? null,
+      instance_id: input.instance_id ?? null,
+      payload: input.payload ?? {},
+      headers: input.headers ?? {},
+    });
+  } catch (e) {
+    console.error("[webhook_events insert]", e);
+  }
+}
+

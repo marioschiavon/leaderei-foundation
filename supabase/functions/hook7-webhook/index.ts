@@ -90,6 +90,8 @@ serve(async (req: Request) => {
       return ok200();
     }
 
+    let processStatus: "processed" | "ignored" | "failed" = "processed";
+    let processError: string | null = null;
     try {
       switch (event) {
         case "Message":
@@ -105,21 +107,41 @@ serve(async (req: Request) => {
           await handleLoggedOut(supabase, instance, body.data);
           break;
         case "ChatPresence":
-          // discard
+          processStatus = "ignored";
           break;
         case "SendMessage":
           // discard — o evento Message com IsFromMe:true já cobre o caso
           console.log("[hook7-webhook] SendMessage event ignored (handled via Message)", {
             instanceId: body.instanceId,
           });
+          processStatus = "ignored";
           break;
         default:
+          processStatus = "ignored";
           console.log("[hook7-webhook] unknown event", { event, instanceId: body.instanceId });
       }
     } catch (err) {
+      processStatus = "failed";
+      processError = String(err).slice(0, 500);
       console.error("[hook7-webhook] handler error", {
         event, instanceId, orgSlug, error: String(err),
       });
+    }
+
+    try {
+      await supabase.from("webhook_events").insert({
+        source: "hook7",
+        organization_id: instance.organization_id,
+        instance_id: instance.id,
+        event_type: String(event),
+        status: processStatus,
+        http_status: 200,
+        error: processError,
+        payload: body,
+        headers: { "user-agent": req.headers.get("user-agent") },
+      });
+    } catch (e) {
+      console.error("[webhook_events insert]", String(e));
     }
 
     return ok200();
@@ -128,6 +150,7 @@ serve(async (req: Request) => {
     return ok200();
   }
 });
+
 
 async function handleMessage(supabase: any, instance: any, data: any) {
   const info = data?.Info;

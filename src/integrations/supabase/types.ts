@@ -2241,6 +2241,51 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_events: {
+        Row: {
+          cal_booking_uid: string | null
+          error: string | null
+          event_type: string | null
+          headers: Json
+          http_status: number | null
+          id: string
+          instance_id: string | null
+          organization_id: string | null
+          payload: Json
+          received_at: string
+          source: string
+          status: string
+        }
+        Insert: {
+          cal_booking_uid?: string | null
+          error?: string | null
+          event_type?: string | null
+          headers?: Json
+          http_status?: number | null
+          id?: string
+          instance_id?: string | null
+          organization_id?: string | null
+          payload?: Json
+          received_at?: string
+          source: string
+          status?: string
+        }
+        Update: {
+          cal_booking_uid?: string | null
+          error?: string | null
+          event_type?: string | null
+          headers?: Json
+          http_status?: number | null
+          id?: string
+          instance_id?: string | null
+          organization_id?: string | null
+          payload?: Json
+          received_at?: string
+          source?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

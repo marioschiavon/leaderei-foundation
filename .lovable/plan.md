@@ -1,41 +1,99 @@
-## Mudança
 
-Trocar o campo **"ID do event type"** (input numérico) por um **Select amigável** que lista os event types já sincronizados da conta Cal.com, mostrando título + duração (ex.: "Reunião 30min · 30min"). Internamente continua salvando o `event_type_id` no `config` do nó — zero mudança no executor.
+# Master · Logs — implementação
 
-## Onde
+Substituir o placeholder atual de `/master/logs` por uma página real, com 4 abas. Acesso restrito a master admin (já garantido pelo layout `_master`). Cada aba lista os **últimos 100 registros** com auto-refresh a cada 30s e botão "Atualizar agora".
 
-Nó por nó, no `ConfigPanel` do `src/components/builder/FlowEditor.tsx`:
+## Estrutura da página
 
-1. **Consultar agenda** (`calcom_check_availability`) — troca input por Select.
-2. **Agendar reunião** (`calcom_book_meeting`) — troca input por Select.
-3. **Reagendar reunião** (`calcom_reschedule_booking`) — troca input por Select.
-4. **Cancelar reunião** (`calcom_cancel_booking`) — não tem event type, sem mudança.
+```text
+/master/logs
+├─ Tab: Emails        → tabela email_send_log
+├─ Tab: Fluxos        → tabela flow_step_runs
+├─ Tab: Webhooks      → tabela nova webhook_events
+└─ Tab: Auditoria     → tabela audit_logs
+```
 
-Os campos **Estratégia de escolha do horário**, **Janela de busca (dias)** e **Retomar fluxo após (dias úteis)** ficam como estão.
+Header com filtro de período (1h / 24h / 7d, default 24h) compartilhado pelas abas. Badge de contagem por aba (ex.: "Fluxos · 12 com erro nas últimas 24h").
 
-## UX do Select
+## Aba 1 — Emails
 
-- **Vazio (nenhum event type sincronizado)**: Select desabilitado + alerta inline com botão **"Sincronizar agora"** que chama `syncCalcomEventTypes` e refaz o `listCalcomEventTypes`.
-- **Cal.com não conectado**: alerta "Conecte o Cal.com em Integrações" com link pra `/dashboard/integrations`.
-- **Lista carregada**: cada opção mostra `título · Xmin` (ex.: "Demo · 45min"). Valor selecionado = `cal_event_type_id`.
-- **Pré-seleção**: se `cfg.event_type_id` ainda for `0` (padrão) e existir só 1 event type, pré-seleciona ele automaticamente ao abrir o painel.
-- Pequeno texto auxiliar: "Sincronizado em <data>. [Re-sincronizar]" (link que chama `syncCalcomEventTypes`).
+Fonte: `email_send_log` (já existe, RLS já é master-only).
 
-## Implementação
+Colunas: hora, status (badge colorido), purpose, destinatário, assunto, erro (se houver), provider message id.
 
-- Novo componente local `CalEventTypeSelect` em `FlowEditor.tsx` que:
-  - Usa `useQuery(['calcom-event-types'], () => listCalcomEventTypes())` para carregar a lista (cache compartilhado entre os 3 painéis).
-  - Trata os 3 estados: não-conectado / vazio / com dados.
-  - Aceita `value: number`, `onChange: (id: number) => void`.
-- Refatora `CalEventTypePanel` e `CalBookMeetingPanel` para usar `CalEventTypeSelect` no lugar do `<Input type="number">`.
-- Reaproveita a mutation de sync via `useMutation(syncCalcomEventTypes)` com invalidate da query.
+Filtros locais: status (queued/sent/failed/bounced/delivered) e purpose.
 
-## Fora deste plano
+Já existe `listEmailSendLogs` em `src/lib/platform.functions.ts` — reaproveitar, só ajustar default de `page_size` para 100.
 
-- "Padrão global" em Integrações — não é necessário, o Select cobre o caso.
-- Edição/criação de event types dentro do app — continua sendo no Cal.com.
+## Aba 2 — Fluxos (Builder)
 
-## Arquivos tocados
+Fonte: `flow_step_runs` (já existe). Join com `flow_steps` (tipo do nó) e `campaign_enrollments` → `leads` (nome do lead) e `campaigns` (nome da campanha) para contexto humano.
 
-- `src/components/builder/FlowEditor.tsx` (substitui inputs dos 3 painéis Cal.com, adiciona componente `CalEventTypeSelect`).
-- Nenhuma migration. Nenhuma mudança em server functions (já existem `listCalcomEventTypes` e `syncCalcomEventTypes`).
+Colunas: hora, campanha, lead, tipo do step, status (pending/success/failed), branch tomada, duração (finished_at − started_at), erro (expandível para ver `output` em JSON).
+
+Filtro local: status (todos / só falhas).
+
+Novo server fn: `listFlowStepRuns` em `src/lib/master.functions.ts` (master-only), com paginação.
+
+## Aba 3 — Webhooks
+
+**Não existe tabela de log de webhooks hoje.** Precisa criar.
+
+Nova tabela `webhook_events`:
+- `id uuid pk`
+- `received_at timestamptz default now()`
+- `source text` — `'calcom'` | `'hook7'` | outros
+- `event_type text` — ex.: `BOOKING_CREATED`, `Message`
+- `organization_id uuid null` (quando der pra inferir)
+- `instance_id uuid null` (Hook7) / `cal_booking_uid text null`
+- `status text` — `received` | `processed` | `failed` | `ignored`
+- `http_status int`
+- `error text null`
+- `payload jsonb` (corpo recebido, truncado a ~32KB)
+- `headers jsonb` (subset seguro: signature, user-agent)
+
+RLS: só master_admin (SELECT/ALL); INSERT permitido também para `service_role` (rotas públicas usam admin client). GRANT `SELECT/INSERT` para `authenticated` e `service_role` conforme padrão do projeto.
+
+Instrumentar as 2 rotas existentes para gravar 1 linha cada chamada:
+- `src/routes/api/public/hooks/calcom.ts`
+- `supabase/functions/hook7-webhook/index.ts` (existente; gravar usando service role)
+
+Colunas na UI: hora, source (badge), event_type, status, http_status, org (se houver), erro, botão "Ver payload" (dialog com JSON).
+
+Filtros locais: source e status.
+
+## Aba 4 — Auditoria
+
+Fonte: `audit_logs` (já existe, hoje vazia).
+
+Colunas: hora, ator (full_name do profile), ação, entity_type, entity_id, organização, IP. Expandir mostra diff `before`/`after`.
+
+Como hoje quase nada escreve nessa tabela, a aba mostra os 100 últimos registros existentes + `EmptyState` quando vazia, com texto explicativo: *"A captura de eventos administrativos (login, criação de organização, mudanças de plano) ainda não está plugada nas ações — entra junto com a Fase 2."*
+
+Sem instrumentação de novas ações neste passo (escopo fica só na UI de leitura). A instrumentação fica para uma task separada.
+
+## Detalhes técnicos
+
+**Server functions (master-only, em `src/lib/master.functions.ts`):**
+- `listEmailLogsForMaster({ since, status?, purpose? })` — usa o `listEmailSendLogs` já existente como base
+- `listFlowStepRunsForMaster({ since, onlyFailed? })`
+- `listWebhookEventsForMaster({ since, source?, status? })`
+- `listAuditLogsForMaster({ since })`
+
+Cada uma protegida por `requireSupabaseAuth` + verificação `has_role(master_admin)` (padrão já usado em `platform.functions.ts`). Retornam no máximo 100 linhas ordenadas por timestamp desc.
+
+**Rota:** atualizar `src/routes/_master.master.logs.tsx` para renderizar `<Tabs>` (shadcn) com 4 `TabsContent`. Cada aba é um componente próprio em `src/components/master/logs/*` para manter o arquivo de rota enxuto.
+
+**Migration única:**
+1. `CREATE TABLE public.webhook_events (...)` + GRANTs + RLS + policies (master-only SELECT/ALL, service_role INSERT).
+2. Index em `(received_at DESC)` e `(source, received_at DESC)`.
+
+**Instrumentação dos webhooks:** edits surgicais em `src/routes/api/public/hooks/calcom.ts` e em `supabase/functions/hook7-webhook/index.ts` para inserir 1 linha por chamada via `supabaseAdmin` / service role, encapsulada em try/catch para nunca derrubar a rota se o insert falhar.
+
+## Fora do escopo
+
+- Stream em tempo real (Realtime channel) — auto-refresh de 30s basta nesta fase
+- Export CSV — fica para depois se você pedir
+- Instrumentação ativa do `audit_logs` (login, mudanças de org/plano)
+- Retenção / TTL automático — pode rodar como cron job num momento futuro
+
