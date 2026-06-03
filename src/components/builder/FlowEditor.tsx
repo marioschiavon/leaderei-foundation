@@ -500,13 +500,28 @@ function CalSimpleNode({
   );
 }
 
+function useEventTypeLabel(eventTypeId: number | undefined | null) {
+  const listFn = useServerFn(listCalcomEventTypes);
+  const { data } = useQuery({
+    queryKey: ["calcom-event-types"],
+    queryFn: () => listFn(),
+    staleTime: 60_000,
+  });
+  if (!eventTypeId || eventTypeId <= 0) return null;
+  const match = (data ?? []).find((et: any) => Number(et.cal_event_type_id) === Number(eventTypeId));
+  if (!match) return `Reunião #${eventTypeId}`;
+  return match.length_minutes ? `${match.title} · ${match.length_minutes}min` : match.title;
+}
+
 function CalCheckAvailabilityNode(props: NodeProps<StepNode>) {
+  const cfg = props.data.config as any;
+  const label = useEventTypeLabel(cfg.event_type_id);
   return (
     <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={CalendarSearch} label="Consultar agenda" />
       <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
-        Janela: {(props.data.config as any).window_days ?? 7} dias · event #{(props.data.config as any).event_type_id ?? "—"}
+        Janela: {cfg.window_days ?? 7} dias{label ? ` · ${label}` : " · selecione a reunião"}
       </div>
       <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
@@ -523,12 +538,14 @@ function CalCheckAvailabilityNode(props: NodeProps<StepNode>) {
 }
 
 function CalBookMeetingNode(props: NodeProps<StepNode>) {
+  const cfg = props.data.config as any;
+  const label = useEventTypeLabel(cfg.event_type_id);
   return (
     <NodeShell selected={props.selected} isEntry={props.data.is_entry} hasError={!!props.data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
       <NodeHeader icon={CalendarCheck} label="Agendar reunião" />
       <div style={{ padding: "8px 12px 4px", fontSize: 11, color: COLORS.muted }}>
-        event #{(props.data.config as any).event_type_id ?? "—"} · {(props.data.config as any).slot_strategy ?? "first_available"}
+        {label ?? "Selecione a reunião"} · {cfg.slot_strategy ?? "first_available"}
       </div>
       <div style={{ padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ position: "relative", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#059669" }}>
@@ -538,6 +555,7 @@ function CalBookMeetingNode(props: NodeProps<StepNode>) {
         <div style={{ position: "relative", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
           Falhou
           <Handle type="source" id="failed" position={Position.Right} style={{ top: "50%", right: -6, background: COLORS.no, border: "2px solid #fff", width: 12, height: 12 }} />
+
         </div>
       </div>
     </NodeShell>
