@@ -589,6 +589,10 @@ function CalcomConnectionDialog({
                   <p className="text-2xs text-muted-foreground">
                     Em Cal.com → Settings → Developer → Webhooks. Marque os eventos: <strong>BOOKING_CREATED</strong>, <strong>BOOKING_RESCHEDULED</strong>, <strong>BOOKING_CANCELLED</strong>. Use o secret abaixo no campo "Secret".
                   </p>
+                  <p className="text-2xs text-amber-600">
+                    Já tinha um webhook configurado? O domínio oficial mudou para <code>app.leaderei.com.br</code>. Copie a URL acima e atualize no Cal.com.
+                  </p>
+
                 </div>
 
                 <div className="space-y-1.5">
