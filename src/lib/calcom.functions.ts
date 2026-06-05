@@ -57,7 +57,7 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
         has_key: false,
         has_webhook_secret: false,
         webhook_secret: null as string | null,
-        webhook_url: webhookUrlFor(organization_id),
+        webhook_url: await webhookUrlFor(organization_id),
         event_types_count: 0,
       };
     }
@@ -83,7 +83,7 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
       has_key: hasKey,
       has_webhook_secret: !!webhookSecret,
       webhook_secret: webhookSecret,
-      webhook_url: webhookUrlFor(organization_id),
+      webhook_url: await webhookUrlFor(organization_id),
       event_types_count: count ?? 0,
     };
   });
@@ -133,10 +133,27 @@ export const regenerateCalcomWebhookSecret = createServerFn({ method: "POST" })
     return { ok: true, webhook_secret: secret };
   });
 
-function webhookUrlFor(org: string): string {
-  const base = process.env.PUBLIC_APP_URL
+const DEFAULT_APP_BASE_URL = "https://app.leaderei.com.br";
+
+async function resolveAppBaseUrl(): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value_plain")
+      .eq("key", "app_public_url")
+      .maybeSingle();
+    const raw = (data?.value_plain as unknown);
+    const fromDb = typeof raw === "string" ? raw : (typeof raw === "object" && raw && "value" in (raw as any) ? String((raw as any).value ?? "") : "");
+    if (fromDb && fromDb.trim().length > 0) return fromDb.trim();
+  } catch { /* fall through */ }
+  return (process.env.PUBLIC_APP_URL
     || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
-    || "https://leaderei.lovable.app";
+    || DEFAULT_APP_BASE_URL);
+}
+
+async function webhookUrlFor(org: string): Promise<string> {
+  const base = await resolveAppBaseUrl();
   return `${base.replace(/\/+$/, "")}/api/public/hooks/calcom?org=${org}`;
 }
 
@@ -337,9 +354,7 @@ export const testCalcomWebhook = createServerFn({ method: "POST" })
     if (!conn.webhook_secret) throw new Error("Webhook secret ausente. Gere um secret antes.");
 
     const { verifyCalcomSignature } = await import("./calcom.server");
-    const webhook_url = `${(process.env.PUBLIC_APP_URL
-      || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
-      || "https://leaderei.lovable.app").replace(/\/+$/, "")}/api/public/hooks/calcom?org=${organization_id}`;
+    const webhook_url = await webhookUrlFor(organization_id);
 
     // Synthetic payload signed and verified in-process — proves the secret
     // works end-to-end without an HTTP round trip (the sandbox can't fetch
