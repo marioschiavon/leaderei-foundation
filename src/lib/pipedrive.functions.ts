@@ -206,7 +206,7 @@ export const disconnectPipedrive = createServerFn({ method: "POST" })
 
     await supabase.from("integration_credentials").delete().eq("integration_id", conn.id);
 
-    const newConfig: Record<string, any> = { ...(conn.config ?? {}) };
+    const newConfig: Record<string, any> = { ...((conn.config ?? {}) as Record<string, any>) };
     if (data.clear_cursors) {
       delete newConfig.pipedrive_cursors;
     }
