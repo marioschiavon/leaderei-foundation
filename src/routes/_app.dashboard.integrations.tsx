@@ -58,7 +58,7 @@ const SLUG_BRAND: Record<string, Brand> = {
   hubspot:           { Icon: SiHubspot,         tint: "text-[#FF7A59]" },
   pipedrive:         { Icon: PipedriveIcon,     tint: "text-[#1A1A1A] dark:text-foreground" },
   apollo:            { Icon: ApolloIcon,        tint: "text-[#1B116E]" },
-  "google-calendar": { Icon: SiGooglecalendar,  tint: "text-[#4285F4]" },
+  
   cal_com:           { Icon: SiCalendly,        tint: "text-[#292929] dark:text-foreground" },
 };
 
