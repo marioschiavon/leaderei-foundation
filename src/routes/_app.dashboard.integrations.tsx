@@ -270,6 +270,7 @@ function IntegrationsPage() {
       <ResendConnectionDialog open={resendOpen} onOpenChange={setResendOpen} />
       <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
       <CalcomConnectionDialog open={calcomOpen} onOpenChange={setCalcomOpen} />
+      <PipedriveConnectDialog open={pipedriveOpen} onOpenChange={setPipedriveOpen} />
     </div>
   );
 }
