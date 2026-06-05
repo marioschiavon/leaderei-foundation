@@ -133,10 +133,27 @@ export const regenerateCalcomWebhookSecret = createServerFn({ method: "POST" })
     return { ok: true, webhook_secret: secret };
   });
 
-function webhookUrlFor(org: string): string {
-  const base = process.env.PUBLIC_APP_URL
+const DEFAULT_APP_BASE_URL = "https://app.leaderei.com.br";
+
+async function resolveAppBaseUrl(): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value_plain")
+      .eq("key", "app_public_url")
+      .maybeSingle();
+    const raw = (data?.value_plain as unknown);
+    const fromDb = typeof raw === "string" ? raw : (typeof raw === "object" && raw && "value" in (raw as any) ? String((raw as any).value ?? "") : "");
+    if (fromDb && fromDb.trim().length > 0) return fromDb.trim();
+  } catch { /* fall through */ }
+  return (process.env.PUBLIC_APP_URL
     || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
-    || "https://leaderei.lovable.app";
+    || DEFAULT_APP_BASE_URL);
+}
+
+async function webhookUrlFor(org: string): Promise<string> {
+  const base = await resolveAppBaseUrl();
   return `${base.replace(/\/+$/, "")}/api/public/hooks/calcom?org=${org}`;
 }
 
