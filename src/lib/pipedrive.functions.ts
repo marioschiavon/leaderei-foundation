@@ -301,7 +301,7 @@ export const syncPipedriveNow = createServerFn({ method: "POST" })
       await supabase
         .from("organization_integrations")
         .update({
-          config: { ...cfg, pipedrive_cursors: result.newCursors },
+          config: { ...(cfg as Record<string, any>), pipedrive_cursors: result.newCursors },
           last_synced_at: new Date().toISOString(),
           last_error: null,
           updated_at: new Date().toISOString(),
