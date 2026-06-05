@@ -83,7 +83,7 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
       has_key: hasKey,
       has_webhook_secret: !!webhookSecret,
       webhook_secret: webhookSecret,
-      webhook_url: webhookUrlFor(organization_id),
+      webhook_url: await webhookUrlFor(organization_id),
       event_types_count: count ?? 0,
     };
   });
