@@ -501,6 +501,7 @@ export type Database = {
           notes: string | null
           organization_id: string
           owner_user_id: string | null
+          pipedrive_deal_id: number | null
           position: number
           probability: number
           stage: Database["public"]["Enums"]["deal_stage"]
@@ -520,6 +521,7 @@ export type Database = {
           notes?: string | null
           organization_id: string
           owner_user_id?: string | null
+          pipedrive_deal_id?: number | null
           position?: number
           probability?: number
           stage?: Database["public"]["Enums"]["deal_stage"]
@@ -539,6 +541,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner_user_id?: string | null
+          pipedrive_deal_id?: number | null
           position?: number
           probability?: number
           stage?: Database["public"]["Enums"]["deal_stage"]
@@ -1245,6 +1248,7 @@ export type Database = {
           lead_id: string
           organization_id: string
           payload: Json
+          pipedrive_activity_id: number | null
           title: string
           type: Database["public"]["Enums"]["lead_activity_type"]
         }
@@ -1256,6 +1260,7 @@ export type Database = {
           lead_id: string
           organization_id: string
           payload?: Json
+          pipedrive_activity_id?: number | null
           title: string
           type: Database["public"]["Enums"]["lead_activity_type"]
         }
@@ -1267,6 +1272,7 @@ export type Database = {
           lead_id?: string
           organization_id?: string
           payload?: Json
+          pipedrive_activity_id?: number | null
           title?: string
           type?: Database["public"]["Enums"]["lead_activity_type"]
         }
@@ -1489,6 +1495,7 @@ export type Database = {
           owner_user_id: string | null
           personal_email: string | null
           phone: string | null
+          pipedrive_person_id: number | null
           review_reason: string | null
           score: number
           secondary_email: string | null
@@ -1529,6 +1536,7 @@ export type Database = {
           owner_user_id?: string | null
           personal_email?: string | null
           phone?: string | null
+          pipedrive_person_id?: number | null
           review_reason?: string | null
           score?: number
           secondary_email?: string | null
@@ -1569,6 +1577,7 @@ export type Database = {
           owner_user_id?: string | null
           personal_email?: string | null
           phone?: string | null
+          pipedrive_person_id?: number | null
           review_reason?: string | null
           score?: number
           secondary_email?: string | null
@@ -1968,6 +1977,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      pipedrive_sync_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          organization_id: string
+          started_at: string
+          stats: Json
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          started_at?: string
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipedrive_sync_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plans: {
         Row: {

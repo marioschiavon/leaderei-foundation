@@ -30,6 +30,7 @@ import {
 } from "@/lib/calcom.functions";
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
+import { PipedriveConnectDialog } from "@/components/app/PipedriveConnectDialog";
 
 export const Route = createFileRoute("/_app/dashboard/integrations")({
   component: IntegrationsPage,
@@ -110,6 +111,7 @@ function IntegrationsPage() {
   const [resendOpen, setResendOpen] = useState(false);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
   const [calcomOpen, setCalcomOpen] = useState(false);
+  const [pipedriveOpen, setPipedriveOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -156,7 +158,8 @@ function IntegrationsPage() {
                 const isResend = provider.slug === "resend";
                 const isWhatsApp = provider.slug === "whatsapp";
                 const isCalcom = provider.slug === "cal_com";
-                const isInteractive = isResend || isWhatsApp || isCalcom;
+                const isPipedrive = provider.slug === "pipedrive";
+                const isInteractive = isResend || isWhatsApp || isCalcom || isPipedrive;
 
                 // Hook7-aware override for the WhatsApp card.
                 let operationalLabel: string;
@@ -251,6 +254,7 @@ function IntegrationsPage() {
                         if (isResend) setResendOpen(true);
                         else if (isWhatsApp) setWhatsAppOpen(true);
                         else if (isCalcom) setCalcomOpen(true);
+                        else if (isPipedrive) setPipedriveOpen(true);
                       }}
                       title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
@@ -266,6 +270,7 @@ function IntegrationsPage() {
       <ResendConnectionDialog open={resendOpen} onOpenChange={setResendOpen} />
       <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
       <CalcomConnectionDialog open={calcomOpen} onOpenChange={setCalcomOpen} />
+      <PipedriveConnectDialog open={pipedriveOpen} onOpenChange={setPipedriveOpen} />
     </div>
   );
 }

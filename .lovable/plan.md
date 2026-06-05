@@ -1,99 +1,117 @@
 
-# Master · Logs — implementação
+# Integração Pipedrive — sincronização manual
 
-Substituir o placeholder atual de `/master/logs` por uma página real, com 4 abas. Acesso restrito a master admin (já garantido pelo layout `_master`). Cada aba lista os **últimos 100 registros** com auto-refresh a cada 30s e botão "Atualizar agora".
+Conectar Pipedrive via **API Token pessoal**, importar **Persons, Organizations, Deals e Activities** sob demanda (botão "Sincronizar agora"). CSV existente continua funcionando sem mudanças.
 
-## Estrutura da página
+## Visão geral do fluxo
 
 ```text
-/master/logs
-├─ Tab: Emails        → tabela email_send_log
-├─ Tab: Fluxos        → tabela flow_step_runs
-├─ Tab: Webhooks      → tabela nova webhook_events
-└─ Tab: Auditoria     → tabela audit_logs
+Settings → Integrações → Card Pipedrive
+   ↓
+[Conectar]  → dialog pede API Token + domínio da company (ex: minhaempresa.pipedrive.com)
+   ↓
+Validação: GET /users/me → grava em organization_integrations + integration_credentials
+   ↓
+Card mostra "Conectado · 1.245 persons disponíveis"
+   ↓
+[Sincronizar agora] → server fn paginada → upsert em leads/deals/activities
+   ↓
+Toast: "237 novos, 1.008 atualizados, 12 ignorados" + log em pipedrive_sync_runs
 ```
 
-Header com filtro de período (1h / 24h / 7d, default 24h) compartilhado pelas abas. Badge de contagem por aba (ex.: "Fluxos · 12 com erro nas últimas 24h").
+## Modelo de dados (1 migration)
 
-## Aba 1 — Emails
-
-Fonte: `email_send_log` (já existe, RLS já é master-only).
-
-Colunas: hora, status (badge colorido), purpose, destinatário, assunto, erro (se houver), provider message id.
-
-Filtros locais: status (queued/sent/failed/bounced/delivered) e purpose.
-
-Já existe `listEmailSendLogs` em `src/lib/platform.functions.ts` — reaproveitar, só ajustar default de `page_size` para 100.
-
-## Aba 2 — Fluxos (Builder)
-
-Fonte: `flow_step_runs` (já existe). Join com `flow_steps` (tipo do nó) e `campaign_enrollments` → `leads` (nome do lead) e `campaigns` (nome da campanha) para contexto humano.
-
-Colunas: hora, campanha, lead, tipo do step, status (pending/success/failed), branch tomada, duração (finished_at − started_at), erro (expandível para ver `output` em JSON).
-
-Filtro local: status (todos / só falhas).
-
-Novo server fn: `listFlowStepRuns` em `src/lib/master.functions.ts` (master-only), com paginação.
-
-## Aba 3 — Webhooks
-
-**Não existe tabela de log de webhooks hoje.** Precisa criar.
-
-Nova tabela `webhook_events`:
-- `id uuid pk`
-- `received_at timestamptz default now()`
-- `source text` — `'calcom'` | `'hook7'` | outros
-- `event_type text` — ex.: `BOOKING_CREATED`, `Message`
-- `organization_id uuid null` (quando der pra inferir)
-- `instance_id uuid null` (Hook7) / `cal_booking_uid text null`
-- `status text` — `received` | `processed` | `failed` | `ignored`
-- `http_status int`
+**Tabela `pipedrive_sync_runs`** — histórico de execuções (master pode auditar via /master/logs depois).
+- `id`, `organization_id`, `started_at`, `finished_at`
+- `status` text — `running | success | partial | failed`
+- `triggered_by uuid` (usuário que clicou)
+- `stats jsonb` — `{ persons: {created, updated, skipped}, deals: {...}, organizations: {...}, activities: {...} }`
 - `error text null`
-- `payload jsonb` (corpo recebido, truncado a ~32KB)
-- `headers jsonb` (subset seguro: signature, user-agent)
 
-RLS: só master_admin (SELECT/ALL); INSERT permitido também para `service_role` (rotas públicas usam admin client). GRANT `SELECT/INSERT` para `authenticated` e `service_role` conforme padrão do projeto.
+**Colunas novas (idempotência / dedup):**
+- `leads.pipedrive_person_id bigint null` + index único parcial `(organization_id, pipedrive_person_id) WHERE pipedrive_person_id IS NOT NULL`
+- `deals.pipedrive_deal_id bigint null` + mesmo padrão de índice único parcial
+- `lead_activities.pipedrive_activity_id bigint null` + índice único parcial
 
-Instrumentar as 2 rotas existentes para gravar 1 linha cada chamada:
-- `src/routes/api/public/hooks/calcom.ts`
-- `supabase/functions/hook7-webhook/index.ts` (existente; gravar usando service role)
+Organizations do Pipedrive **não viram entidade separada** — preenchem `leads.company_name` e ficam guardadas inteiras em `leads.enrichment_data.pipedrive_org` para referência. Evita criar uma nova tabela só para isso.
 
-Colunas na UI: hora, source (badge), event_type, status, http_status, org (se houver), erro, botão "Ver payload" (dialog com JSON).
+**GRANTs + RLS** seguindo padrão do projeto (org members SELECT/manage, master ALL, service_role ALL).
 
-Filtros locais: source e status.
+**Provider `pipedrive`** já existe em `integration_providers`. Não cria de novo.
 
-## Aba 4 — Auditoria
+## Server functions (`src/lib/pipedrive.functions.ts`)
 
-Fonte: `audit_logs` (já existe, hoje vazia).
+Todas com `requireSupabaseAuth` + verificação de org admin.
 
-Colunas: hora, ator (full_name do profile), ação, entity_type, entity_id, organização, IP. Expandir mostra diff `before`/`after`.
+1. **`getPipedriveConnection()`** — retorna `{ connected, company_domain, has_token, last_sync_at, last_stats }`. Espelha o padrão de `getOrgResendConnection`.
+2. **`savePipedriveConnection({ api_token, company_domain })`** — valida `GET https://{domain}/api/v2/users/me` com o token, grava em `organization_integrations` + `integration_credentials.key='api_token'`. Erros amigáveis para 401 ("token inválido") e DNS/timeout ("domínio incorreto").
+3. **`disconnectPipedrive()`** — apaga credencial, marca connection `disconnected`. Não toca em `leads/deals` já importados (mantém `pipedrive_*_id` para reativação futura).
+4. **`syncPipedriveNow({ since?: 'last_sync' | 'full' })`** — orquestrador. Cria linha em `pipedrive_sync_runs`, chama os 4 fetchers em sequência, atualiza stats, marca finished. Roda em até ~5min (timeout do server fn). Limite: 5.000 registros por entidade por execução; se exceder, retorna `status: 'partial'` e o próximo clique continua de onde parou (usa `update_time` da última linha importada como cursor, salvo em `organization_integrations.config.cursors`).
 
-Como hoje quase nada escreve nessa tabela, a aba mostra os 100 últimos registros existentes + `EmptyState` quando vazia, com texto explicativo: *"A captura de eventos administrativos (login, criação de organização, mudanças de plano) ainda não está plugada nas ações — entra junto com a Fase 2."*
+## Lógica de sync por entidade (`src/lib/pipedrive.server.ts`)
 
-Sem instrumentação de novas ações neste passo (escopo fica só na UI de leitura). A instrumentação fica para uma task separada.
+Helper privado server-only — não vai num `.functions.ts` para evitar bundle no client.
+
+### Ordem importa (FKs)
+1. **Organizations** — fetch `GET /v2/organizations?updated_since={cursor}&limit=500&cursor=...` paginado. Não cria linha em nenhuma tabela; só cacheia em memória `{ pipedrive_org_id → {name, address, ...} }` para o passo de persons enriquecer `company_name` e `enrichment_data.pipedrive_org`.
+2. **Persons** → `leads`. Match por `pipedrive_person_id` (atualiza) ou cria novo. Source padrão: cria lead_source slug `pipedrive` se não existir e usa nele. Mapeamento:
+   - `name` → `full_name`
+   - `email[0].value` → `email`; resto vai pra `secondary_email`
+   - `phone[0].value` → `phone`; resto pra `mobile_phone`
+   - `org_id` → resolve via cache do passo 1 para `company_name`
+   - `custom_fields` do Pipedrive → `leads.custom_fields.pipedrive` (objeto)
+   - `pipedrive_person_id` preenchido
+3. **Deals** → `deals`. Match por `pipedrive_deal_id`. `person_id` → busca `leads.id` via `pipedrive_person_id` para preencher `lead_id`. Mapeamento de stage do Pipedrive para o enum `deal_stage` do projeto via tabela de equivalência fixa no código (`new/lead`, `qualified`, `proposal`, `negotiation`, `won/closed_won`, `lost/closed_lost`); fallback `lead` quando não casar. `value`, `currency`, `probability`, `expected_close_date`, `status` (`open/won/lost`) mapeados direto.
+4. **Activities** → `lead_activities`. Match por `pipedrive_activity_id`. Liga via `person_id → lead_id`. Tipo do Pipedrive (`call`, `meeting`, `task`, `email`, `lunch`) mapeado para o enum `activity_type` existente (qualquer não mapeado vira `note`). `subject`→`title`, `note`→`description`, payload bruto em `payload.pipedrive`.
+
+### Regras gerais
+- **Idempotência**: tudo via `upsert` no índice único `(organization_id, pipedrive_*_id)`.
+- **Paginação**: API v2 do Pipedrive usa cursor. Loop até `next_cursor=null` ou limite de 5k.
+- **Rate limit**: Pipedrive permite ~80 req/2s no plano padrão. Aguardar 250ms entre páginas (suficiente para ~8 req/s).
+- **Erro em uma entidade não derruba o sync inteiro**: cada fetcher é envolto em try/catch, erro vai pra `stats.{entidade}.error` e o run termina como `partial`.
+- **Skipped**: persons sem nome E sem email/telefone são ignoradas (motivo: "registro vazio").
+
+## UI
+
+### Card no `_app.dashboard.integrations.tsx` (Pipedrive já listado)
+Estados:
+- **Não conectado**: botão "Conectar" abre `<PipedriveConnectDialog>` (campos: Company domain, API Token com toggle eye/eye-off, link "Onde encontro?" → docs Pipedrive).
+- **Conectado**: badge verde "Conectado", texto "Última sync: há 2h · 1.245 persons", botões "Sincronizar agora" (loading state) e "Desconectar" (confirm dialog).
+- Durante sync: spinner + progress textual ("Importando deals... 320/1.500"). Como server fn é uma única chamada bloqueante, só mostramos "Sincronizando..." e ao final um toast com `stats`. Sem progress real nessa fase.
+
+### Botão "Ver histórico" (opcional, pequeno)
+Sheet lateral lista últimos 20 `pipedrive_sync_runs` com timestamp, status, stats, erro. Mesma página de integrações.
+
+### Importante: CSV intocado
+`ImportLeadsSheet.tsx` continua exatamente como está. Adicionamos só um hint no topo do dialog do Pipedrive: "Esta importação roda em paralelo ao CSV — leads duplicados são deduplicados por email."
+
+Regra de dedup adicional para evitar duplicar com CSV: ao criar lead novo via Pipedrive, se já existir lead na org com mesmo `email` (case-insensitive) **sem** `pipedrive_person_id`, fazer UPDATE preenchendo `pipedrive_person_id` em vez de criar duplicado.
 
 ## Detalhes técnicos
 
-**Server functions (master-only, em `src/lib/master.functions.ts`):**
-- `listEmailLogsForMaster({ since, status?, purpose? })` — usa o `listEmailSendLogs` já existente como base
-- `listFlowStepRunsForMaster({ since, onlyFailed? })`
-- `listWebhookEventsForMaster({ since, source?, status? })`
-- `listAuditLogsForMaster({ since })`
+- **API base**: `https://{company_domain}/api/v2/{resource}`. Autenticação via query `?api_token=...` (header Bearer não funciona com token pessoal — só com OAuth).
+- **Cursor incremental**: salvo em `organization_integrations.config.pipedrive_cursors = { persons_updated_since, deals_updated_since, ... }`. Primeira sync é full (sem cursor); seguintes usam `updated_since` ISO.
+- **Modo full re-sync**: dialog "Desconectar" oferece checkbox "Limpar cursores na próxima conexão" para forçar full sync.
+- **Token storage**: reutiliza `integration_credentials.value_encrypted` (já é o padrão do Resend). Sem mudança no schema dessa tabela.
+- **Verificação de domínio**: aceitar formato com ou sem `https://`, normalizar para `{slug}.pipedrive.com`. Rejeitar se não terminar em `.pipedrive.com` ou `.pipedrive.com.br`.
+- **Types**: regenerados automaticamente após migration.
 
-Cada uma protegida por `requireSupabaseAuth` + verificação `has_role(master_admin)` (padrão já usado em `platform.functions.ts`). Retornam no máximo 100 linhas ordenadas por timestamp desc.
+## Fora do escopo (deixa explícito)
 
-**Rota:** atualizar `src/routes/_master.master.logs.tsx` para renderizar `<Tabs>` (shadcn) com 4 `TabsContent`. Cada aba é um componente próprio em `src/components/master/logs/*` para manter o arquivo de rota enxuto.
+- OAuth flow do Pipedrive Marketplace
+- Push de mudanças (Leaderei → Pipedrive)
+- Webhooks em tempo real
+- Sync automático por cron (botão manual só)
+- Mapping editor visual de custom fields (vão raw para `custom_fields.pipedrive`)
+- Resolução de conflito por timestamp em caso de edição simultânea (last-write-wins do Pipedrive)
+- Importação de Notes separadas de Activities
+- Multi-conexão (1 organização Leaderei = 1 conta Pipedrive)
 
-**Migration única:**
-1. `CREATE TABLE public.webhook_events (...)` + GRANTs + RLS + policies (master-only SELECT/ALL, service_role INSERT).
-2. Index em `(received_at DESC)` e `(source, received_at DESC)`.
+## Entregáveis
 
-**Instrumentação dos webhooks:** edits surgicais em `src/routes/api/public/hooks/calcom.ts` e em `supabase/functions/hook7-webhook/index.ts` para inserir 1 linha por chamada via `supabaseAdmin` / service role, encapsulada em try/catch para nunca derrubar a rota se o insert falhar.
-
-## Fora do escopo
-
-- Stream em tempo real (Realtime channel) — auto-refresh de 30s basta nesta fase
-- Export CSV — fica para depois se você pedir
-- Instrumentação ativa do `audit_logs` (login, mudanças de org/plano)
-- Retenção / TTL automático — pode rodar como cron job num momento futuro
-
+1. Migration: `pipedrive_sync_runs` + 3 colunas + 3 índices únicos + GRANTs + RLS.
+2. `src/lib/pipedrive.functions.ts` (4 server fns).
+3. `src/lib/pipedrive.server.ts` (fetchers + mappers + upserts).
+4. `src/components/app/PipedriveConnectDialog.tsx` (form de conexão).
+5. `src/components/app/PipedriveSyncHistorySheet.tsx` (histórico opcional).
+6. Edição cirúrgica em `src/routes/_app.dashboard.integrations.tsx` para tornar o card Pipedrive funcional (hoje só renderiza ícone).
