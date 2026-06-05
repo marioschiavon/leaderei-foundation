@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
-  SiResend, SiWhatsapp, SiHubspot, SiGooglecalendar, SiCalendly,
+  SiResend, SiWhatsapp, SiHubspot, SiCalendly,
 } from "react-icons/si";
 import { FaLinkedin } from "react-icons/fa";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -58,7 +58,7 @@ const SLUG_BRAND: Record<string, Brand> = {
   hubspot:           { Icon: SiHubspot,         tint: "text-[#FF7A59]" },
   pipedrive:         { Icon: PipedriveIcon,     tint: "text-[#1A1A1A] dark:text-foreground" },
   apollo:            { Icon: ApolloIcon,        tint: "text-[#1B116E]" },
-  "google-calendar": { Icon: SiGooglecalendar,  tint: "text-[#4285F4]" },
+  
   cal_com:           { Icon: SiCalendly,        tint: "text-[#292929] dark:text-foreground" },
 };
 
