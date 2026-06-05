@@ -120,8 +120,8 @@ export const savePipedriveConnection = createServerFn({ method: "POST" })
       .maybeSingle();
 
     let integration_id: string;
-    const newConfig = {
-      ...(existing?.config ?? {}),
+    const newConfig: Record<string, any> = {
+      ...((existing?.config ?? {}) as Record<string, any>),
       company_domain,
       pipedrive_user_id: me.user_id,
       pipedrive_user_name: me.name,
