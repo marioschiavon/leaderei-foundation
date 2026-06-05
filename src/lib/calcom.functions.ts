@@ -354,9 +354,7 @@ export const testCalcomWebhook = createServerFn({ method: "POST" })
     if (!conn.webhook_secret) throw new Error("Webhook secret ausente. Gere um secret antes.");
 
     const { verifyCalcomSignature } = await import("./calcom.server");
-    const webhook_url = `${(process.env.PUBLIC_APP_URL
-      || (process.env.VITE_PUBLIC_APP_URL as string | undefined)
-      || "https://leaderei.lovable.app").replace(/\/+$/, "")}/api/public/hooks/calcom?org=${organization_id}`;
+    const webhook_url = await webhookUrlFor(organization_id);
 
     // Synthetic payload signed and verified in-process — proves the secret
     // works end-to-end without an HTTP round trip (the sandbox can't fetch
