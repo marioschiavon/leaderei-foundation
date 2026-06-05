@@ -254,6 +254,7 @@ function IntegrationsPage() {
                         if (isResend) setResendOpen(true);
                         else if (isWhatsApp) setWhatsAppOpen(true);
                         else if (isCalcom) setCalcomOpen(true);
+                        else if (isPipedrive) setPipedriveOpen(true);
                       }}
                       title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
