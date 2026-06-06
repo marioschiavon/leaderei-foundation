@@ -120,13 +120,15 @@ function ApolloSearchPage() {
       <PageHeader
         title="Busca Apollo"
         description="Encontre prospects por cargo, senioridade, indústria e localização. Importe direto para a base — sem CSV."
-      >
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/dashboard/leads">
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Link>
-        </Button>
-      </PageHeader>
+        actions={
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/dashboard/leads">
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Link>
+          </Button>
+        }
+      />
+
 
       {!statusQuery.isLoading && !isConnected && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
