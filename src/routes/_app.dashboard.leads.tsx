@@ -624,6 +624,23 @@ function LeadDetailPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const enrichFn = useServerFn(enrichLeadWithApollo);
+  const enrichMutation = useMutation({
+    mutationFn: () => enrichFn({ data: { lead_id: lead.id } }),
+    onSuccess: (r: any) => {
+      if (r.matched) {
+        const n = r.fields_updated?.length ?? 0;
+        toast.success(n ? `Enriquecido: ${n} campos atualizados.` : "Enriquecido. Nenhum campo novo.");
+      } else {
+        toast.warning("Apollo não encontrou correspondência.");
+      }
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", "detail", lead.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   const enrichmentPayload =
     detail.enrichment?.payload && typeof detail.enrichment.payload === "object" && !Array.isArray(detail.enrichment.payload)
       ? (detail.enrichment.payload as Record<string, unknown>)
