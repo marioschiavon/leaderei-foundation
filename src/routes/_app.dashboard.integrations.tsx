@@ -114,6 +114,8 @@ function IntegrationsPage() {
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
   const [calcomOpen, setCalcomOpen] = useState(false);
   const [pipedriveOpen, setPipedriveOpen] = useState(false);
+  const [apolloOpen, setApolloOpen] = useState(false);
+
 
   return (
     <div className="space-y-6">
