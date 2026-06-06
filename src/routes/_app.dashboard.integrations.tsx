@@ -163,7 +163,9 @@ function IntegrationsPage() {
                 const isWhatsApp = provider.slug === "whatsapp";
                 const isCalcom = provider.slug === "cal_com";
                 const isPipedrive = provider.slug === "pipedrive";
-                const isInteractive = isResend || isWhatsApp || isCalcom || isPipedrive;
+                const isApollo = provider.slug === "apollo";
+                const isInteractive = isResend || isWhatsApp || isCalcom || isPipedrive || isApollo;
+
 
                 // Hook7-aware override for the WhatsApp card.
                 let operationalLabel: string;
