@@ -110,6 +110,97 @@ export type Database = {
         }
         Relationships: []
       }
+      apollo_api_calls: {
+        Row: {
+          created_at: string
+          credits_consumed: number | null
+          endpoint: string
+          error: string | null
+          id: string
+          latency_ms: number | null
+          organization_id: string
+          request_summary: Json
+          status_code: number | null
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          credits_consumed?: number | null
+          endpoint: string
+          error?: string | null
+          id?: string
+          latency_ms?: number | null
+          organization_id: string
+          request_summary?: Json
+          status_code?: number | null
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          credits_consumed?: number | null
+          endpoint?: string
+          error?: string | null
+          id?: string
+          latency_ms?: number | null
+          organization_id?: string
+          request_summary?: Json
+          status_code?: number | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apollo_api_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apollo_search_cache: {
+        Row: {
+          created_at: string
+          expires_at: string
+          filters: Json
+          id: string
+          organization_id: string
+          page: number
+          query_hash: string
+          results: Json
+          total_entries: number | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          filters: Json
+          id?: string
+          organization_id: string
+          page?: number
+          query_hash: string
+          results: Json
+          total_entries?: number | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          filters?: Json
+          id?: string
+          organization_id?: string
+          page?: number
+          query_hash?: string
+          results?: Json
+          total_entries?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apollo_search_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1468,6 +1559,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          apollo_person_id: string | null
           archived_at: string | null
           city: string | null
           company_name: string | null
@@ -1509,6 +1601,7 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          apollo_person_id?: string | null
           archived_at?: string | null
           city?: string | null
           company_name?: string | null
@@ -1550,6 +1643,7 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          apollo_person_id?: string | null
           archived_at?: string | null
           city?: string | null
           company_name?: string | null

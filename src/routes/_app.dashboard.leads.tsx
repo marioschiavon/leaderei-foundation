@@ -55,6 +55,8 @@ import {
   listLeadSources,
   updateLead,
 } from "@/lib/tenant.functions";
+import { enrichLeadWithApollo } from "@/lib/apollo.functions";
+
 import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Check } from "lucide-react";
@@ -622,6 +624,23 @@ function LeadDetailPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const enrichFn = useServerFn(enrichLeadWithApollo);
+  const enrichMutation = useMutation({
+    mutationFn: () => enrichFn({ data: { lead_id: lead.id } }),
+    onSuccess: (r: any) => {
+      if (r.matched) {
+        const n = r.fields_updated?.length ?? 0;
+        toast.success(n ? `Enriquecido: ${n} campos atualizados.` : "Enriquecido. Nenhum campo novo.");
+      } else {
+        toast.warning("Apollo não encontrou correspondência.");
+      }
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads", "detail", lead.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   const enrichmentPayload =
     detail.enrichment?.payload && typeof detail.enrichment.payload === "object" && !Array.isArray(detail.enrichment.payload)
       ? (detail.enrichment.payload as Record<string, unknown>)
@@ -754,6 +773,25 @@ function LeadDetailPanel({
                 )}
                 Arquivar
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (confirm("Enriquecer este lead com Apollo? Vai consumir crédito da sua conta Apollo.")) {
+                    enrichMutation.mutate();
+                  }
+                }}
+                disabled={enrichMutation.isPending}
+                title="Preenche campos vazios usando os dados do Apollo"
+              >
+                {enrichMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Enriquecer com Apollo
+              </Button>
+
             </div>
           </>
         )}

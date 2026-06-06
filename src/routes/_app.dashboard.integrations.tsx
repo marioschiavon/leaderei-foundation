@@ -31,6 +31,8 @@ import {
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
 import { PipedriveConnectDialog } from "@/components/app/PipedriveConnectDialog";
+import { ApolloConnectDialog } from "@/components/app/ApolloConnectDialog";
+
 
 export const Route = createFileRoute("/_app/dashboard/integrations")({
   component: IntegrationsPage,
@@ -112,6 +114,8 @@ function IntegrationsPage() {
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
   const [calcomOpen, setCalcomOpen] = useState(false);
   const [pipedriveOpen, setPipedriveOpen] = useState(false);
+  const [apolloOpen, setApolloOpen] = useState(false);
+
 
   return (
     <div className="space-y-6">
@@ -159,7 +163,9 @@ function IntegrationsPage() {
                 const isWhatsApp = provider.slug === "whatsapp";
                 const isCalcom = provider.slug === "cal_com";
                 const isPipedrive = provider.slug === "pipedrive";
-                const isInteractive = isResend || isWhatsApp || isCalcom || isPipedrive;
+                const isApollo = provider.slug === "apollo";
+                const isInteractive = isResend || isWhatsApp || isCalcom || isPipedrive || isApollo;
+
 
                 // Hook7-aware override for the WhatsApp card.
                 let operationalLabel: string;
@@ -255,6 +261,7 @@ function IntegrationsPage() {
                         else if (isWhatsApp) setWhatsAppOpen(true);
                         else if (isCalcom) setCalcomOpen(true);
                         else if (isPipedrive) setPipedriveOpen(true);
+                        else if (isApollo) setApolloOpen(true);
                       }}
                       title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
@@ -271,9 +278,11 @@ function IntegrationsPage() {
       <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
       <CalcomConnectionDialog open={calcomOpen} onOpenChange={setCalcomOpen} />
       <PipedriveConnectDialog open={pipedriveOpen} onOpenChange={setPipedriveOpen} />
+      <ApolloConnectDialog open={apolloOpen} onOpenChange={setApolloOpen} />
     </div>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Resend per-org dialog
