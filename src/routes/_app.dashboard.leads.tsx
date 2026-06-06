@@ -773,6 +773,25 @@ function LeadDetailPanel({
                 )}
                 Arquivar
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (confirm("Enriquecer este lead com Apollo? Vai consumir crédito da sua conta Apollo.")) {
+                    enrichMutation.mutate();
+                  }
+                }}
+                disabled={enrichMutation.isPending}
+                title="Preenche campos vazios usando os dados do Apollo"
+              >
+                {enrichMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Enriquecer com Apollo
+              </Button>
+
             </div>
           </>
         )}
