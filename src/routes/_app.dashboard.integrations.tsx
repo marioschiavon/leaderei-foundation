@@ -261,6 +261,7 @@ function IntegrationsPage() {
                         else if (isWhatsApp) setWhatsAppOpen(true);
                         else if (isCalcom) setCalcomOpen(true);
                         else if (isPipedrive) setPipedriveOpen(true);
+                        else if (isApollo) setApolloOpen(true);
                       }}
                       title={!isInteractive ? "Conexão guiada chega nas próximas fases." : undefined}
                     >
@@ -277,9 +278,11 @@ function IntegrationsPage() {
       <WhatsAppManagerDialog open={whatsAppOpen} onOpenChange={setWhatsAppOpen} />
       <CalcomConnectionDialog open={calcomOpen} onOpenChange={setCalcomOpen} />
       <PipedriveConnectDialog open={pipedriveOpen} onOpenChange={setPipedriveOpen} />
+      <ApolloConnectDialog open={apolloOpen} onOpenChange={setApolloOpen} />
     </div>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Resend per-org dialog
