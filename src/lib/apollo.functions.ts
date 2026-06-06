@@ -512,9 +512,7 @@ export const enrichLeadWithApollo = createServerFn({ method: "POST" })
           organization_id,
           lead_id: data.lead_id,
           provider: "apollo",
-          status: "not_found",
-          payload: { match_body: matchBody },
-          triggered_by: userId,
+          payload: { status: "not_found", match_body: matchBody, triggered_by: userId },
         } as any);
       } catch { /* best-effort */ }
       return { ok: true, matched: false };
@@ -532,11 +530,10 @@ export const enrichLeadWithApollo = createServerFn({ method: "POST" })
         organization_id,
         lead_id: data.lead_id,
         provider: "apollo",
-        status: "success",
-        payload: { apollo: result.person },
-        triggered_by: userId,
+        payload: { status: "success", apollo: result.person, triggered_by: userId },
       } as any);
     } catch { /* best-effort */ }
+
 
     return { ok: true, matched: true, fields_updated: Object.keys(patch).filter((k) => k !== "enrichment_data") };
   });
