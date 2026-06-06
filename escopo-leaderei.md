@@ -685,9 +685,12 @@ O Pipedrive é o CRM. Quem já usa Pipedrive exporta listas dele para o Leaderei
 - ✅ Importer suporta nativamente headers em formato Apollo e Pipedrive
 - ✅ Esquema híbrido: campos importantes viram colunas, resto vai pra `enrichment_data`
 - ✅ Validado com 3 CSVs de teste (Apollo style, Pipedrive style, custom esquisito com PT-BR e separador `;`)
-- ⏳ Futuro: Integração API direta com Apollo (busca + import sem CSV)
-- ⏳ Futuro: Sync bidirecional com Pipedrive
-- ⏳ Futuro: Enriquecimento via Apollo de leads já existentes (botão "Enriquecer com Apollo")
+- ✅ **Integração API direta com Apollo** (jun/2026) — chave por org, busca com filtros (cargo, senioridade, indústria, país, tamanho de empresa, keywords), cache de 24h em `apollo_search_cache`, telemetria em `apollo_api_calls`, rate-limit local de 30/min, dedup por `apollo_person_id` + email + linkedin_url
+- ✅ **Enriquecimento via Apollo de leads existentes** — botão "Enriquecer com Apollo" no detalhe do lead, usa `POST /v1/people/match`, só preenche campos vazios, payload completo em `lead_enrichment`
+- ✅ Sync bidirecional com Pipedrive (entregue na fase do conector Pipedrive)
+- ⏳ Futuro: Busca de empresas (organizations search) — Fase 3
+- ⏳ Futuro: Enriquecimento em background dentro do executor de fluxos
+
 
 ---
 
