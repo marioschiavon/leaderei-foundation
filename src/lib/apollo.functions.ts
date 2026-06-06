@@ -507,15 +507,16 @@ export const enrichLeadWithApollo = createServerFn({ method: "POST" })
     });
 
     if (!result?.person) {
-      // Always log enrichment attempt
-      await supabase.from("lead_enrichment").insert({
-        organization_id,
-        lead_id: data.lead_id,
-        provider: "apollo",
-        status: "not_found",
-        payload: { match_body: matchBody },
-        triggered_by: userId,
-      } as any).then(() => null).catch(() => null);
+      try {
+        await supabase.from("lead_enrichment").insert({
+          organization_id,
+          lead_id: data.lead_id,
+          provider: "apollo",
+          status: "not_found",
+          payload: { match_body: matchBody },
+          triggered_by: userId,
+        } as any);
+      } catch { /* best-effort */ }
       return { ok: true, matched: false };
     }
 
@@ -523,25 +524,23 @@ export const enrichLeadWithApollo = createServerFn({ method: "POST" })
     const patch = mergeLeadPatch(lead, incoming);
 
     if (Object.keys(patch).length) {
-      await supabase.from("leads").update(patch).eq("id", data.lead_id);
+      await supabase.from("leads").update(patch as any).eq("id", data.lead_id);
     }
 
-    // Best-effort enrichment log
-    await supabase
-      .from("lead_enrichment")
-      .insert({
+    try {
+      await supabase.from("lead_enrichment").insert({
         organization_id,
         lead_id: data.lead_id,
         provider: "apollo",
         status: "success",
         payload: { apollo: result.person },
         triggered_by: userId,
-      } as any)
-      .then(() => null)
-      .catch(() => null);
+      } as any);
+    } catch { /* best-effort */ }
 
     return { ok: true, matched: true, fields_updated: Object.keys(patch).filter((k) => k !== "enrichment_data") };
   });
+
 
 // ---------------------------------------------------------------------------
 // Recent calls (telemetria)
