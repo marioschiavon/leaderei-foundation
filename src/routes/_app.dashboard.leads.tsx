@@ -55,6 +55,8 @@ import {
   listLeadSources,
   updateLead,
 } from "@/lib/tenant.functions";
+import { enrichLeadWithApollo } from "@/lib/apollo.functions";
+
 import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Check } from "lucide-react";
