@@ -398,7 +398,7 @@ export const importApolloLeads = createServerFn({ method: "POST" })
       if (byApollo?.id) {
         const patch = mergeLeadPatch(byApollo, payload);
         if (Object.keys(patch).length) {
-          await supabase.from("leads").update(patch).eq("id", byApollo.id);
+          await supabase.from("leads").update(patch as any).eq("id", byApollo.id);
         }
         updated += 1;
         continue;
@@ -415,7 +415,7 @@ export const importApolloLeads = createServerFn({ method: "POST" })
         if (byEmail?.id) {
           const patch = mergeLeadPatch(byEmail, payload);
           if (Object.keys(patch).length) {
-            await supabase.from("leads").update(patch).eq("id", byEmail.id);
+            await supabase.from("leads").update(patch as any).eq("id", byEmail.id);
           }
           updated += 1;
           continue;
@@ -433,17 +433,18 @@ export const importApolloLeads = createServerFn({ method: "POST" })
         if (byLi?.id) {
           const patch = mergeLeadPatch(byLi, payload);
           if (Object.keys(patch).length) {
-            await supabase.from("leads").update(patch).eq("id", byLi.id);
+            await supabase.from("leads").update(patch as any).eq("id", byLi.id);
           }
           updated += 1;
           continue;
         }
       }
 
-      const { error: insErr } = await supabase.from("leads").insert(payload);
+      const { error: insErr } = await supabase.from("leads").insert(payload as any);
       if (insErr) skipped += 1;
       else created += 1;
     }
+
 
     return { ok: true, created, updated, skipped };
   });
