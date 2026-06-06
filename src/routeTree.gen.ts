@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as MasterRouteImport } from './routes/_master'
@@ -31,11 +32,18 @@ import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dash
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
+import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
+import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -144,6 +152,17 @@ const AppDashboardBuilderIndexRoute =
     path: '/builder/',
     getParentRoute: () => AppDashboardRoute,
   } as any)
+const ApiPublicHooksRunFlowTickRoute =
+  ApiPublicHooksRunFlowTickRouteImport.update({
+    id: '/api/public/hooks/run-flow-tick',
+    path: '/api/public/hooks/run-flow-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksCalcomRoute = ApiPublicHooksCalcomRouteImport.update({
+  id: '/api/public/hooks/calcom',
+  path: '/api/public/hooks/calcom',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppDashboardBuilderDocumentIdRoute =
   AppDashboardBuilderDocumentIdRouteImport.update({
     id: '/builder/$documentId',
@@ -155,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
@@ -172,12 +192,15 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/master/': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
+  '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/invite/$token': typeof InviteTokenRoute
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
@@ -194,6 +217,8 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/master': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
+  '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRoutesById {
@@ -203,6 +228,7 @@ export interface FileRoutesById {
   '/_master': typeof MasterRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRouteWithChildren
   '/invite/$token': typeof InviteTokenRoute
@@ -220,6 +246,8 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_master/master/': typeof MasterMasterIndexRoute
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
+  '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
 }
 export interface FileRouteTypes {
@@ -228,6 +256,7 @@ export interface FileRouteTypes {
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/signup'
     | '/dashboard'
     | '/invite/$token'
@@ -245,12 +274,15 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/master/'
     | '/dashboard/builder/$documentId'
+    | '/api/public/hooks/calcom'
+    | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/signup'
     | '/invite/$token'
     | '/dashboard/campaigns'
@@ -267,6 +299,8 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/master'
     | '/dashboard/builder/$documentId'
+    | '/api/public/hooks/calcom'
+    | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder'
   id:
     | '__root__'
@@ -275,6 +309,7 @@ export interface FileRouteTypes {
     | '/_master'
     | '/forgot-password'
     | '/login'
+    | '/onboarding'
     | '/signup'
     | '/_app/dashboard'
     | '/invite/$token'
@@ -292,6 +327,8 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_master/master/'
     | '/_app/dashboard/builder/$documentId'
+    | '/api/public/hooks/calcom'
+    | '/api/public/hooks/run-flow-tick'
     | '/_app/dashboard/builder/'
   fileRoutesById: FileRoutesById
 }
@@ -301,8 +338,11 @@ export interface RootRouteChildren {
   MasterRoute: typeof MasterRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiPublicHooksCalcomRoute: typeof ApiPublicHooksCalcomRoute
+  ApiPublicHooksRunFlowTickRoute: typeof ApiPublicHooksRunFlowTickRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -312,6 +352,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -461,6 +508,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardBuilderIndexRouteImport
       parentRoute: typeof AppDashboardRoute
     }
+    '/api/public/hooks/run-flow-tick': {
+      id: '/api/public/hooks/run-flow-tick'
+      path: '/api/public/hooks/run-flow-tick'
+      fullPath: '/api/public/hooks/run-flow-tick'
+      preLoaderRoute: typeof ApiPublicHooksRunFlowTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/calcom': {
+      id: '/api/public/hooks/calcom'
+      path: '/api/public/hooks/calcom'
+      fullPath: '/api/public/hooks/calcom'
+      preLoaderRoute: typeof ApiPublicHooksCalcomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/dashboard/builder/$documentId': {
       id: '/_app/dashboard/builder/$documentId'
       path: '/builder/$documentId'
@@ -536,8 +597,11 @@ const rootRouteChildren: RootRouteChildren = {
   MasterRoute: MasterRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiPublicHooksCalcomRoute: ApiPublicHooksCalcomRoute,
+  ApiPublicHooksRunFlowTickRoute: ApiPublicHooksRunFlowTickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -13,6 +13,11 @@ const STEP_TYPES = [
   "wait",
   "condition_replied",
   "action",
+  "calcom_check_availability",
+  "calcom_book_meeting",
+  "calcom_cancel_booking",
+  "calcom_reschedule_booking",
+  "end",
 ] as const;
 export type StepType = (typeof STEP_TYPES)[number];
 
@@ -49,6 +54,28 @@ const ActionConfig = z.object({
   ]),
   params: z.record(z.string(), z.any()).default({}),
 });
+const EndConfig = z.object({
+  reason: z.string().max(160).optional(),
+});
+
+const CalCheckAvailabilityConfig = z.object({
+  event_type_id: z.number().int().positive(),
+  window_days: z.number().int().min(1).max(60).default(7),
+  business_hours_only: z.boolean().default(true),
+});
+const CalBookMeetingConfig = z.object({
+  event_type_id: z.number().int().positive(),
+  slot_strategy: z.enum(["first_available", "ai_decided", "lead_picks_link"]).default("first_available"),
+  fallback_link_text: z.string().max(500).optional(),
+  cancel_retry_business_days: z.number().int().min(0).max(60).default(3),
+});
+const CalCancelBookingConfig = z.object({
+  reason_template: z.string().max(300).optional(),
+});
+const CalRescheduleBookingConfig = z.object({
+  event_type_id: z.number().int().positive(),
+  strategy: z.enum(["first_available", "lead_picks_link"]).default("first_available"),
+});
 
 function validateConfigForType(type: StepType, config: unknown): unknown {
   switch (type) {
@@ -64,6 +91,16 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return ConditionRepliedConfig.parse(config ?? {});
     case "action":
       return ActionConfig.parse(config ?? {});
+    case "calcom_check_availability":
+      return CalCheckAvailabilityConfig.parse(config ?? {});
+    case "calcom_book_meeting":
+      return CalBookMeetingConfig.parse(config ?? {});
+    case "calcom_cancel_booking":
+      return CalCancelBookingConfig.parse(config ?? {});
+    case "calcom_reschedule_booking":
+      return CalRescheduleBookingConfig.parse(config ?? {});
+    case "end":
+      return EndConfig.parse(config ?? {});
   }
 }
 
@@ -80,7 +117,7 @@ const TransitionInput = z.object({
   id: z.string().uuid(),
   from_step_id: z.string().uuid(),
   to_step_id: z.string().uuid(),
-  branch: z.enum(["next", "yes", "no"]).default("next"),
+  branch: z.enum(["next", "yes", "no", "failed", "no_slots"]).default("next"),
 });
 
 // ---------------------------------------------------------------------------
@@ -156,18 +193,51 @@ function validateGraph(
   }
   for (const s of steps) {
     const out = outgoing.get(s.id) ?? new Set();
-    if (s.type === "condition_replied") {
+    if (s.type === "end") {
+      if (out.size > 0) {
+        errors.push({
+          step_id: s.id,
+          message: 'O nó "Fim" não pode ter saídas.',
+        });
+      }
+    } else if (s.type === "condition_replied") {
       if (out.size !== 0 && !(out.has("yes") && out.has("no") && out.size === 2)) {
         errors.push({
           step_id: s.id,
           message: 'Condição precisa de 0 ou 2 saídas ("Sim" e "Não").',
         });
       }
+    } else if (s.type === "calcom_check_availability") {
+      // allowed: 'next' (slots found) and/or 'no_slots'
+      for (const b of out) {
+        if (b !== "next" && b !== "no_slots") {
+          errors.push({ step_id: s.id, message: `Saída "${b}" inválida em Consultar agenda.` });
+        }
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({ step_id: s.id, message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.' });
+      }
+    } else if (s.type === "calcom_book_meeting") {
+      // allowed: 'next' (booked) and/or 'failed' (no slot / api error)
+      for (const b of out) {
+        if (b !== "next" && b !== "failed") {
+          errors.push({ step_id: s.id, message: `Saída "${b}" inválida em Agendar reunião.` });
+        }
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({ step_id: s.id, message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.' });
+      }
     } else {
       if (out.size > 1 || (out.size === 1 && !out.has("next"))) {
         errors.push({
           step_id: s.id,
           message: 'Passo linear só pode ter 1 saída "next".',
+        });
+      }
+      if (opts.strict && out.size === 0) {
+        errors.push({
+          step_id: s.id,
+          message: 'Passo sem próximo nó. Conecte a um nó "Fim" para encerrar o fluxo.',
         });
       }
     }

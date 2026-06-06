@@ -49,7 +49,7 @@ export const getMyContext = createServerFn({ method: "GET" })
       .limit(1)
       .maybeSingle();
 
-    const [orgRes, rolesRes] = await Promise.all([
+    const [orgRes, rolesRes, profileRes] = await Promise.all([
       membership
         ? supabase
             .from("organizations")
@@ -58,6 +58,11 @@ export const getMyContext = createServerFn({ method: "GET" })
             .maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.from("user_roles").select("role").eq("user_id", userId),
+      supabase
+        .from("profiles")
+        .select("full_name, onboarding_completed_at")
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
 
     return {
@@ -65,8 +70,23 @@ export const getMyContext = createServerFn({ method: "GET" })
       organization: orgRes.data ?? null,
       role: membership?.role ?? null,
       isMaster: (rolesRes.data ?? []).some((r) => r.role === "master_admin"),
+      profile: profileRes.data ?? null,
+      onboardingCompleted: !!profileRes.data?.onboarding_completed_at,
     };
   });
+
+export const markOnboardingCompleted = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ onboarding_completed_at: new Date().toISOString() })
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
 export const getDashboardSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -204,17 +224,31 @@ export const getLeadDetail = createServerFn({ method: "GET" })
     };
   });
 
-export const listCampaigns = createServerFn({ method: "GET" })
+const ListCampaignsSchema = z.object({
+  scope: z.enum(["active", "archived"]).default("active"),
+}).default({ scope: "active" });
+
+export const listCampaigns = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data: campaigns, error } = await context.supabase
+  .inputValidator((input: unknown) => ListCampaignsSchema.parse(input ?? {}))
+  .handler(async ({ context, data }) => {
+    const scope = data.scope;
+    // Count of archived (always returned so the toggle badge shows the right number)
+    const { count: archivedCount } = await context.supabase
+      .from("campaigns")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "archived");
+
+    let q = context.supabase
       .from("campaigns")
       .select("id, name, description, status, channel, total_enrolled, total_sent, total_replied, created_at, scheduled_at")
       .order("created_at", { ascending: false })
       .limit(100);
+    q = scope === "archived" ? q.eq("status", "archived") : q.neq("status", "archived");
+    const { data: campaigns, error } = await q;
     if (error) throw new Error(error.message);
     const list = campaigns ?? [];
-    if (list.length === 0) return [];
+    if (list.length === 0) return { items: [], archived_count: archivedCount ?? 0 };
 
     const campaignIds = list.map((c) => c.id);
     const { data: docs, error: docsErr } = await context.supabase
@@ -239,14 +273,60 @@ export const listCampaigns = createServerFn({ method: "GET" })
     }
     const docByCampaign = new Map(docList.map((d) => [d.campaign_id, d]));
 
-    return list.map((c) => {
+    // For running/paused campaigns, aggregate enrollments by current_step_id so
+    // the card can show which node leads are sitting on right now.
+    const liveCampaignIds = list
+      .filter((c) => c.status === "running" || c.status === "paused")
+      .map((c) => c.id);
+    const currentNodesByCampaign = new Map<string, Array<{ step_id: string; type: string; config: any; count: number }>>();
+    if (liveCampaignIds.length > 0) {
+      const { data: enrolls } = await context.supabase
+        .from("campaign_enrollments")
+        .select("campaign_id, current_step_id")
+        .in("campaign_id", liveCampaignIds)
+        .eq("status", "active")
+        .not("current_step_id", "is", null)
+        .limit(5000);
+      const grouped = new Map<string, Map<string, number>>();
+      for (const row of (enrolls ?? []) as Array<{ campaign_id: string; current_step_id: string }>) {
+        let byStep = grouped.get(row.campaign_id);
+        if (!byStep) { byStep = new Map(); grouped.set(row.campaign_id, byStep); }
+        byStep.set(row.current_step_id, (byStep.get(row.current_step_id) ?? 0) + 1);
+      }
+      const stepIds = Array.from(new Set(
+        Array.from(grouped.values()).flatMap((m) => Array.from(m.keys())),
+      ));
+      const stepsById = new Map<string, { type: string; config: any }>();
+      if (stepIds.length > 0) {
+        const { data: stepsRows } = await context.supabase
+          .from("flow_steps")
+          .select("id, type, config")
+          .in("id", stepIds);
+        for (const s of (stepsRows ?? []) as Array<{ id: string; type: string; config: any }>) {
+          stepsById.set(s.id, { type: s.type, config: s.config });
+        }
+      }
+      for (const [campId, byStep] of grouped.entries()) {
+        const arr = Array.from(byStep.entries())
+          .map(([step_id, count]) => {
+            const s = stepsById.get(step_id);
+            return { step_id, type: s?.type ?? "unknown", config: s?.config ?? {}, count };
+          })
+          .sort((a, b) => b.count - a.count);
+        currentNodesByCampaign.set(campId, arr);
+      }
+    }
+
+    const items = list.map((c) => {
       const doc = docByCampaign.get(c.id);
       return {
         ...c,
         flow_step_count: doc ? stepCountByDoc.get(doc.id) ?? 0 : null,
         flow_status: (doc?.status as string | undefined) ?? null,
+        current_nodes: currentNodesByCampaign.get(c.id) ?? [],
       };
     });
+    return { items, archived_count: archivedCount ?? 0 };
   });
 
 export const listConversations = createServerFn({ method: "GET" })
@@ -254,11 +334,65 @@ export const listConversations = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("conversations")
-      .select("id, subject, channel, status, last_message_preview, last_message_at, unread_count, ai_enabled, leads(full_name, company_name)")
+      .select("id, subject, channel, status, last_message_preview, last_message_at, unread_count, ai_enabled, lead_id, leads(id, full_name, company_name, phone, needs_review)")
+      .in("channel", ["email", "whatsapp"])
       .order("last_message_at", { ascending: false, nullsFirst: false })
-      .limit(100);
+      .limit(200);
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const listLeadsNeedingReview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("leads")
+      .select("id, full_name, phone, company_name, job_title, review_reason, created_at")
+      .eq("needs_review", true)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    const ids = (data ?? []).map((l) => l.id);
+    let previewByLead = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: convs } = await context.supabase
+        .from("conversations")
+        .select("lead_id, last_message_preview, last_message_at")
+        .in("lead_id", ids)
+        .eq("channel", "whatsapp");
+      for (const c of (convs ?? []) as any[]) {
+        if (c.lead_id && c.last_message_preview && !previewByLead.has(c.lead_id)) {
+          previewByLead.set(c.lead_id, c.last_message_preview);
+        }
+      }
+    }
+    return (data ?? []).map((l) => ({ ...l, preview: previewByLead.get(l.id) ?? null }));
+  });
+
+export const getLeadsNeedingReviewCount = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { count, error } = await context.supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("needs_review", true)
+      .is("archived_at", null);
+    if (error) throw new Error(error.message);
+    return { count: count ?? 0 };
+  });
+
+export const acceptLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("leads")
+      .update({ needs_review: false, review_reason: null, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const listIntegrations = createServerFn({ method: "GET" })
@@ -364,28 +498,72 @@ export const archiveLead = createServerFn({ method: "POST" })
   });
 
 // -------- Lead import (CSV) --------
-const ImportLeadRowSchema = z.object({
-  full_name: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(255),
-  phone: z.string().trim().max(40).nullable().optional(),
-  company_name: z.string().trim().max(160).nullable().optional(),
-  job_title: z.string().trim().max(160).nullable().optional(),
-});
+const KNOWN_LEAD_FIELDS = [
+  "full_name",
+  "first_name",
+  "last_name",
+  "email",
+  "secondary_email",
+  "personal_email",
+  "phone",
+  "mobile_phone",
+  "corporate_phone",
+  "company_name",
+  "job_title",
+  "seniority",
+  "department",
+  "industry",
+  "employee_count",
+  "website_url",
+  "linkedin_url",
+  "city",
+  "state",
+  "country",
+  "tags",
+] as const;
+
+type KnownLeadField = (typeof KNOWN_LEAD_FIELDS)[number];
+
+const ImportLeadCellSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()),
+]);
 
 const ImportLeadsSchema = z.object({
-  rows: z.array(z.record(z.string(), z.string().nullable().optional())).min(1).max(2000),
+  rows: z
+    .array(z.record(z.string(), ImportLeadCellSchema.optional()))
+    .min(1)
+    .max(2000),
   source_id: z.string().uuid().nullable().optional(),
 });
 
-function pickCol(
-  row: Record<string, string | null | undefined>,
-  keys: string[],
-): string | null {
-  for (const k of keys) {
-    const v = row[k];
-    if (v != null && String(v).trim() !== "") return String(v).trim();
+function asString(v: unknown): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.join(", ");
+  return String(v).trim();
+}
+
+function normalizeUrl(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  const candidate = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const u = new URL(candidate);
+    if (!u.hostname.includes(".")) return null;
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return null;
   }
-  return null;
+}
+
+function parseEmployeeCount(raw: string): number | null {
+  const m = raw.match(/\d[\d.,]*/);
+  if (!m) return null;
+  const n = parseInt(m[0].replace(/[.,]/g, ""), 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 export const importLeads = createServerFn({ method: "POST" })
@@ -395,52 +573,87 @@ export const importLeads = createServerFn({ method: "POST" })
     const organization_id = await getActiveOrgId(context.supabase, context.userId);
 
     const errors: Array<{ row: number; message: string }> = [];
-    const valid: Array<z.infer<typeof ImportLeadRowSchema>> = [];
+    const toInsert: Array<Record<string, unknown>> = [];
 
     data.rows.forEach((raw, idx) => {
-      const normalized: Record<string, string | null> = {};
-      for (const k of Object.keys(raw)) {
-        normalized[k.toLowerCase().trim()] = (raw[k] ?? null) as string | null;
-      }
-      const candidate = {
-        full_name: pickCol(normalized, ["full_name", "name", "nome", "nome completo"]),
-        email: pickCol(normalized, ["email", "e-mail"]),
-        phone: pickCol(normalized, ["phone", "telefone", "celular"]),
-        company_name: pickCol(normalized, ["company_name", "company", "empresa"]),
-        job_title: pickCol(normalized, ["job_title", "cargo", "title"]),
-      };
-      const parsed = ImportLeadRowSchema.safeParse(candidate);
-      if (!parsed.success) {
-        errors.push({
-          row: idx + 2,
-          message: parsed.error.issues[0]?.message ?? "Linha inválida",
-        });
+      const rowNum = idx + 2;
+      const get = (k: string) => asString(raw[k as keyof typeof raw]);
+
+      // Compose full_name from first/last if needed
+      let full_name = get("full_name");
+      const first = get("first_name");
+      const last = get("last_name");
+      if (!full_name) full_name = [first, last].filter(Boolean).join(" ").trim();
+
+      const email = get("email").toLowerCase();
+      const parsedEmail = z.string().email().safeParse(email);
+      if (!full_name || full_name.length < 1) {
+        errors.push({ row: rowNum, message: "Nome ausente" });
         return;
       }
-      valid.push(parsed.data);
+      if (!parsedEmail.success) {
+        errors.push({ row: rowNum, message: "Email inválido ou ausente" });
+        return;
+      }
+
+      const websiteRaw = get("website_url");
+      const linkedinRaw = get("linkedin_url");
+      const employeeRaw = get("employee_count");
+
+      // tags: accept array or delimited string
+      const tagsRaw = raw["tags" as keyof typeof raw];
+      let tags: string[] = [];
+      if (Array.isArray(tagsRaw)) tags = tagsRaw.map(String).map((t) => t.trim()).filter(Boolean);
+      else if (typeof tagsRaw === "string")
+        tags = tagsRaw.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
+
+      // enrichment_data: any key not in KNOWN_LEAD_FIELDS
+      const enrichment_data: Record<string, unknown> = {};
+      for (const k of Object.keys(raw)) {
+        if ((KNOWN_LEAD_FIELDS as readonly string[]).includes(k)) continue;
+        const v = raw[k as keyof typeof raw];
+        if (v == null || v === "") continue;
+        enrichment_data[k] = v;
+      }
+
+      const row: Record<string, unknown> = {
+        organization_id,
+        full_name: full_name.slice(0, 120),
+        email: email.slice(0, 255),
+        phone: get("phone") || null,
+        mobile_phone: get("mobile_phone") || null,
+        corporate_phone: get("corporate_phone") || null,
+        secondary_email: get("secondary_email").toLowerCase() || null,
+        personal_email: get("personal_email").toLowerCase() || null,
+        company_name: get("company_name") || null,
+        job_title: get("job_title") || null,
+        seniority: get("seniority") || null,
+        department: get("department") || null,
+        industry: get("industry") || null,
+        employee_count: employeeRaw ? parseEmployeeCount(employeeRaw) : null,
+        website_url: websiteRaw ? normalizeUrl(websiteRaw) : null,
+        linkedin_url: linkedinRaw ? normalizeUrl(linkedinRaw) : null,
+        city: get("city") || null,
+        state: get("state") || null,
+        country: get("country") || null,
+        tags,
+        enrichment_data,
+        source_id: data.source_id ?? null,
+        status: "new" as const,
+        created_by: context.userId,
+      };
+      toInsert.push(row);
     });
 
     let created = 0;
-    if (valid.length > 0) {
+    if (toInsert.length > 0) {
       const { error, count } = await context.supabase
         .from("leads")
-        .insert(
-          valid.map((v) => ({
-            organization_id,
-            full_name: v.full_name,
-            email: v.email,
-            phone: v.phone ?? null,
-            company_name: v.company_name ?? null,
-            job_title: v.job_title ?? null,
-            source_id: data.source_id ?? null,
-            status: "new" as const,
-            created_by: context.userId,
-          })),
-          { count: "exact" },
-        );
+        .insert(toInsert as never, { count: "exact" });
       if (error) throw new Error(error.message);
-      created = count ?? valid.length;
+      created = count ?? toInsert.length;
     }
+
 
     return {
       received: data.rows.length,
@@ -449,6 +662,10 @@ export const importLeads = createServerFn({ method: "POST" })
       errors: errors.slice(0, 25),
     };
   });
+
+// Re-export type so the importer UI can stay in sync.
+export type ImportableLeadField = KnownLeadField;
+
 
 // -------- Campaigns CRUD --------
 const CAMPAIGN_CHANNELS = ["email", "whatsapp", "linkedin", "sms", "multi"] as const;
@@ -586,4 +803,96 @@ export const archiveCampaign = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return row;
+  });
+
+export const restoreCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { data: existing, error: e0 } = await context.supabase
+      .from("campaigns")
+      .select("id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (e0) throw new Error(e0.message);
+    if (!existing) throw new Error("Campanha não encontrada.");
+    if (existing.status !== "archived") {
+      throw new Error("Apenas campanhas arquivadas podem ser restauradas.");
+    }
+    const { data: row, error } = await context.supabase
+      .from("campaigns")
+      .update({
+        status: "draft",
+        started_at: null,
+        completed_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+// Hard delete an archived campaign. Guards against deleting live campaigns —
+// the only way to call this is after archiving first. Wipes downstream rows
+// (enrollments, scheduled jobs, step runs) and soft-archives the builder
+// document so flow history isn't completely lost.
+export const deleteCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const { data: campaign, error: e0 } = await supabase
+      .from("campaigns")
+      .select("id, organization_id, status, name")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (e0) throw new Error(e0.message);
+    if (!campaign) throw new Error("Campanha não encontrada.");
+    if (campaign.status !== "archived") {
+      throw new Error("Arquive a campanha antes de excluir definitivamente.");
+    }
+
+    // Collect enrollment ids so we can cascade cleanups.
+    const { data: enrollRows } = await supabase
+      .from("campaign_enrollments")
+      .select("id")
+      .eq("campaign_id", data.id);
+    const enrollmentIds = (enrollRows ?? []).map((r) => r.id);
+
+    if (enrollmentIds.length > 0) {
+      // Cancel pending jobs (do not delete — keep audit trail).
+      await supabase
+        .from("scheduled_jobs")
+        .update({ status: "cancelled" })
+        .in("enrollment_id", enrollmentIds)
+        .eq("status", "pending");
+      // Delete step runs tied to these enrollments.
+      await supabase.from("flow_step_runs").delete().in("enrollment_id", enrollmentIds);
+      // Delete enrollments themselves.
+      await supabase.from("campaign_enrollments").delete().eq("campaign_id", data.id);
+    }
+
+    // Soft-archive any builder document(s) linked to this campaign.
+    await supabase
+      .from("builder_documents")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("campaign_id", data.id)
+      .is("archived_at", null);
+
+    const { error: delErr } = await supabase.from("campaigns").delete().eq("id", data.id);
+    if (delErr) throw new Error(delErr.message);
+
+    await supabase.from("audit_logs").insert({
+      organization_id: campaign.organization_id,
+      actor_user_id: userId,
+      action: "campaign.deleted",
+      entity_type: "campaign",
+      entity_id: data.id,
+      before: { name: campaign.name, status: campaign.status },
+      after: null,
+    });
+
+    return { ok: true };
   });

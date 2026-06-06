@@ -25,9 +25,16 @@ A Fase 1 está fechada. Restam para próximas fases:
 ## 1. Primeiros passos
 
 1. Crie sua conta em `/signup` ou entre em `/login`.
-2. Depois do login, você cai em `/dashboard`.
-3. Se não houver sessão, o sistema redireciona automaticamente para `/login`.
-4. A área `/master` aparece apenas para usuários com papel `master_admin`.
+2. **Confirmação de email está desabilitada no MVP** — após o signup, o usuário entra direto na plataforma sem precisar clicar em link de verificação. Para reativar futuramente: religar `Confirm email` nas configurações de Auth do Lovable Cloud (Auth → Email) e restaurar a tela de "verifique seu email" no `/signup`.
+3. No primeiro acesso, o usuário é levado para `/onboarding` — uma tela única de boas-vindas com 5 cards (Importar leads, Criar fluxos, Acompanhar painel, IA — em breve, Agendamento — em breve) e um botão "Começar a usar" que marca `profiles.onboarding_completed_at = now()` e leva para `/dashboard`.
+4. Logins subsequentes vão direto para `/dashboard`. A rota `/onboarding` continua acessível manualmente.
+5. Se não houver sessão, o sistema redireciona automaticamente para `/login`.
+6. A área `/master` aparece apenas para usuários com papel `master_admin`.
+
+### Builder — auto-link
+
+No Builder, ao arrastar um novo step (Email, Aguardar, Condição) da paleta para o canvas, o sistema **conecta automaticamente** o novo nó ao último nó adicionado, com `branch = next` (ou na primeira saída livre `yes`/`no` para Condições). O novo nó é posicionado 280px à direita do último. Quando o último nó já tem todas as saídas ocupadas — ou quando é uma Condição com `yes` e `no` ambos ocupados — o novo nó fica solto e o usuário conecta manualmente. A operação ainda exige clicar em "Salvar" para persistir.
+
 
 ## 2. Navegação
 
@@ -112,6 +119,18 @@ A tela também mostra:
 - último sync
 - erro mais recente, se houver
 
+### WhatsApp via Hook7
+
+O provider **WhatsApp** usa o Hook7 (API própria da S7) para conectar números reais via QR Code.
+
+- A **chave global do Hook7** é configurada pelo operador da plataforma (S7) via variável de ambiente do servidor (`HOOK7_GLOBAL_APIKEY`). O `master_admin` pode verificar status e testar a conexão em **Master → Plataforma → WhatsApp · Hook7**, mas **não** pode visualizar ou alterar o valor pela UI. A **URL base** continua editável pela UI (não é segredo).
+- O prefixo de nomes de instância é controlado pela variável `HOOK7_INSTANCE_PREFIX` (padrão `lead`).
+- Em cada organização, o `company_admin` abre **Integrações → WhatsApp → Gerenciar instâncias** para criar uma instância, gerar o QR Code e escaneá-lo no app WhatsApp do celular. O status é atualizado a cada 3 segundos e expira em 2 minutos se ninguém parear.
+- O modo de uso (compartilhado pela organização ou por usuário) é definido em **Configurações → WhatsApp**. Em modo "por usuário", cada instância pertence a um membro específico.
+- Tokens de instância são armazenados criptografados (pgp_sym_encrypt) e só são acessíveis via função SECURITY DEFINER para administradores da organização ou pelo service role.
+
+
+
 ## 6. Área Master
 
 Para usuários `master_admin`, o painel Master já permite:
@@ -166,3 +185,11 @@ Todos os envios ficam registrados em `email_send_log`, auditáveis pelo master e
 ### Histórico
 
 - Adicionado: roteador central de email (`src/lib/email.functions.ts`), tabela `platform_settings` com Vault/pgcrypto, tabela `email_send_log`, página **Master → Plataforma** (chave Resend global, branding/logo, teste de envio, logs), banner explicativo em Integrações.
+
+## Webhook Hook7 / Recebimento de mensagens
+
+A infraestrutura WhatsApp (Hook7) entrega cada mensagem recebida no número conectado para uma Edge Function do Leaderei (`hook7-webhook`), que grava as mensagens na tabela `messages` e cria automaticamente um **lead órfão** (`needs_review = true`, motivo `inbound_from_unknown_whatsapp`) quando o número remetente ainda não existe na organização.
+
+A URL do webhook tem o formato `https://<projeto>.supabase.co/functions/v1/hook7-webhook/{secret}/{org-slug}` e é registrada automaticamente no Hook7 toda vez que uma instância é conectada ou reconectada. Mensagens de grupo, eventos de presença e tipos desconhecidos são descartados (200 + nada). A idempotência usa `Info.ID` (campo `external_message_id`), então reentregas do mesmo evento nunca duplicam linhas.
+
+**Configuração:** defina `HOOK7_WEBHOOK_SECRET` no painel de deploy (UUID v4 gerado uma única vez — **nunca rotacionar**, rotacionar invalida todos os webhooks já registrados nas instâncias existentes). Sem essa variável as instâncias ainda conectam, mas o Leaderei não recebe mensagens — o status aparece em **Master → Plataforma → WhatsApp · Hook7 → Webhook URL**.

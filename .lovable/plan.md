@@ -1,51 +1,50 @@
-## Problema
+## Contexto
 
-A tabela `public.user_roles` hoje só tem duas policies:
-- `SELECT` permitindo o usuário ver suas próprias roles (`user_id = auth.uid()`)
-- `ALL` para `master_admin`
+O domínio primário foi alterado para `https://app.leaderei.com.br` (já ativo, custom domain do projeto). No código existem três pontos onde a URL pública importa — principalmente para **webhooks externos** que precisam de URL estável e para **links em e-mails transacionais** (convites, etc).
 
-Não existe nenhuma policy de `INSERT/UPDATE/DELETE` para usuários comuns — e como RLS é permissiva por padrão, isso **não bloqueia** escrita: qualquer usuário autenticado pode rodar um `INSERT` atribuindo a si mesmo a role `master_admin` e ganhar acesso global.
+Hoje o sistema já tem:
+- `platform_settings.app_public_url` (registro existe, mas **valor está vazio**)
+- env var opcional `PUBLIC_APP_URL` / `VITE_PUBLIC_APP_URL` (não definidas)
+- fallback hardcoded `https://leaderei.lovable.app` em 2 lugares no `calcom.functions.ts`
 
-## Correção
+Resultado atual: o webhook do Cal.com mostrado na UI para o cliente colar lá usa `leaderei.lovable.app`, não o domínio novo.
 
-Migração SQL adicionando policies de escrita restritivas em `public.user_roles`:
+## O que muda
 
-1. **`INSERT` apenas para `master_admin`**
-   ```sql
-   CREATE POLICY "Only master_admin can insert roles"
-   ON public.user_roles FOR INSERT TO authenticated
-   WITH CHECK (public.has_role(auth.uid(), 'master_admin'));
-   ```
-2. **`UPDATE` apenas para `master_admin`**
-   ```sql
-   CREATE POLICY "Only master_admin can update roles"
-   ON public.user_roles FOR UPDATE TO authenticated
-   USING (public.has_role(auth.uid(), 'master_admin'))
-   WITH CHECK (public.has_role(auth.uid(), 'master_admin'));
-   ```
-3. **`DELETE` apenas para `master_admin`**
-   ```sql
-   CREATE POLICY "Only master_admin can delete roles"
-   ON public.user_roles FOR DELETE TO authenticated
-   USING (public.has_role(auth.uid(), 'master_admin'));
-   ```
+### 1. Definir o domínio oficial no banco
+Atualizar `platform_settings.app_public_url` para `https://app.leaderei.com.br`. Isto já é consumido por `src/lib/settings.functions.ts` (linhas 197–204) na geração de links de convite.
 
-A policy `ALL` de `master_admin` já existente continua funcionando (policies permissivas são unidas por OR). A nova explicitação fecha o buraco para usuários comuns.
+### 2. Webhook do Cal.com passar a usar o domínio oficial
+Em `src/lib/calcom.functions.ts`:
+- A função `webhookUrlFor(org)` (linha 136) e a função `testWebhookSignature` (linha 340) hoje só leem `process.env.PUBLIC_APP_URL` → caem no fallback `leaderei.lovable.app`.
+- Mudança: passar a ler também `platform_settings.app_public_url` (via `supabaseAdmin`), com prioridade:
+  `app_public_url (DB) → PUBLIC_APP_URL (env) → https://app.leaderei.com.br (novo fallback)`.
+- Trocar o fallback hardcoded de `leaderei.lovable.app` por `app.leaderei.com.br`.
 
-## Por que isso não quebra signup/convites
+### 3. Placeholder da UI master
+`src/routes/_master.master.platform.tsx` linha 295 já mostra `https://app.leaderei.com.br` como placeholder — sem alteração de código, apenas confirmar que o valor salvo agora é esse.
 
-Os fluxos que hoje inserem em `user_roles` rodam via funções `SECURITY DEFINER` (executam como dono da função, ignorando RLS):
-- `public.provision_user_account` — usada por `handle_new_user` no signup → insere `company_admin`.
-- `public.accept_invitation` — usada na aceitação de convite → insere `company_admin`/`user`.
+### 4. O que NÃO muda
+- **Hook7 webhook** (`src/lib/hook7.functions.ts`): usa `SUPABASE_URL/functions/v1/hook7-webhook/...` — não depende do domínio do app, segue igual.
+- **Endpoints `/api/public/hooks/run-flow-tick`** (pg_cron): hoje são chamados via URL estável `project--{id}.lovable.app`, que continua válida. Sem mudança.
+- **Cal.com já configurado em clientes existentes**: como o webhook atual aponta para `leaderei.lovable.app` (que continua publicado e roteando para o mesmo backend), **continua funcionando**. Mas novos clientes / regenerações usarão a URL nova. Recomendo, depois do deploy, os clientes que já configuraram o Cal.com **copiarem a nova URL** e atualizarem lá — vou deixar isso destacado na UI da integração com um aviso.
+- `src/routes/__root.tsx` og:image: aponta para R2 (preview), é só imagem social — fora de escopo.
 
-Nenhum código cliente faz `supabase.from('user_roles').insert(...)` diretamente, então a restrição não afeta a aplicação.
+## Passos de implementação
 
-## Verificação após aplicar
+1. Migração SQL atualizando `platform_settings.app_public_url` para `https://app.leaderei.com.br`.
+2. Editar `src/lib/calcom.functions.ts`:
+   - Criar helper `async function resolveAppBaseUrl()` que consulta `platform_settings` via `supabaseAdmin` e cacheia em memória por request.
+   - `webhookUrlFor` vira `async`; ajustar os 2 call sites (`getCalcomConnection`, `saveCalcomConnection` retorno) para `await`.
+   - `testWebhookSignature` passa a usar o mesmo helper.
+   - Trocar fallback string.
+3. Adicionar pequeno aviso (`<p className="text-xs text-muted-foreground">`) abaixo do campo "Webhook URL" em `_app.dashboard.integrations.tsx` lembrando de atualizar no Cal.com se a URL mudou.
 
-- Re-rodar o scanner de segurança — finding `user_roles_self_assignment` deve sumir.
-- Signup novo continua provisionando role corretamente.
-- Aceite de convite continua atribuindo role corretamente.
+## Verificação
 
-## Escopo
+- `psql` para confirmar `app_public_url`.
+- Abrir `/dashboard/integrations` → card Cal.com → URL exibida deve começar com `https://app.leaderei.com.br/api/public/hooks/calcom?org=...`.
+- Botão "Testar webhook" deve responder 200 contra o domínio novo.
+- Enviar um convite (settings → membros) e conferir que o link do e-mail usa o domínio novo.
 
-Apenas 1 migração SQL. Sem mudanças em código TypeScript. Os outros findings do painel (tokens de convite, hashes de api_keys, funções SECURITY DEFINER executáveis, bucket público) ficam fora desta rodada — posso tratar em seguida se quiser.
+Sem mudanças em RLS, schema, rotas ou fluxos.

@@ -209,6 +209,42 @@ export type Database = {
         }
         Relationships: []
       }
+      cal_event_types_cache: {
+        Row: {
+          cal_event_type_id: number
+          created_at: string
+          id: string
+          length_minutes: number | null
+          organization_id: string
+          scheduling_type: string | null
+          slug: string
+          synced_at: string
+          title: string
+        }
+        Insert: {
+          cal_event_type_id: number
+          created_at?: string
+          id?: string
+          length_minutes?: number | null
+          organization_id: string
+          scheduling_type?: string | null
+          slug: string
+          synced_at?: string
+          title: string
+        }
+        Update: {
+          cal_event_type_id?: number
+          created_at?: string
+          id?: string
+          length_minutes?: number | null
+          organization_id?: string
+          scheduling_type?: string | null
+          slug?: string
+          synced_at?: string
+          title?: string
+        }
+        Relationships: []
+      }
       campaign_enrollments: {
         Row: {
           campaign_id: string
@@ -216,6 +252,8 @@ export type Database = {
           context: Json
           created_at: string
           current_node_id: string | null
+          current_step_id: string | null
+          document_id: string | null
           enrolled_at: string
           flow_definition_id: string | null
           id: string
@@ -232,6 +270,8 @@ export type Database = {
           context?: Json
           created_at?: string
           current_node_id?: string | null
+          current_step_id?: string | null
+          document_id?: string | null
           enrolled_at?: string
           flow_definition_id?: string | null
           id?: string
@@ -248,6 +288,8 @@ export type Database = {
           context?: Json
           created_at?: string
           current_node_id?: string | null
+          current_step_id?: string | null
+          document_id?: string | null
           enrolled_at?: string
           flow_definition_id?: string | null
           id?: string
@@ -271,6 +313,20 @@ export type Database = {
             columns: ["current_node_id"]
             isOneToOne: false
             referencedRelation: "flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "flow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_enrollments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "builder_documents"
             referencedColumns: ["id"]
           },
           {
@@ -445,6 +501,7 @@ export type Database = {
           notes: string | null
           organization_id: string
           owner_user_id: string | null
+          pipedrive_deal_id: number | null
           position: number
           probability: number
           stage: Database["public"]["Enums"]["deal_stage"]
@@ -464,6 +521,7 @@ export type Database = {
           notes?: string | null
           organization_id: string
           owner_user_id?: string | null
+          pipedrive_deal_id?: number | null
           position?: number
           probability?: number
           stage?: Database["public"]["Enums"]["deal_stage"]
@@ -483,6 +541,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner_user_id?: string | null
+          pipedrive_deal_id?: number | null
           position?: number
           probability?: number
           stage?: Database["public"]["Enums"]["deal_stage"]
@@ -739,6 +798,70 @@ export type Database = {
           },
         ]
       }
+      flow_step_runs: {
+        Row: {
+          branch_taken: string | null
+          created_at: string
+          enrollment_id: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          organization_id: string
+          output: Json
+          started_at: string
+          status: Database["public"]["Enums"]["flow_step_run_status"]
+          step_id: string
+        }
+        Insert: {
+          branch_taken?: string | null
+          created_at?: string
+          enrollment_id: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          output?: Json
+          started_at?: string
+          status?: Database["public"]["Enums"]["flow_step_run_status"]
+          step_id: string
+        }
+        Update: {
+          branch_taken?: string | null
+          created_at?: string
+          enrollment_id?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          output?: Json
+          started_at?: string
+          status?: Database["public"]["Enums"]["flow_step_run_status"]
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_step_runs_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_step_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_step_runs_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "flow_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flow_steps: {
         Row: {
           config: Json
@@ -873,6 +996,80 @@ export type Database = {
           },
           {
             foreignKeyName: "handoff_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hook7_instances: {
+        Row: {
+          archived_at: string | null
+          config: Json
+          connected_profile_name: string | null
+          created_at: string
+          created_by: string
+          display_name: string
+          external_id: string
+          external_name: string
+          id: string
+          last_connected_at: string | null
+          last_disconnected_at: string | null
+          last_qr_at: string | null
+          last_status_check_at: string | null
+          organization_id: string
+          owner_user_id: string | null
+          phone_number: string | null
+          status: string
+          token_encrypted: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          config?: Json
+          connected_profile_name?: string | null
+          created_at?: string
+          created_by: string
+          display_name: string
+          external_id: string
+          external_name: string
+          id?: string
+          last_connected_at?: string | null
+          last_disconnected_at?: string | null
+          last_qr_at?: string | null
+          last_status_check_at?: string | null
+          organization_id: string
+          owner_user_id?: string | null
+          phone_number?: string | null
+          status?: string
+          token_encrypted?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          config?: Json
+          connected_profile_name?: string | null
+          created_at?: string
+          created_by?: string
+          display_name?: string
+          external_id?: string
+          external_name?: string
+          id?: string
+          last_connected_at?: string | null
+          last_disconnected_at?: string | null
+          last_qr_at?: string | null
+          last_status_check_at?: string | null
+          organization_id?: string
+          owner_user_id?: string | null
+          phone_number?: string | null
+          status?: string
+          token_encrypted?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hook7_instances_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1051,6 +1248,7 @@ export type Database = {
           lead_id: string
           organization_id: string
           payload: Json
+          pipedrive_activity_id: number | null
           title: string
           type: Database["public"]["Enums"]["lead_activity_type"]
         }
@@ -1062,6 +1260,7 @@ export type Database = {
           lead_id: string
           organization_id: string
           payload?: Json
+          pipedrive_activity_id?: number | null
           title: string
           type: Database["public"]["Enums"]["lead_activity_type"]
         }
@@ -1073,6 +1272,7 @@ export type Database = {
           lead_id?: string
           organization_id?: string
           payload?: Json
+          pipedrive_activity_id?: number | null
           title?: string
           type?: Database["public"]["Enums"]["lead_activity_type"]
         }
@@ -1092,6 +1292,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lead_bookings: {
+        Row: {
+          attendee_email: string | null
+          attendee_name: string | null
+          cal_booking_id: string | null
+          cal_booking_uid: string
+          campaign_id: string | null
+          cancellation_reason: string | null
+          created_at: string
+          end_at: string | null
+          enrollment_id: string | null
+          event_type_id: number | null
+          event_type_slug: string | null
+          id: string
+          lead_id: string
+          location: string | null
+          meeting_url: string | null
+          organization_id: string
+          organizer_email: string | null
+          raw_payload: Json
+          reschedule_count: number
+          rescheduled_from_uid: string | null
+          start_at: string
+          status: Database["public"]["Enums"]["lead_booking_status"]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          attendee_email?: string | null
+          attendee_name?: string | null
+          cal_booking_id?: string | null
+          cal_booking_uid: string
+          campaign_id?: string | null
+          cancellation_reason?: string | null
+          created_at?: string
+          end_at?: string | null
+          enrollment_id?: string | null
+          event_type_id?: number | null
+          event_type_slug?: string | null
+          id?: string
+          lead_id: string
+          location?: string | null
+          meeting_url?: string | null
+          organization_id: string
+          organizer_email?: string | null
+          raw_payload?: Json
+          reschedule_count?: number
+          rescheduled_from_uid?: string | null
+          start_at: string
+          status?: Database["public"]["Enums"]["lead_booking_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attendee_email?: string | null
+          attendee_name?: string | null
+          cal_booking_id?: string | null
+          cal_booking_uid?: string
+          campaign_id?: string | null
+          cancellation_reason?: string | null
+          created_at?: string
+          end_at?: string | null
+          enrollment_id?: string | null
+          event_type_id?: number | null
+          event_type_slug?: string | null
+          id?: string
+          lead_id?: string
+          location?: string | null
+          meeting_url?: string | null
+          organization_id?: string
+          organizer_email?: string | null
+          raw_payload?: Json
+          reschedule_count?: number
+          rescheduled_from_uid?: string | null
+          start_at?: string
+          status?: Database["public"]["Enums"]["lead_booking_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       lead_enrichment: {
         Row: {
@@ -1190,24 +1471,37 @@ export type Database = {
           archived_at: string | null
           city: string | null
           company_name: string | null
+          corporate_phone: string | null
           country: string | null
           created_at: string
           created_by: string | null
           currency: string
           custom_fields: Json
+          department: string | null
           email: string | null
+          employee_count: number | null
+          enrichment_data: Json
           estimated_value: number | null
           full_name: string
           id: string
+          industry: string | null
           job_title: string | null
           last_contact_at: string | null
           linkedin_url: string | null
+          mobile_phone: string | null
+          needs_review: boolean
           next_followup_at: string | null
           organization_id: string
           owner_user_id: string | null
+          personal_email: string | null
           phone: string | null
+          pipedrive_person_id: number | null
+          review_reason: string | null
           score: number
+          secondary_email: string | null
+          seniority: string | null
           source_id: string | null
+          state: string | null
           status: Database["public"]["Enums"]["lead_status"]
           tags: string[]
           temperature: Database["public"]["Enums"]["lead_temperature"]
@@ -1218,24 +1512,37 @@ export type Database = {
           archived_at?: string | null
           city?: string | null
           company_name?: string | null
+          corporate_phone?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           custom_fields?: Json
+          department?: string | null
           email?: string | null
+          employee_count?: number | null
+          enrichment_data?: Json
           estimated_value?: number | null
           full_name: string
           id?: string
+          industry?: string | null
           job_title?: string | null
           last_contact_at?: string | null
           linkedin_url?: string | null
+          mobile_phone?: string | null
+          needs_review?: boolean
           next_followup_at?: string | null
           organization_id: string
           owner_user_id?: string | null
+          personal_email?: string | null
           phone?: string | null
+          pipedrive_person_id?: number | null
+          review_reason?: string | null
           score?: number
+          secondary_email?: string | null
+          seniority?: string | null
           source_id?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           tags?: string[]
           temperature?: Database["public"]["Enums"]["lead_temperature"]
@@ -1246,24 +1553,37 @@ export type Database = {
           archived_at?: string | null
           city?: string | null
           company_name?: string | null
+          corporate_phone?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           custom_fields?: Json
+          department?: string | null
           email?: string | null
+          employee_count?: number | null
+          enrichment_data?: Json
           estimated_value?: number | null
           full_name?: string
           id?: string
+          industry?: string | null
           job_title?: string | null
           last_contact_at?: string | null
           linkedin_url?: string | null
+          mobile_phone?: string | null
+          needs_review?: boolean
           next_followup_at?: string | null
           organization_id?: string
           owner_user_id?: string | null
+          personal_email?: string | null
           phone?: string | null
+          pipedrive_person_id?: number | null
+          review_reason?: string | null
           score?: number
+          secondary_email?: string | null
+          seniority?: string | null
           source_id?: string | null
+          state?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           tags?: string[]
           temperature?: Database["public"]["Enums"]["lead_temperature"]
@@ -1305,7 +1625,10 @@ export type Database = {
           sender_user_id: string | null
           sent_at: string | null
           sent_by_ai: boolean
+          source_channel: string
           status: Database["public"]["Enums"]["message_status"]
+          whatsapp_status: string | null
+          whatsapp_status_at: string | null
         }
         Insert: {
           attachments?: Json
@@ -1324,7 +1647,10 @@ export type Database = {
           sender_user_id?: string | null
           sent_at?: string | null
           sent_by_ai?: boolean
+          source_channel?: string
           status?: Database["public"]["Enums"]["message_status"]
+          whatsapp_status?: string | null
+          whatsapp_status_at?: string | null
         }
         Update: {
           attachments?: Json
@@ -1343,7 +1669,10 @@ export type Database = {
           sender_user_id?: string | null
           sent_at?: string | null
           sent_by_ai?: boolean
+          source_channel?: string
           status?: Database["public"]["Enums"]["message_status"]
+          whatsapp_status?: string | null
+          whatsapp_status_at?: string | null
         }
         Relationships: [
           {
@@ -1542,6 +1871,7 @@ export type Database = {
           timezone: string
           trial_ends_at: string | null
           updated_at: string
+          whatsapp_mode: string
         }
         Insert: {
           billing_email?: string | null
@@ -1561,6 +1891,7 @@ export type Database = {
           timezone?: string
           trial_ends_at?: string | null
           updated_at?: string
+          whatsapp_mode?: string
         }
         Update: {
           billing_email?: string | null
@@ -1580,6 +1911,7 @@ export type Database = {
           timezone?: string
           trial_ends_at?: string | null
           updated_at?: string
+          whatsapp_mode?: string
         }
         Relationships: []
       }
@@ -1645,6 +1977,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      pipedrive_sync_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          organization_id: string
+          started_at: string
+          stats: Json
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          started_at?: string
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipedrive_sync_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plans: {
         Row: {
@@ -1736,6 +2112,7 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          onboarding_completed_at: string | null
           updated_at: string
           user_id: string
         }
@@ -1744,6 +2121,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          onboarding_completed_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1752,6 +2130,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          onboarding_completed_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1761,6 +2140,7 @@ export type Database = {
         Row: {
           attempts: number
           created_at: string
+          enrollment_id: string | null
           id: string
           kind: string
           last_error: string | null
@@ -1777,6 +2157,7 @@ export type Database = {
         Insert: {
           attempts?: number
           created_at?: string
+          enrollment_id?: string | null
           id?: string
           kind: string
           last_error?: string | null
@@ -1793,6 +2174,7 @@ export type Database = {
         Update: {
           attempts?: number
           created_at?: string
+          enrollment_id?: string | null
           id?: string
           kind?: string
           last_error?: string | null
@@ -1806,7 +2188,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["job_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_jobs_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -1904,6 +2294,51 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_events: {
+        Row: {
+          cal_booking_uid: string | null
+          error: string | null
+          event_type: string | null
+          headers: Json
+          http_status: number | null
+          id: string
+          instance_id: string | null
+          organization_id: string | null
+          payload: Json
+          received_at: string
+          source: string
+          status: string
+        }
+        Insert: {
+          cal_booking_uid?: string | null
+          error?: string | null
+          event_type?: string | null
+          headers?: Json
+          http_status?: number | null
+          id?: string
+          instance_id?: string | null
+          organization_id?: string | null
+          payload?: Json
+          received_at?: string
+          source: string
+          status?: string
+        }
+        Update: {
+          cal_booking_uid?: string | null
+          error?: string | null
+          event_type?: string | null
+          headers?: Json
+          http_status?: number | null
+          id?: string
+          instance_id?: string | null
+          organization_id?: string | null
+          payload?: Json
+          received_at?: string
+          source?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1911,6 +2346,14 @@ export type Database = {
     Functions: {
       _platform_passphrase: { Args: never; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: string }
+      add_business_days: {
+        Args: { _days: number; _ts: string }
+        Returns: string
+      }
+      get_hook7_instance_token: {
+        Args: { _instance_id: string }
+        Returns: string
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
@@ -1969,6 +2412,10 @@ export type Database = {
           _user_id: string
         }
         Returns: string
+      }
+      set_hook7_instance_token: {
+        Args: { _instance_id: string; _token: string }
+        Returns: undefined
       }
       set_platform_plain: {
         Args: { _key: string; _value: Json }
@@ -2035,6 +2482,12 @@ export type Database = {
         | "enrich"
         | "tag"
         | "end"
+      flow_step_run_status:
+        | "pending"
+        | "running"
+        | "done"
+        | "failed"
+        | "skipped"
       integration_status: "disconnected" | "connected" | "error" | "pending"
       job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
       knowledge_source_kind: "url" | "file" | "text" | "faq"
@@ -2050,6 +2503,7 @@ export type Database = {
         | "message_received"
         | "enrichment"
         | "system"
+      lead_booking_status: "confirmed" | "rescheduled" | "cancelled" | "no_show"
       lead_status:
         | "new"
         | "contacted"
@@ -2261,6 +2715,7 @@ export const Constants = {
         "tag",
         "end",
       ],
+      flow_step_run_status: ["pending", "running", "done", "failed", "skipped"],
       integration_status: ["disconnected", "connected", "error", "pending"],
       job_status: ["pending", "running", "completed", "failed", "cancelled"],
       knowledge_source_kind: ["url", "file", "text", "faq"],
@@ -2277,6 +2732,7 @@ export const Constants = {
         "enrichment",
         "system",
       ],
+      lead_booking_status: ["confirmed", "rescheduled", "cancelled", "no_show"],
       lead_status: [
         "new",
         "contacted",

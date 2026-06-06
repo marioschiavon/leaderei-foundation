@@ -1,0 +1,2 @@
+ALTER TABLE public.flow_transitions DROP CONSTRAINT IF EXISTS flow_transitions_branch_check;
+ALTER TABLE public.flow_transitions ADD CONSTRAINT flow_transitions_branch_check CHECK (branch = ANY (ARRAY['next'::text, 'yes'::text, 'no'::text, 'failed'::text, 'no_slots'::text]));

@@ -45,15 +45,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  acceptLead,
   archiveLead,
   createLead,
   getLeadDetail,
+  getLeadsNeedingReviewCount,
   listLeads,
+  listLeadsNeedingReview,
   listLeadSources,
   updateLead,
 } from "@/lib/tenant.functions";
 import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, Check } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard/leads")({
   component: LeadsPage,
@@ -152,6 +156,42 @@ function LeadsPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [tab, setTab] = useState<"all" | "review">("all");
+
+  const fetchReview = useServerFn(listLeadsNeedingReview);
+  const fetchReviewCount = useServerFn(getLeadsNeedingReviewCount);
+  const acceptFn = useServerFn(acceptLead);
+  const archiveFnReview = useServerFn(archiveLead);
+  const queryClient = useQueryClient();
+  const { data: reviewLeads } = useQuery({
+    queryKey: ["leads-needing-review"],
+    queryFn: () => fetchReview(),
+  });
+  const { data: reviewCount } = useQuery({
+    queryKey: ["leads-needing-review-count"],
+    queryFn: () => fetchReviewCount(),
+  });
+
+  const acceptMut = useMutation({
+    mutationFn: (id: string) => acceptFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Lead aceito.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const discardMut = useMutation({
+    mutationFn: (id: string) => archiveFnReview({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Lead descartado.");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-needing-review-count"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const filtered = useMemo(() => {
     return (leads ?? []).filter((lead) => {
@@ -217,6 +257,82 @@ function LeadsPage() {
         }
       />
 
+      <div className="flex gap-1 border-b">
+        <button
+          onClick={() => setTab("all")}
+          className={cn(
+            "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+            tab === "all" ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Todos
+        </button>
+        <button
+          onClick={() => setTab("review")}
+          className={cn(
+            "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors inline-flex items-center gap-2",
+            tab === "review" ? "border-amber-500 text-amber-700" : "border-transparent text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Pra revisar
+          {reviewCount?.count ? (
+            <span className="rounded-full bg-amber-500/15 text-amber-700 px-1.5 py-0.5 text-[0.65rem] font-semibold">
+              {reviewCount.count}
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      {tab === "review" ? (
+        <div className="space-y-2">
+          {!reviewLeads?.length ? (
+            <EmptyState
+              icon={Check}
+              title="Nada pra revisar"
+              description="Leads criados automaticamente via WhatsApp aparecerão aqui."
+            />
+          ) : (
+            <ul className="space-y-2">
+              {reviewLeads.map((l: any) => (
+                <li key={l.id} className="rounded-xl border bg-surface p-4 flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/15 text-amber-700 text-xs font-semibold">
+                    {(l.full_name ?? "?").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">{l.full_name ?? l.phone}</span>
+                      {l.phone && <span className="text-xs text-muted-foreground">{l.phone}</span>}
+                      {l.review_reason && (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[0.65rem] text-muted-foreground">
+                          {l.review_reason === "inbound_from_unknown_whatsapp"
+                            ? "Respondeu via WhatsApp sem campanha ativa"
+                            : l.review_reason}
+                        </span>
+                      )}
+                    </div>
+                    {l.preview && <p className="text-xs text-muted-foreground line-clamp-2">{l.preview}</p>}
+                    <div className="text-[11px] text-muted-foreground">
+                      criado {new Date(l.created_at).toLocaleString("pt-BR")}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <Button size="sm" onClick={() => acceptMut.mutate(l.id)} disabled={acceptMut.isPending}>
+                      Aceitar
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedLeadId(l.id); setTab("all"); }}>
+                      Editar e aceitar
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => discardMut.mutate(l.id)} disabled={discardMut.isPending}>
+                      Descartar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
       <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_360px]">
         <section className="space-y-4">
           <div className="flex flex-col gap-3 rounded-xl border bg-surface p-3 lg:flex-row lg:items-center">
@@ -378,6 +494,9 @@ function LeadsPage() {
           )}
         </aside>
       </div>
+      )}
+
+
 
       <NewLeadSheet
         open={newLeadOpen}
