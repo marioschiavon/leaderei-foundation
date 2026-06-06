@@ -491,9 +491,9 @@ Tela onde o `company_admin` conecta canais externos. Atualmente:
 
 - **Email** (via Resend) — configurar chave própria ou usar transacional
 - **WhatsApp** (via Hook7) — gerenciar instâncias (1 ou mais números)
-- **Apollo** — placeholder (importação via CSV ativa, API futura)
-- **Pipedrive** — placeholder (importação via CSV ativa, API futura)
-- **Google Calendar** — placeholder (depende de Cal.com)
+- **Apollo** — API conectada por org (busca + enriquecimento + telemetria)
+- **Pipedrive** — API conectada por org (sync de persons/deals/activities)
+- **Cal.com** — conectado por org (webhook + cache de event types)
 
 Cada card mostra status agregado (conectado, parcialmente conectado, desconectado).
 
@@ -501,8 +501,11 @@ Cada card mostra status agregado (conectado, parcialmente conectado, desconectad
 
 - ✅ Card WhatsApp totalmente funcional (criar/conectar/desconectar/reconectar/apagar/renomear instâncias)
 - ✅ Card Resend funcional para chave da organização (campanhas)
-- ⏳ Cards Apollo/Pipedrive são placeholders (a integração real está em Leads → Importar CSV)
-- ⏳ Cards Cal.com, LinkedIn — futuros
+- ✅ Card Pipedrive funcional (conectar + sync manual + cursores incrementais)
+- ✅ Card Apollo funcional (conectar + abrir busca + telemetria de chamadas)
+- ✅ Card Cal.com funcional (conectar + webhook + sync de tipos de evento)
+- ⏳ Cards LinkedIn, HubSpot — futuros
+
 
 ---
 
