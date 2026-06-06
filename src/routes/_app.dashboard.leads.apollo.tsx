@@ -308,7 +308,7 @@ function ApolloSearchPage() {
                           />
                         </td>
                         <td className="p-2">
-                          <div className="font-medium">{p.name ?? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"}</div>
+                          <div className="font-medium">{p.name ?? (`${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—")}</div>
                           <div className="text-2xs text-muted-foreground">
                             {p.title ?? "—"}
                             {p.linkedin_url && (
