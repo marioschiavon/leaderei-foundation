@@ -31,6 +31,8 @@ import {
 import { listHook7Instances } from "@/lib/hook7.functions";
 import { WhatsAppManagerDialog } from "@/components/app/WhatsAppManagerDialog";
 import { PipedriveConnectDialog } from "@/components/app/PipedriveConnectDialog";
+import { ApolloConnectDialog } from "@/components/app/ApolloConnectDialog";
+
 
 export const Route = createFileRoute("/_app/dashboard/integrations")({
   component: IntegrationsPage,
