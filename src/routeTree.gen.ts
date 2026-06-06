@@ -34,6 +34,7 @@ import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboa
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
 import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
 import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
+import { Route as AppDashboardLeadsApolloRouteImport } from './routes/_app.dashboard.leads.apollo'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
@@ -163,6 +164,11 @@ const ApiPublicHooksCalcomRoute = ApiPublicHooksCalcomRouteImport.update({
   path: '/api/public/hooks/calcom',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppDashboardLeadsApolloRoute = AppDashboardLeadsApolloRouteImport.update({
+  id: '/apollo',
+  path: '/apollo',
+  getParentRoute: () => AppDashboardLeadsRoute,
+} as any)
 const AppDashboardBuilderDocumentIdRoute =
   AppDashboardBuilderDocumentIdRouteImport.update({
     id: '/builder/$documentId',
@@ -181,7 +187,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
-  '/dashboard/leads': typeof AppDashboardLeadsRoute
+  '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/logs': typeof MasterMasterLogsRoute
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/master/': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
@@ -206,7 +213,7 @@ export interface FileRoutesByTo {
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
-  '/dashboard/leads': typeof AppDashboardLeadsRoute
+  '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/logs': typeof MasterMasterLogsRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/master': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
@@ -235,7 +243,7 @@ export interface FileRoutesById {
   '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
   '/_app/dashboard/integrations': typeof AppDashboardIntegrationsRoute
-  '/_app/dashboard/leads': typeof AppDashboardLeadsRoute
+  '/_app/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/_app/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
   '/_master/master/logs': typeof MasterMasterLogsRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_master/master/': typeof MasterMasterIndexRoute
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/_app/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/master/'
     | '/dashboard/builder/$documentId'
+    | '/dashboard/leads/apollo'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder/'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/master'
     | '/dashboard/builder/$documentId'
+    | '/dashboard/leads/apollo'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_master/master/'
     | '/_app/dashboard/builder/$documentId'
+    | '/_app/dashboard/leads/apollo'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/_app/dashboard/builder/'
@@ -522,6 +534,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCalcomRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/dashboard/leads/apollo': {
+      id: '/_app/dashboard/leads/apollo'
+      path: '/apollo'
+      fullPath: '/dashboard/leads/apollo'
+      preLoaderRoute: typeof AppDashboardLeadsApolloRouteImport
+      parentRoute: typeof AppDashboardLeadsRoute
+    }
     '/_app/dashboard/builder/$documentId': {
       id: '/_app/dashboard/builder/$documentId'
       path: '/builder/$documentId'
@@ -532,11 +551,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppDashboardLeadsRouteChildren {
+  AppDashboardLeadsApolloRoute: typeof AppDashboardLeadsApolloRoute
+}
+
+const AppDashboardLeadsRouteChildren: AppDashboardLeadsRouteChildren = {
+  AppDashboardLeadsApolloRoute: AppDashboardLeadsApolloRoute,
+}
+
+const AppDashboardLeadsRouteWithChildren =
+  AppDashboardLeadsRoute._addFileChildren(AppDashboardLeadsRouteChildren)
+
 interface AppDashboardRouteChildren {
   AppDashboardCampaignsRoute: typeof AppDashboardCampaignsRoute
   AppDashboardInboxRoute: typeof AppDashboardInboxRoute
   AppDashboardIntegrationsRoute: typeof AppDashboardIntegrationsRoute
-  AppDashboardLeadsRoute: typeof AppDashboardLeadsRoute
+  AppDashboardLeadsRoute: typeof AppDashboardLeadsRouteWithChildren
   AppDashboardPipelineRoute: typeof AppDashboardPipelineRoute
   AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
@@ -548,7 +578,7 @@ const AppDashboardRouteChildren: AppDashboardRouteChildren = {
   AppDashboardCampaignsRoute: AppDashboardCampaignsRoute,
   AppDashboardInboxRoute: AppDashboardInboxRoute,
   AppDashboardIntegrationsRoute: AppDashboardIntegrationsRoute,
-  AppDashboardLeadsRoute: AppDashboardLeadsRoute,
+  AppDashboardLeadsRoute: AppDashboardLeadsRouteWithChildren,
   AppDashboardPipelineRoute: AppDashboardPipelineRoute,
   AppDashboardSettingsRoute: AppDashboardSettingsRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
