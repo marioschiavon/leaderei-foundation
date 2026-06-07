@@ -1301,6 +1301,7 @@ function ConfigPanel({
   if (node.type === "calcom_reschedule_booking")
     return <CalEventTypePanel node={node} onChange={onChange} kind="reschedule" />;
   if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
+  if (node.type === "ai_message") return <AiMessagePanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
