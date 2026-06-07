@@ -44,6 +44,7 @@ import {
   CalendarSearch,
   CalendarX,
   CalendarClock,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,7 @@ import {
   deleteBuilderDocument,
 } from "@/lib/builder.functions";
 import { listCalcomEventTypes, syncCalcomEventTypes } from "@/lib/calcom.functions";
+import { listAiTonePresets, previewAiMessage } from "@/lib/ai.functions";
 import { Link } from "@tanstack/react-router";
 
 
@@ -93,6 +95,7 @@ type StepType =
   | "message_email"
   | "message_whatsapp"
   | "message_linkedin"
+  | "ai_message"
   | "wait"
   | "condition_replied"
   | "action"
@@ -133,6 +136,7 @@ const PALETTE: Array<{
   { type: "wait", label: "Aguardar", icon: Clock, enabled: true },
   { type: "condition_replied", label: "Condição: respondeu?", icon: GitBranch, enabled: true },
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
+  { type: "ai_message", label: "Mensagem com IA", icon: Sparkles, enabled: true },
   { type: "calcom_check_availability", label: "Consultar agenda", icon: CalendarSearch, enabled: true },
   { type: "calcom_book_meeting", label: "Agendar reunião", icon: CalendarCheck, enabled: true },
   { type: "calcom_reschedule_booking", label: "Reagendar reunião", icon: CalendarClock, enabled: true },
@@ -146,6 +150,17 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   message_email: { subject: "", body_html: "", from_alias: "" },
   message_whatsapp: { body: "" },
   message_linkedin: { message_type: "message", body: "" },
+  ai_message: {
+    channel: "whatsapp",
+    task_instruction: "",
+    email_subject_template: "",
+    mood_slug: null,
+    approach_slug: null,
+    length_slug: null,
+    language_slug: null,
+    extra_context: "",
+    must_include: "",
+  },
   wait: { duration_value: 1, duration_unit: "days" },
   condition_replied: { scope: "any_channel", timeout_value: 3, timeout_unit: "days" },
   action: { action_type: "set_status", params: {} },
