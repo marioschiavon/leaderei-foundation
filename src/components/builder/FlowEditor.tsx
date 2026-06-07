@@ -636,6 +636,81 @@ const nodeTypes = {
   end: EndStepNode,
 } as any;
 
+// Edge with inline delete button when selected
+function DeletableEdge(props: EdgeProps) {
+  const {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    style,
+    label,
+    labelStyle,
+    selected,
+    markerEnd,
+  } = props;
+  const { setEdges } = useReactFlow();
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const stroke = (style as any)?.stroke ?? "#94a3b8";
+  const mergedStyle = {
+    ...style,
+    strokeWidth: selected ? 3 : ((style as any)?.strokeWidth ?? 2),
+    filter: selected ? `drop-shadow(0 0 4px ${stroke})` : undefined,
+  } as React.CSSProperties;
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={mergedStyle} markerEnd={markerEnd} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: "all",
+          }}
+          className="flex items-center gap-1.5 nodrag nopan"
+        >
+          {label ? (
+            <span
+              className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold shadow-sm ring-1 ring-slate-200"
+              style={labelStyle}
+            >
+              {label}
+            </span>
+          ) : null}
+          {selected ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEdges((eds) => eds.filter((ed) => ed.id !== id));
+              }}
+              className="grid h-5 w-5 place-items-center rounded-full bg-destructive text-white shadow-md ring-2 ring-white hover:scale-110 transition-transform"
+              title="Remover conexão"
+              aria-label="Remover conexão"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          ) : null}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const edgeTypes = {
+  deletable: DeletableEdge,
+} as any;
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
