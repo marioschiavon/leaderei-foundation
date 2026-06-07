@@ -381,10 +381,19 @@ export const getBuilderDocumentByCampaign = createServerFn({ method: "POST" })
       // Seed entry step
       const { error: seedErr } = await supabase.from("flow_steps").insert({
         document_id: docId,
-        type: "message_email",
+        type: "ai_message",
         position_x: 100,
         position_y: 200,
-        config: { subject: "", body_html: "" },
+        config: {
+          channel: "whatsapp",
+          task_instruction: "",
+          mood_slug: null,
+          approach_slug: null,
+          length_slug: null,
+          language_slug: null,
+          extra_context: "",
+          must_include: "",
+        },
         is_entry: true,
       });
       if (seedErr) throw new Error(seedErr.message);
