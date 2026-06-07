@@ -839,6 +839,48 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
     [nodes, edges, setEdges, markDirty],
   );
 
+  const edgeReconnectSuccessful = useRef(true);
+  const onReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false;
+  }, []);
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConn: Connection) => {
+      if (!newConn.source || !newConn.target) return;
+      if (newConn.source === newConn.target) {
+        toast.error("Auto-conexão não é permitida.");
+        return;
+      }
+      const branch = (oldEdge.sourceHandle as string) ?? "next";
+      // If source changed, ensure new source doesn't already have this branch
+      if (newConn.source !== oldEdge.source) {
+        const clash = edges.find(
+          (e) =>
+            e.id !== oldEdge.id &&
+            e.source === newConn.source &&
+            ((e.sourceHandle ?? "next") === branch),
+        );
+        if (clash) {
+          toast.error(`Já existe uma conexão "${branch}" saindo deste passo.`);
+          return;
+        }
+      }
+      edgeReconnectSuccessful.current = true;
+      setEdges((eds) => reconnectEdge(oldEdge, newConn, eds));
+      markDirty();
+    },
+    [edges, setEdges, markDirty],
+  );
+  const onReconnectEnd = useCallback(
+    (_: unknown, edge: Edge) => {
+      if (!edgeReconnectSuccessful.current) {
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        markDirty();
+      }
+      edgeReconnectSuccessful.current = true;
+    },
+    [setEdges, markDirty],
+  );
+
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
