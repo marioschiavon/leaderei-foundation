@@ -307,13 +307,12 @@ export const previewAiMessage = createServerFn({ method: "POST" })
     const result = await callOpenAI({
       systemPrompt: system,
       userPrompt: user,
-      kind: "other",
       model: settings.default_model,
       temperature: Number(settings.default_temperature),
       maxTokens: settings.max_tokens_per_call,
       organizationId: orgId,
       leadId: data.lead_id ?? null,
-      kind: "preview",
+      kind: "other",
       triggeredBy: context.userId,
     });
 
