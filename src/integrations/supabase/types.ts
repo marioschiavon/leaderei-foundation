@@ -68,6 +68,138 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_org_profile: {
+        Row: {
+          brand_name: string | null
+          brand_voice: string | null
+          created_at: string
+          default_approach_slug: string | null
+          default_cta: string | null
+          default_language_slug: string
+          default_length_slug: string | null
+          default_mood_slug: string | null
+          forbidden_words: string[]
+          icp_description: string | null
+          organization_id: string
+          product_description: string | null
+          updated_at: string
+          updated_by: string | null
+          value_proposition: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          brand_voice?: string | null
+          created_at?: string
+          default_approach_slug?: string | null
+          default_cta?: string | null
+          default_language_slug?: string
+          default_length_slug?: string | null
+          default_mood_slug?: string | null
+          forbidden_words?: string[]
+          icp_description?: string | null
+          organization_id: string
+          product_description?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          value_proposition?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          brand_voice?: string | null
+          created_at?: string
+          default_approach_slug?: string | null
+          default_cta?: string | null
+          default_language_slug?: string
+          default_length_slug?: string | null
+          default_mood_slug?: string | null
+          forbidden_words?: string[]
+          icp_description?: string | null
+          organization_id?: string
+          product_description?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          value_proposition?: string | null
+        }
+        Relationships: []
+      }
+      ai_platform_settings: {
+        Row: {
+          allowed_models: string[]
+          created_at: string
+          default_model: string
+          default_temperature: number
+          id: string
+          is_enabled: boolean
+          master_system_prompt: string
+          max_tokens_per_call: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allowed_models?: string[]
+          created_at?: string
+          default_model?: string
+          default_temperature?: number
+          id?: string
+          is_enabled?: boolean
+          master_system_prompt?: string
+          max_tokens_per_call?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allowed_models?: string[]
+          created_at?: string
+          default_model?: string
+          default_temperature?: number
+          id?: string
+          is_enabled?: boolean
+          master_system_prompt?: string
+          max_tokens_per_call?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      ai_tone_presets: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          label: string
+          prompt_fragment: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          kind: string
+          label: string
+          prompt_fragment: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          label?: string
+          prompt_fragment?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           created_at: string
