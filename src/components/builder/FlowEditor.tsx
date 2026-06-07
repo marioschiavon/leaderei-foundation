@@ -1827,3 +1827,161 @@ function ConditionPanel({
     </div>
   );
 }
+
+function AiPresetSelect({
+  label, kind, value, presets, onChange,
+}: {
+  label: string; kind: "mood" | "approach" | "length" | "language";
+  value: string | null | undefined;
+  presets: Array<{ kind: string; slug: string; label: string; is_active: boolean }>;
+  onChange: (v: string | null) => void;
+}) {
+  const opts = (presets ?? []).filter((p) => p.kind === kind && p.is_active);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      <Select value={value ?? "__none"} onValueChange={(v) => onChange(v === "__none" ? null : v)}>
+        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none">— (padrão da marca)</SelectItem>
+          {opts.map((o) => <SelectItem key={o.slug} value={o.slug}>{o.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function AiMessagePanel({
+  node, onChange,
+}: { node: StepNode; onChange: (patch: Record<string, any>) => void }) {
+  const cfg = node.data.config as {
+    channel?: "whatsapp" | "email";
+    task_instruction?: string;
+    email_subject_template?: string;
+    mood_slug?: string | null;
+    approach_slug?: string | null;
+    length_slug?: string | null;
+    language_slug?: string | null;
+    extra_context?: string;
+    must_include?: string;
+  };
+  const fetchPresets = useServerFn(listAiTonePresets);
+  const previewFn = useServerFn(previewAiMessage);
+  const { data: presets } = useQuery({
+    queryKey: ["ai-tone-presets"],
+    queryFn: () => fetchPresets(),
+    staleTime: 5 * 60_000,
+  });
+  const [preview, setPreview] = useState<{ text: string; tokens_in: number; tokens_out: number; cost_usd: number; model: string } | null>(null);
+  const previewMut = useMutation({
+    mutationFn: () => previewFn({
+      data: {
+        stepConfig: {
+          mood_slug: cfg.mood_slug ?? null,
+          approach_slug: cfg.approach_slug ?? null,
+          length_slug: cfg.length_slug ?? null,
+          language_slug: cfg.language_slug ?? null,
+          extra_context: cfg.extra_context ?? null,
+          must_include: cfg.must_include ?? null,
+        },
+        channel: cfg.channel ?? "whatsapp",
+        task_instruction: cfg.task_instruction ?? null,
+      },
+    }),
+    onSuccess: (r: any) => setPreview(r),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label>Canal</Label>
+        <Select value={cfg.channel ?? "whatsapp"} onValueChange={(v) => onChange({ channel: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            <SelectItem value="email">Email</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {cfg.channel === "email" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-subject">Assunto do email (template)</Label>
+          <Input
+            id="ai-subject"
+            value={cfg.email_subject_template ?? ""}
+            onChange={(e) => onChange({ email_subject_template: e.target.value })}
+            placeholder="Ex.: {{ lead.first_name }}, uma ideia rápida"
+            maxLength={200}
+          />
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <Label htmlFor="ai-task">Tarefa para a IA</Label>
+        <Textarea
+          id="ai-task"
+          rows={4}
+          maxLength={500}
+          value={cfg.task_instruction ?? ""}
+          onChange={(e) => onChange({ task_instruction: e.target.value })}
+          placeholder="Ex.: Escreva a primeira mensagem fria de prospecção, mencionando o setor do lead e propondo uma conversa de 15 min."
+        />
+        <p className="text-[10px] text-muted-foreground text-right">{(cfg.task_instruction ?? "").length}/500</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <AiPresetSelect label="Humor" kind="mood" value={cfg.mood_slug} presets={presets ?? []} onChange={(v) => onChange({ mood_slug: v })} />
+        <AiPresetSelect label="Abordagem" kind="approach" value={cfg.approach_slug} presets={presets ?? []} onChange={(v) => onChange({ approach_slug: v })} />
+        <AiPresetSelect label="Tamanho" kind="length" value={cfg.length_slug} presets={presets ?? []} onChange={(v) => onChange({ length_slug: v })} />
+        <AiPresetSelect label="Idioma" kind="language" value={cfg.language_slug} presets={presets ?? []} onChange={(v) => onChange({ language_slug: v })} />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="ai-extra">Contexto extra (opcional)</Label>
+        <Textarea
+          id="ai-extra"
+          rows={2}
+          maxLength={280}
+          value={cfg.extra_context ?? ""}
+          onChange={(e) => onChange({ extra_context: e.target.value })}
+          placeholder="Ex.: o lead baixou nosso whitepaper na semana passada."
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="ai-include">Precisa mencionar (opcional)</Label>
+        <Input
+          id="ai-include"
+          maxLength={280}
+          value={cfg.must_include ?? ""}
+          onChange={(e) => onChange({ must_include: e.target.value })}
+          placeholder="Ex.: desconto de lançamento até sexta."
+        />
+      </div>
+
+      <div className="rounded-md border bg-background p-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium">Pré-visualizar com lead fictício</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => previewMut.mutate()} disabled={previewMut.isPending}>
+            {previewMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            Gerar
+          </Button>
+        </div>
+        {preview && (
+          <div className="mt-2 space-y-1">
+            <div className="whitespace-pre-wrap rounded border bg-surface p-2 text-xs">{preview.text}</div>
+            <div className="text-[10px] text-muted-foreground">
+              {preview.model} · {preview.tokens_in}/{preview.tokens_out} tokens · ${preview.cost_usd.toFixed(5)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        A IA gera o texto a cada execução, combinando o prompt mestre da plataforma + voz da sua marca + ajustes deste passo. O lead recebe pelo canal escolhido.
+      </p>
+    </div>
+  );
+}
