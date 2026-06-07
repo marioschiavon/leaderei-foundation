@@ -16,10 +16,15 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  reconnectEdge,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   type Node,
   type Edge,
   type Connection,
   type NodeProps,
+  type EdgeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -631,6 +636,81 @@ const nodeTypes = {
   end: EndStepNode,
 } as any;
 
+// Edge with inline delete button when selected
+function DeletableEdge(props: EdgeProps) {
+  const {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    style,
+    label,
+    labelStyle,
+    selected,
+    markerEnd,
+  } = props;
+  const { setEdges } = useReactFlow();
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const stroke = (style as any)?.stroke ?? "#94a3b8";
+  const mergedStyle = {
+    ...style,
+    strokeWidth: selected ? 3 : ((style as any)?.strokeWidth ?? 2),
+    filter: selected ? `drop-shadow(0 0 4px ${stroke})` : undefined,
+  } as React.CSSProperties;
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={mergedStyle} markerEnd={markerEnd} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: "all",
+          }}
+          className="flex items-center gap-1.5 nodrag nopan"
+        >
+          {label ? (
+            <span
+              className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold shadow-sm ring-1 ring-slate-200"
+              style={labelStyle}
+            >
+              {label}
+            </span>
+          ) : null}
+          {selected ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEdges((eds) => eds.filter((ed) => ed.id !== id));
+              }}
+              className="grid h-5 w-5 place-items-center rounded-full bg-destructive text-white shadow-md ring-2 ring-white hover:scale-110 transition-transform"
+              title="Remover conexão"
+              aria-label="Remover conexão"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          ) : null}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const edgeTypes = {
+  deletable: DeletableEdge,
+} as any;
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -691,7 +771,7 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         source: t.from_step_id,
         target: t.to_step_id,
         sourceHandle: t.branch === "next" ? null : t.branch,
-        type: "smoothstep",
+        type: "deletable",
         label: branchLabel(t.branch),
         style: { stroke: branchColor(t.branch), strokeWidth: 2 },
         labelStyle: { fill: branchColor(t.branch), fontWeight: 600 },
@@ -748,7 +828,7 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         source: conn.source,
         target: conn.target,
         sourceHandle: branch === "next" ? null : branch,
-        type: "smoothstep",
+        type: "deletable",
         label: branchLabel(branch),
         style: { stroke: branchColor(branch), strokeWidth: 2 },
         labelStyle: { fill: branchColor(branch), fontWeight: 600 },
@@ -757,6 +837,48 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
       markDirty();
     },
     [nodes, edges, setEdges, markDirty],
+  );
+
+  const edgeReconnectSuccessful = useRef(true);
+  const onReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false;
+  }, []);
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConn: Connection) => {
+      if (!newConn.source || !newConn.target) return;
+      if (newConn.source === newConn.target) {
+        toast.error("Auto-conexão não é permitida.");
+        return;
+      }
+      const branch = (oldEdge.sourceHandle as string) ?? "next";
+      // If source changed, ensure new source doesn't already have this branch
+      if (newConn.source !== oldEdge.source) {
+        const clash = edges.find(
+          (e) =>
+            e.id !== oldEdge.id &&
+            e.source === newConn.source &&
+            ((e.sourceHandle ?? "next") === branch),
+        );
+        if (clash) {
+          toast.error(`Já existe uma conexão "${branch}" saindo deste passo.`);
+          return;
+        }
+      }
+      edgeReconnectSuccessful.current = true;
+      setEdges((eds) => reconnectEdge(oldEdge, newConn, eds));
+      markDirty();
+    },
+    [edges, setEdges, markDirty],
+  );
+  const onReconnectEnd = useCallback(
+    (_: unknown, edge: Edge) => {
+      if (!edgeReconnectSuccessful.current) {
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        markDirty();
+      }
+      edgeReconnectSuccessful.current = true;
+    },
+    [setEdges, markDirty],
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -823,7 +945,7 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
           source: last.id,
           target: id,
           sourceHandle: branch === "next" ? null : branch,
-          type: "smoothstep",
+          type: "deletable",
           label: branchLabel(branch),
           style: { stroke: branchColor(branch), strokeWidth: 2 },
           labelStyle: { fill: branchColor(branch), fontWeight: 600 },
@@ -1193,9 +1315,15 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
+            onReconnectStart={onReconnectStart}
+            onReconnectEnd={onReconnectEnd}
+            edgesReconnectable
             onNodeClick={handleNodeClick}
             onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            deleteKeyCode={["Delete", "Backspace"]}
             minZoom={0.4}
             maxZoom={1.5}
             fitView
