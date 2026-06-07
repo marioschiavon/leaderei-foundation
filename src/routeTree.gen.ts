@@ -25,6 +25,7 @@ import { Route as MasterMasterPlatformRouteImport } from './routes/_master.maste
 import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.plans'
 import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
 import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.logs'
+import { Route as MasterMasterAiRouteImport } from './routes/_master.master.ai'
 import { Route as AppDashboardSettingsRouteImport } from './routes/_app.dashboard.settings'
 import { Route as AppDashboardPipelineRouteImport } from './routes/_app.dashboard.pipeline'
 import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.leads'
@@ -116,6 +117,11 @@ const MasterMasterLogsRoute = MasterMasterLogsRouteImport.update({
   path: '/master/logs',
   getParentRoute: () => MasterRoute,
 } as any)
+const MasterMasterAiRoute = MasterMasterAiRouteImport.update({
+  id: '/master/ai',
+  path: '/master/ai',
+  getParentRoute: () => MasterRoute,
+} as any)
 const AppDashboardSettingsRoute = AppDashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
+  '/master/ai': typeof MasterMasterAiRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
+  '/master/ai': typeof MasterMasterAiRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
   '/master/plans': typeof MasterMasterPlansRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/_app/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/_app/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
+  '/_master/master/ai': typeof MasterMasterAiRoute
   '/_master/master/logs': typeof MasterMasterLogsRoute
   '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
   '/_master/master/plans': typeof MasterMasterPlansRoute
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
+    | '/master/ai'
     | '/master/logs'
     | '/master/organizations'
     | '/master/plans'
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
+    | '/master/ai'
     | '/master/logs'
     | '/master/organizations'
     | '/master/plans'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/leads'
     | '/_app/dashboard/pipeline'
     | '/_app/dashboard/settings'
+    | '/_master/master/ai'
     | '/_master/master/logs'
     | '/_master/master/organizations'
     | '/_master/master/plans'
@@ -471,6 +483,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MasterMasterLogsRouteImport
       parentRoute: typeof MasterRoute
     }
+    '/_master/master/ai': {
+      id: '/_master/master/ai'
+      path: '/master/ai'
+      fullPath: '/master/ai'
+      preLoaderRoute: typeof MasterMasterAiRouteImport
+      parentRoute: typeof MasterRoute
+    }
     '/_app/dashboard/settings': {
       id: '/_app/dashboard/settings'
       path: '/settings'
@@ -601,6 +620,7 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface MasterRouteChildren {
+  MasterMasterAiRoute: typeof MasterMasterAiRoute
   MasterMasterLogsRoute: typeof MasterMasterLogsRoute
   MasterMasterOrganizationsRoute: typeof MasterMasterOrganizationsRoute
   MasterMasterPlansRoute: typeof MasterMasterPlansRoute
@@ -610,6 +630,7 @@ interface MasterRouteChildren {
 }
 
 const MasterRouteChildren: MasterRouteChildren = {
+  MasterMasterAiRoute: MasterMasterAiRoute,
   MasterMasterLogsRoute: MasterMasterLogsRoute,
   MasterMasterOrganizationsRoute: MasterMasterOrganizationsRoute,
   MasterMasterPlansRoute: MasterMasterPlansRoute,

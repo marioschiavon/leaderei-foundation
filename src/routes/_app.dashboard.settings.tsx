@@ -34,6 +34,7 @@ import {
   listApiKeys, createApiKey, revokeApiKey,
 } from "@/lib/settings.functions";
 import { getWhatsAppMode, updateWhatsAppMode } from "@/lib/hook7.functions";
+import { AiBrandTab } from "@/components/app/AiBrandTab";
 
 export const Route = createFileRoute("/_app/dashboard/settings")({
   component: SettingsPage,
@@ -52,6 +53,7 @@ function SettingsPage() {
           <TabsTrigger value="org">Organização</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+          <TabsTrigger value="ai">IA da marca</TabsTrigger>
           <TabsTrigger value="api">API keys</TabsTrigger>
           <TabsTrigger value="billing">Faturamento</TabsTrigger>
           <TabsTrigger value="prefs">Preferências</TabsTrigger>
@@ -60,6 +62,7 @@ function SettingsPage() {
         <TabsContent value="org" className="mt-6"><OrgTab isAdmin={!!isAdmin} /></TabsContent>
         <TabsContent value="members" className="mt-6"><MembersTab isAdmin={!!isAdmin} /></TabsContent>
         <TabsContent value="whatsapp" className="mt-6"><WhatsAppTab isAdmin={!!isAdmin} /></TabsContent>
+        <TabsContent value="ai" className="mt-6"><AiBrandTab isAdmin={!!isAdmin} /></TabsContent>
         <TabsContent value="api" className="mt-6"><ApiKeysTab isAdmin={!!isAdmin} /></TabsContent>
 
         <TabsContent value="billing" className="mt-6">

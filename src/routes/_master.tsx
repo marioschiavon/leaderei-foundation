@@ -14,6 +14,7 @@ const NAV = [
   { label: "Usuários", to: "/master/users" },
   { label: "Planos", to: "/master/plans" },
   { label: "Plataforma", to: "/master/platform" },
+  { label: "IA", to: "/master/ai" },
   { label: "Logs", to: "/master/logs" },
 ];
 

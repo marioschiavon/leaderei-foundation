@@ -778,10 +778,11 @@ Pedido do Juliano em reunião: cada marca/cliente final do operador tem **prompt
 
 | Camada | Tecnologia | Observação |
 |---|---|---|
-| Modelo principal | A definir entre OpenAI / Claude / Gemini | Suporte a fallback (se um falhar, usa outro) |
+| Modelo principal | **OpenAI** (gpt-4.1-mini default, gpt-4.1 / gpt-4o-mini permitidos) | Chave **nativa da plataforma**, gerenciada pelo master admin. Sem chave por cliente. |
 | Áudio / voz (futuro) | ElevenLabs | Diferencial — vendedor manda áudio personalizado por IA |
 | Vídeo (longo prazo) | Possivelmente MiniMax (mais barato) | Apresentações personalizadas |
 | Scraping | Jina AI Reader | Free tier generoso |
+| Fallback multi-provider (Claude/Gemini) | ⏳ Futuro | Fase 2 |
 
 ### 6.5 Modelo proprietário (longo prazo)
 
@@ -794,7 +795,23 @@ Importante: **isso não muda o desenvolvimento imediato**. No MVP, usamos APIs d
 
 ### 6.6 Estado atual
 
-- ⏳ Pendente: Tudo. Módulo de IA não foi implementado ainda. Próxima frente após executor de fluxos.
+- ✅ Fundação OpenAI implementada: tabelas `ai_platform_settings`, `ai_tone_presets`, `ai_org_profile`, telemetria em `ai_actions`.
+- ✅ Helper server-side `callOpenAI` (com logging de tokens/custo/latência) e `buildPrompt` (concatenação master → marca → presets → step → lead).
+- ✅ UI master em `/master/ai`: prompt mestre, modelos permitidos, temperatura, max_tokens, presets CRUD, dashboard de uso 24h.
+- ✅ UI org em `/dashboard/settings → IA da marca`: voz, produto, ICP, proposta de valor, CTA, palavras proibidas, defaults de humor/abordagem/tamanho/idioma + pré-visualização.
+- ⏳ Pendente: novo tipo de step `ai_message` no Builder com painel de dropdowns + textareas + botão de preview.
+- ⏳ Pendente: integração no `flow-executor` para chamar `callOpenAI` em steps de IA.
+- ⏳ Pendente: rate-limit por org, fallback multi-provider.
+
+### 6.8 Camadas de configuração de IA (master → org → step)
+
+Toda chamada à OpenAI compõe o prompt em três camadas:
+
+1. **Plataforma (master admin)** — `ai_platform_settings`: prompt mestre global (segredo, nunca sai do servidor), modelo padrão, modelos permitidos, temperatura, teto de tokens. Editado em `/master/ai`.
+2. **Organização (company_admin)** — `ai_org_profile`: voz da marca, descrição do produto, ICP, proposta de valor, CTA, palavras proibidas, defaults de humor/abordagem/tamanho/idioma. Editado em `/dashboard/settings → IA da marca`.
+3. **Step (qualquer membro)** — `flow_steps.config`: nos steps de IA do Builder, dropdowns para escolher humor/abordagem/tamanho/idioma (catálogo `ai_tone_presets` gerenciado pelo master) + duas textareas curtas (≤280 chars) "Contexto extra" e "Precisa mencionar". Usuário comum NÃO vê chave, modelo, temperatura nem prompt mestre.
+
+Ordem final do prompt: `master_system_prompt + brand_block + presets_block + channel_hint + step_extras + lead_block + task_instruction`.
 
 ### 6.7 Sistema de score comportamental
 
