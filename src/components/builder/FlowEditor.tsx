@@ -586,9 +586,42 @@ function CalRescheduleNode(props: NodeProps<StepNode>) {
   return <CalSimpleNode {...props} icon={CalendarClock} label="Reagendar reunião" helper="Move para o próximo horário disponível" />;
 }
 
+function AiMessageNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { channel?: string; task_instruction?: string };
+  const ch = cfg.channel === "email" ? "Email" : "WhatsApp";
+  const isComplete = !!cfg.task_instruction?.trim();
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Sparkles} label={`IA · ${ch}`} />
+      <div style={{ padding: "10px 12px", fontSize: 12 }}>
+        <div style={{
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+          overflow: "hidden", textOverflow: "ellipsis",
+          color: isComplete ? COLORS.text : COLORS.muted,
+          fontStyle: isComplete ? "normal" : "italic",
+          whiteSpace: "pre-wrap", wordBreak: "break-word", minHeight: 32,
+        }}>
+          {cfg.task_instruction || "Descreva o que a IA deve escrever"}
+        </div>
+        <div style={{
+          marginTop: 8, display: "inline-flex", alignItems: "center", gap: 4,
+          fontSize: 11, padding: "2px 6px", borderRadius: 4,
+          background: isComplete ? "#ede9fe" : "#fef3c7",
+          color: isComplete ? "#6d28d9" : "#92400e",
+        }}>
+          {isComplete ? "✓ Pronto" : "⚠ Incompleto"}
+        </div>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
+  ai_message: AiMessageNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
   calcom_check_availability: CalCheckAvailabilityNode,
