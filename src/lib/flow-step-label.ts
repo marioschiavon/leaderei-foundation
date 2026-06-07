@@ -45,6 +45,11 @@ export function stepLabel(step: FlowStepLike): string {
       const reason = String(cfg.reason ?? "").trim();
       return reason ? `Fim: ${reason}` : "Fim do fluxo";
     }
+    case "ai_message": {
+      const ch = cfg.channel === "email" ? "Email" : "WhatsApp";
+      const t = String(cfg.task_instruction ?? "").trim();
+      return t ? `IA · ${ch}: ${t.slice(0, 30)}${t.length > 30 ? "…" : ""}` : `IA · ${ch}`;
+    }
     default:
       return step.type;
   }
@@ -72,6 +77,10 @@ export function stepLabelShort(step: FlowStepLike): string {
     case "calcom_cancel_booking": return "Cancelar reunião";
     case "calcom_reschedule_booking": return "Reagendar";
     case "end": return "Fim";
+    case "ai_message": {
+      const cfg = (step.config ?? {}) as any;
+      return cfg.channel === "email" ? "IA Email" : "IA WhatsApp";
+    }
     default: return step.type;
   }
 }
