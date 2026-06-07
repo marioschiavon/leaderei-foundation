@@ -1315,9 +1315,15 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
+            onReconnectStart={onReconnectStart}
+            onReconnectEnd={onReconnectEnd}
+            edgesReconnectable
             onNodeClick={handleNodeClick}
             onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            deleteKeyCode={["Delete", "Backspace"]}
             minZoom={0.4}
             maxZoom={1.5}
             fitView
