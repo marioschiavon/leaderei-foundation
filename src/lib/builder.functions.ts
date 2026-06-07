@@ -10,6 +10,7 @@ const STEP_TYPES = [
   "message_email",
   "message_whatsapp",
   "message_linkedin",
+  "ai_message",
   "wait",
   "condition_replied",
   "action",
@@ -58,6 +59,18 @@ const EndConfig = z.object({
   reason: z.string().max(160).optional(),
 });
 
+const AiMessageConfig = z.object({
+  channel: z.enum(["whatsapp", "email"]).default("whatsapp"),
+  task_instruction: z.string().max(500).default(""),
+  email_subject_template: z.string().max(200).default("").optional(),
+  mood_slug: z.string().max(48).nullable().optional(),
+  approach_slug: z.string().max(48).nullable().optional(),
+  length_slug: z.string().max(48).nullable().optional(),
+  language_slug: z.string().max(48).nullable().optional(),
+  extra_context: z.string().max(280).default("").optional(),
+  must_include: z.string().max(280).default("").optional(),
+});
+
 const CalCheckAvailabilityConfig = z.object({
   event_type_id: z.number().int().positive(),
   window_days: z.number().int().min(1).max(60).default(7),
@@ -101,6 +114,8 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return CalRescheduleBookingConfig.parse(config ?? {});
     case "end":
       return EndConfig.parse(config ?? {});
+    case "ai_message":
+      return AiMessageConfig.parse(config ?? {});
   }
 }
 

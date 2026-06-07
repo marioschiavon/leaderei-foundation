@@ -508,6 +508,172 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
     }
 
     // -----------------------------------------------------------------------
+    case "ai_message": {
+      const cfg = step.config as {
+        channel?: "whatsapp" | "email";
+        task_instruction?: string;
+        email_subject_template?: string;
+        mood_slug?: string | null;
+        approach_slug?: string | null;
+        length_slug?: string | null;
+        language_slug?: string | null;
+        extra_context?: string | null;
+        must_include?: string | null;
+      };
+      const channel = cfg.channel ?? "whatsapp";
+
+      // Load AI config: settings, presets, org profile, lead context
+      const [settingsRes, presetsRes, profileRes, leadFullRes] = await Promise.all([
+        supabaseAdmin.from("ai_platform_settings").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle(),
+        supabaseAdmin.from("ai_tone_presets").select("kind,slug,prompt_fragment").eq("is_active", true),
+        supabaseAdmin.from("ai_org_profile").select("*").eq("organization_id", en.organization_id).maybeSingle(),
+        supabaseAdmin.from("leads")
+          .select("full_name,job_title,company_name,industry,city,country,linkedin_url,website_url,custom_fields")
+          .eq("id", lead.id).maybeSingle(),
+      ]);
+      const settings = settingsRes.data;
+      if (!settings || !settings.is_enabled) {
+        return { kind: "fail", error: "IA da plataforma desabilitada." };
+      }
+      const { hasOpenAIKey, callOpenAI } = await import("@/lib/openai.server");
+      if (!hasOpenAIKey()) return { kind: "fail", error: "OPENAI_API_KEY ausente." };
+
+      const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
+      const { system, user } = buildPrompt({
+        masterSystemPrompt: settings.master_system_prompt ?? "",
+        orgProfile: profileRes.data ?? null,
+        stepConfig: {
+          mood_slug: cfg.mood_slug ?? null,
+          approach_slug: cfg.approach_slug ?? null,
+          length_slug: cfg.length_slug ?? null,
+          language_slug: cfg.language_slug ?? null,
+          extra_context: cfg.extra_context ?? null,
+          must_include: cfg.must_include ?? null,
+        },
+        presets: (presetsRes.data ?? []) as any,
+        lead: (leadFullRes.data ?? lead) as any,
+        channelHint: channel,
+        taskInstruction: cfg.task_instruction ?? null,
+      });
+
+      let aiText = "";
+      try {
+        const r = await callOpenAI({
+          systemPrompt: system,
+          userPrompt: user,
+          model: settings.default_model,
+          temperature: Number(settings.default_temperature),
+          maxTokens: settings.max_tokens_per_call,
+          organizationId: en.organization_id,
+          leadId: lead.id,
+          kind: "reply_draft",
+          triggeredBy: null,
+        });
+        aiText = (r.text ?? "").trim();
+      } catch (e: any) {
+        return { kind: "fail", error: `IA: ${String(e?.message ?? e).slice(0, 200)}` };
+      }
+      if (!aiText) return { kind: "fail", error: "IA retornou texto vazio." };
+
+      // Dispatch by channel
+      if (channel === "email") {
+        if (!lead.email) {
+          return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_email" } };
+        }
+        const subject = renderTemplate(cfg.email_subject_template ?? "", vars) || "Mensagem";
+        const html = aiText.split("\n").map((l) => `<p>${l.replace(/</g, "&lt;")}</p>`).join("");
+        const res = await sendEmailInternal({
+          to: lead.email,
+          subject,
+          html,
+          text: aiText,
+          purpose: "campaign",
+          organization_id: en.organization_id,
+          template_key: `flow:${step.id}:ai`,
+          metadata: { enrollment_id: en.id, campaign_id: en.campaign_id, step_id: step.id, ai_generated: true },
+        });
+        await supabaseAdmin.from("lead_activities").insert({
+          organization_id: en.organization_id,
+          lead_id: lead.id,
+          type: "email_sent",
+          title: subject,
+          description: `IA (passo ${step.id.slice(0, 8)})`,
+          payload: { enrollment_id: en.id, step_id: step.id, send_log_id: res.id, ai_generated: true },
+        });
+        const next = await findNextStep(step.document_id, step.id, "next");
+        return { kind: "advance", next_step_id: next, delay_until: now, output: { send_log_id: res.id, ai_chars: aiText.length } };
+      }
+
+      // WhatsApp
+      const phone = (lead.phone ?? "").replace(/\D+/g, "");
+      if (phone.length < 10 || phone.length > 15) {
+        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "invalid_phone", phone } };
+      }
+      const { data: instances } = await supabaseAdmin
+        .from("hook7_instances")
+        .select("id")
+        .eq("organization_id", en.organization_id)
+        .eq("status", "connected")
+        .is("archived_at", null)
+        .order("last_connected_at", { ascending: false })
+        .limit(1);
+      const inst = instances?.[0];
+      if (!inst) return { kind: "fail", error: "Nenhuma instância WhatsApp conectada." };
+      const { data: token } = await supabaseAdmin.rpc("get_hook7_instance_token", { _instance_id: inst.id });
+      if (!token) return { kind: "fail", error: "Token Hook7 indisponível." };
+      const { data: baseUrlData } = await supabaseAdmin.rpc("get_platform_plain", { _key: "hook7_base_url" });
+      const baseUrl = (typeof baseUrlData === "string" && baseUrlData) || "https://api.hook7.com.br";
+
+      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/send/text`, {
+        method: "POST",
+        headers: { apikey: token as string, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ number: phone, text: aiText }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        return { kind: "fail", error: `Hook7 ${res.status}: ${t.slice(0, 200)}` };
+      }
+      const json: any = await res.json().catch(() => ({}));
+      const externalId: string | null = json?.data?.Info?.ID ?? null;
+
+      let conv: { id: string } | null = null;
+      {
+        const { data: existing } = await supabaseAdmin
+          .from("conversations").select("id")
+          .eq("organization_id", en.organization_id)
+          .eq("lead_id", lead.id).eq("channel", "whatsapp").maybeSingle();
+        conv = existing ?? null;
+      }
+      if (!conv) {
+        const { data: nc } = await supabaseAdmin
+          .from("conversations")
+          .insert({ organization_id: en.organization_id, lead_id: lead.id, channel: "whatsapp" })
+          .select("id").single();
+        conv = nc!;
+      }
+      await supabaseAdmin.from("messages").insert({
+        organization_id: en.organization_id,
+        conversation_id: conv.id,
+        channel: "whatsapp",
+        direction: "outbound",
+        body: aiText,
+        source_channel: "whatsapp",
+        whatsapp_status: "sent",
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        external_message_id: externalId,
+        metadata: { enrollment_id: en.id, step_id: step.id, automated: true, ai_generated: true },
+      });
+      await supabaseAdmin.from("conversations").update({
+        last_message_at: new Date().toISOString(),
+        last_message_preview: aiText.slice(0, 140),
+      }).eq("id", conv.id);
+
+      const next = await findNextStep(step.document_id, step.id, "next");
+      return { kind: "advance", next_step_id: next, delay_until: now, output: { external_message_id: externalId, ai_chars: aiText.length } };
+    }
+
+    // -----------------------------------------------------------------------
     case "end": {
       const cfg = step.config as { reason?: string };
       return { kind: "complete", output: { reason: cfg.reason ?? null, ended_at: now.toISOString() } };
