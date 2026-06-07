@@ -299,7 +299,7 @@ export const previewAiMessage = createServerFn({ method: "POST" })
       orgProfile: profileRes.data ?? null,
       stepConfig: data.stepConfig as StepConfig,
       presets: (presetsRes.data ?? []) as TonePreset[],
-      lead,
+      lead: lead as any,
       channelHint: data.channel ?? null,
       taskInstruction: data.task_instruction ?? null,
     });
@@ -307,6 +307,7 @@ export const previewAiMessage = createServerFn({ method: "POST" })
     const result = await callOpenAI({
       systemPrompt: system,
       userPrompt: user,
+      kind: "other",
       model: settings.default_model,
       temperature: Number(settings.default_temperature),
       maxTokens: settings.max_tokens_per_call,

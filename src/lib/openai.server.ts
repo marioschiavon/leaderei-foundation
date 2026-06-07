@@ -33,7 +33,7 @@ export type CallOpenAIArgs = {
   organizationId: string;
   leadId?: string | null;
   conversationId?: string | null;
-  kind?: "rewrite" | "generate" | "preview" | "negotiate" | "classify";
+  kind?: "auto_reply" | "classify" | "enrich" | "extract" | "other" | "reply_draft" | "summarize";
   triggeredBy?: string | null;
 };
 
@@ -53,7 +53,7 @@ export type CallOpenAIResult = {
 export async function callOpenAI(args: CallOpenAIArgs): Promise<CallOpenAIResult> {
   const started = Date.now();
   const client = getClient();
-  const kind = args.kind ?? "generate";
+  const kind = args.kind ?? "other";
 
   let text = "";
   let tokensIn = 0;
