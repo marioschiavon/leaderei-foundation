@@ -1,177 +1,170 @@
-# Integração Apollo.io — Plano
+# Plano — Integração OpenAI nativa (multi-tenant com controle do master admin)
 
-Apollo é a "farinha de trigo" da prospecção (escopo §5.3). Hoje é CSV-only. Vamos elevar para **API direta** com 3 capacidades-núcleo: busca de leads, enriquecimento de leads existentes e cache de queries.
+## 1. Princípios
 
-Tudo segue o padrão já validado com Pipedrive (`integration_credentials` criptografada + serverFn + dialog em `/dashboard/integrations`).
+- **Chave OpenAI é da plataforma** (não do cliente). Fica em `OPENAI_API_KEY` (secret do servidor), nunca exposta ao browser nem replicada por organização.
+- **Master admin controla**: chave, modelos habilitados, prompt mestre global, limites de uso por plano/org, presets de humor/abordagem disponíveis.
+- **Org/usuário comum controla**: dentro de cada step de IA do fluxo, escolhe via **dropdown** o humor, o tipo de abordagem, idioma, comprimento; e preenche **caixas de texto curtas** (até ~280 chars cada) para contexto da marca (produto, ICP, diferencial, CTA).
+- Toda chamada à OpenAI passa por um único helper server-side que **monta o prompt final** combinando: `prompt mestre (master) + perfil da org (marca) + parâmetros do step (usuário) + dados do lead/contexto`.
+- Reuso máximo: `ai_actions` (já existe) registra cada chamada (tokens, custo, latência, status).
 
----
+## 2. O que entra no escopo (`escopo-leaderei.md` §6)
 
-## 1. Escopo desta entrega
+Atualizar §6.4 e §6.6 para refletir:
+- Modelo principal definido: **OpenAI** (gpt-4.1-mini default; gpt-4.1 para tarefas pesadas; configurável pelo master).
+- Stack de IA: provider = nativo da plataforma; sem chave por org.
+- Nova §6.8 "Camadas de configuração de IA" descrevendo os 3 níveis (master → org → step).
 
-### Dentro
-1. **Conectar** Apollo via API key (por organização), com validação contra `GET /v1/auth/health`
-2. **Status** da conta (créditos restantes, plano, e-mail do dono) via `/v1/users/me`
-3. **Busca de pessoas** (`POST /v1/mixed_people/search`) com filtros: cargo, senioridade, indústria, país, tamanho de empresa, palavras-chave
-4. **Importar selecionados** da busca → cria/atualiza `leads` (dedup por email + linkedin_url)
-5. **Enriquecer lead existente** (`POST /v1/people/match`) — botão no detalhe do lead, atualiza campos vazios e grava em `lead_enrichment`
-6. **Telemetria de consumo**: cada chamada gera linha em nova tabela `apollo_api_calls` (endpoint, créditos consumidos, latência, status)
-7. **Card "Apollo"** em `/dashboard/integrations` (hoje placeholder) com: status, créditos, botão conectar/desconectar/testar, link para a nova tela de busca
-8. **Rota nova `/dashboard/leads/apollo`** com formulário de busca + grid de resultados + ações em massa (importar selecionados)
+## 3. Modelo de dados (migration única)
 
-### Fora (próximas fases)
-- Busca de empresas (organizations search) — Fase 3
-- Sequência automática "Buscar → Enriquecer → Inscrever em campanha" — depende do executor de fluxos
-- Webhooks Apollo (eles não oferecem webhooks padrão de qualquer forma)
-- Enriquecimento em lote (batch) — primeiro validar uso 1-a-1
-
----
-
-## 2. Decisões importantes (assumidas — confirma se algo muda)
-
-| # | Decisão | Padrão assumido | Alternativa |
-|---|---|---|---|
-| 1 | Chave Apollo por **organização** ou **plataforma** (compartilhada) | **Por org** (cada cliente paga seu Apollo) | Master-key da S7 com cobrança embutida (modelo Neros) — fica para depois |
-| 2 | Onde armazenar a chave | `integration_credentials` criptografada (mesmo padrão Pipedrive) | `platform_settings` por org |
-| 3 | Limite de resultados por busca | 100 por página, máximo 5 páginas (500 leads) por sessão de busca | Maior = mais risco de queimar créditos sem querer |
-| 4 | Dedup ao importar | Email **OU** linkedin_url (qualquer match = update, sem duplicar) | Só email |
-| 5 | Enriquecimento sobrescreve campos preenchidos? | **Não** — só preenche o que está vazio. Dados crus completos sempre em `lead_enrichment.payload` | Sim, com confirmação |
-| 6 | Rate limit local | 30 req/min por org (Apollo Basic é ~50/min) | Sem limite local (deixa Apollo bloquear) |
-
----
-
-## 3. Modelo de dados
-
-Tudo novo abaixo segue RLS por org + grant para `authenticated` e `service_role`, igual aos demais.
-
-```sql
--- Histórico de chamadas à API (custo, debug, auditoria)
-CREATE TABLE public.apollo_api_calls (
-  id uuid PK,
-  organization_id uuid FK NOT NULL,
-  endpoint text NOT NULL,           -- 'people/search' | 'people/match' | 'auth/health' | 'users/me'
-  status_code int,
-  credits_consumed int,             -- lido de response headers/body
-  latency_ms int,
-  request_summary jsonb,            -- filtros usados (NÃO o body inteiro)
-  error text,
-  triggered_by uuid,                -- auth.uid()
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
--- Cache de buscas (evita refazer mesma query e queimar créditos)
-CREATE TABLE public.apollo_search_cache (
-  id uuid PK,
-  organization_id uuid FK NOT NULL,
-  query_hash text NOT NULL,         -- sha256(JSON.stringify(filtros normalizados))
-  filters jsonb NOT NULL,
-  results jsonb NOT NULL,           -- payload da Apollo (lista de pessoas)
-  total_entries int,
-  page int NOT NULL DEFAULT 1,
-  expires_at timestamptz NOT NULL,  -- now() + 24h
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (organization_id, query_hash, page)
-);
-
--- leads ganha rastreio de origem Apollo (campo simples, sem nova tabela)
-ALTER TABLE public.leads ADD COLUMN apollo_person_id text;
-CREATE UNIQUE INDEX idx_leads_apollo_person
-  ON public.leads (organization_id, apollo_person_id)
-  WHERE apollo_person_id IS NOT NULL;
+### 3.1 `ai_platform_settings` (singleton — master admin)
+Uma linha só. Guarda config global da plataforma.
 ```
-
-Reusamos:
-- `integration_credentials` (chave API, encrypted)
-- `lead_enrichment` (payload completo do match, por enriquecimento)
-- `integration_providers` (adicionar/atualizar row "apollo")
-
----
-
-## 4. Arquitetura de código
-
-```text
-src/lib/
-├── apollo.functions.ts      # serverFns expostos ao front
-├── apollo.server.ts         # cliente HTTP, mapeamento Apollo→lead, dedup, cache
-└── apollo.types.ts          # tipos compartilhados (filtros, person, org)
-
-src/components/app/
-├── ApolloConnectDialog.tsx  # conectar/desconectar/testar (gêmeo do Pipedrive)
-└── ApolloSearchForm.tsx     # form de busca reutilizável
-
-src/routes/
-├── _app.dashboard.leads.apollo.tsx   # NOVA rota: busca + resultados + import
-└── _app.dashboard.integrations.tsx   # ativar card Apollo (hoje placeholder)
+id (uuid pk, default gen_random_uuid)
+default_model text not null default 'gpt-4.1-mini'
+allowed_models text[] not null default '{gpt-4.1-mini,gpt-4.1,gpt-4o-mini}'
+master_system_prompt text not null  -- prompt mestre, base de tudo
+default_temperature numeric(3,2) not null default 0.7
+max_tokens_per_call int not null default 1200
+is_enabled boolean not null default true
+updated_by uuid, updated_at timestamptz, created_at timestamptz
 ```
+RLS: SELECT/UPDATE só `master_admin`. SELECT do `master_system_prompt` **nunca** vai pro client de org — fica server-side.
 
-### Server functions (todas com `requireSupabaseAuth`)
+### 3.2 `ai_tone_presets` (catálogo gerenciado pelo master)
+Opções que aparecem nos dropdowns dos usuários.
+```
+id uuid pk
+kind text check in ('mood','approach','length','language')  -- tipo do dropdown
+slug text unique               -- ex: 'consultivo', 'descontraido', 'curto'
+label text                     -- ex: 'Consultivo'
+prompt_fragment text           -- pedaço injetado no prompt final
+is_active boolean default true
+sort_order int default 0
+```
+Seed inicial:
+- mood: profissional, consultivo, descontraído, direto, empático
+- approach: educativo, provocativo, social proof, dor-solução, pergunta aberta
+- length: curto (1-2 frases), médio (3-5), longo (parágrafo)
+- language: pt-BR, en, es
 
-| Fn | Quem chama | O que faz |
-|---|---|---|
-| `connectApollo({ apiKey })` | dialog | valida em `/v1/auth/health`, criptografa, salva em `integration_credentials`, marca `organization_integrations.status='connected'` |
-| `disconnectApollo()` | dialog | remove credencial, status=`disconnected` |
-| `getApolloStatus()` | card integrações | retorna `{ connected, credits_remaining, plan, owner_email, last_check_at }` |
-| `searchApolloPeople({ filters, page })` | tela de busca | checa cache 24h → se hit retorna; se miss chama Apollo, grava cache, registra `apollo_api_calls` |
-| `importApolloLeads({ apolloPersonIds[] })` | tela de busca | busca dos resultados em cache, mapeia para schema `leads`, dedup por email/linkedin/apollo_person_id, insert/update em lote |
-| `enrichLead({ leadId })` | botão no lead | `/v1/people/match`, atualiza campos vazios + grava `lead_enrichment.payload` |
+### 3.3 `ai_org_profile` (1:1 com `organizations` — config da marca pelo company_admin)
+```
+organization_id uuid pk
+brand_name text
+brand_voice text                -- até 500 chars, livre
+product_description text        -- até 500 chars
+icp_description text            -- até 500 chars
+value_proposition text          -- até 280 chars
+default_cta text                -- até 140 chars
+forbidden_words text[]          -- palavras a evitar
+default_mood_slug text          -- preset default que aparece selecionado nos steps
+default_approach_slug text
+default_language_slug text default 'pt-BR'
+updated_at, created_at
+```
+RLS: company_admin da org gerencia; master vê tudo.
 
-Tudo passa por um helper único `callApollo(endpoint, body, { orgId, userId })` em `apollo.server.ts` que: lê a key, aplica rate-limit local (counter em `apollo_api_calls`), faz fetch, captura headers de crédito (`x-credits-remaining`), registra a chamada, normaliza erros.
+### 3.4 `flow_steps.config` (sem migration de coluna — é jsonb)
+Para steps do tipo `ai_message` / `ai_rewrite`, o config passa a aceitar:
+```json
+{
+  "mood_slug": "consultivo",
+  "approach_slug": "dor-solucao",
+  "length_slug": "curto",
+  "language_slug": "pt-BR",
+  "extra_context": "Lead veio de evento SaaSHolic",   // textarea curta (280 chars)
+  "must_include": "menção ao case Mauna",             // textarea curta (280 chars)
+  "model_override": null,                              // só master pode setar via UI master
+  "temperature_override": null
+}
+```
+Validação dos slugs contra `ai_tone_presets` no save.
 
----
+### 3.5 `ai_actions` (já existe — só passar a popular)
+Garantir que toda chamada grava `model`, `tokens_input`, `tokens_output`, `cost_usd`, `latency_ms`, `status`, `lead_id`, `conversation_id`, `input` (com hash do prompt final, não o texto puro pra economizar), `output`.
 
-## 5. UX
+### 3.6 Grants/RLS (recap)
+Todas as 3 novas tabelas:
+```
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.<t> TO authenticated;
+GRANT ALL ON public.<t> TO service_role;
+```
+`ai_platform_settings`: SELECT só master_admin (org_admin NÃO lê o prompt mestre — ele é segredo da plataforma).
+`ai_tone_presets`: SELECT para `authenticated` (todo mundo precisa ler pros dropdowns), ALL só master_admin.
+`ai_org_profile`: SELECT/UPDATE org_admin da org; SELECT all members; ALL master.
 
-### Card em `/dashboard/integrations`
-Estados: Não conectado · Conectado (verde, créditos, botão "Abrir busca") · Erro (vermelho, motivo).
+## 4. Backend (server functions)
 
-### `/dashboard/leads/apollo` — busca
-- Topo: form de filtros (cargo, senioridade — multi-select, indústria, país, tamanho empresa, keywords). Botão "Buscar".
-- Meio: tabela com checkbox + nome, cargo, empresa, cidade, LinkedIn, email (mascarado se ainda não revelado), badge "Já existe na sua base" quando dedup detecta.
-- Rodapé: paginação + "Importar X selecionados" + contador de créditos restantes.
-- Toast de aviso antes de cada importação grande: "Isso vai consumir ~N créditos".
+Arquivos novos:
+- `src/lib/openai.server.ts` — cliente OpenAI (SDK oficial `openai` npm), helper `callOpenAI({ messages, model, temperature, maxTokens, orgId, leadId? })` que **sempre grava em `ai_actions`** e respeita rate-limit por org.
+- `src/lib/ai-prompt-builder.server.ts` — função pura `buildPrompt({ masterSettings, orgProfile, stepConfig, lead, conversationHistory? })` que retorna `{ system, user }`. Concatena na ordem: master prompt → bloco da marca → preset mood/approach/length → contexto do step → dados do lead → instrução final.
+- `src/lib/ai.functions.ts` — server functions consumidas pelo client:
+  - `getAiPlatformSettings` (master)
+  - `updateAiPlatformSettings` (master)
+  - `listAiTonePresets` (todos)
+  - `upsertAiTonePreset` (master)
+  - `getAiOrgProfile` (org admin/member — sem prompt mestre)
+  - `updateAiOrgProfile` (org admin)
+  - `previewAiMessage({ stepConfig, leadId? })` — gera 1 mensagem de teste no editor do step
+  - `getAiUsageStats({ orgId?, sinceHours })` — telemetria
 
-### Detalhe do lead (existente, leads page)
-Novo botão "Enriquecer com Apollo" → confirma → mostra antes/depois.
+Executor de fluxos (`flow-executor.server.ts`) passa a chamar `callOpenAI` quando o step for `ai_message`/`ai_rewrite`, usando `buildPrompt`.
 
----
+Limites:
+- Rate-limit local por org (ex.: 60 req/min) — tabela `ai_rate_window` em memória/edge ou contagem via `ai_actions` últimos 60s.
+- Hard cap de tokens por chamada vindo do master (`max_tokens_per_call`).
+
+Erros tratados: 401 (chave inválida → alerta master), 429 (backoff), 402/insufficient_quota (mensagem clara), validation.
+
+## 5. UI
+
+### 5.1 Master (`/master`)
+Nova rota `/master/ai`:
+- Card "Chave OpenAI" → status (configurada ✓), botão "Rotacionar" (abre fluxo de `add_secret`).
+- Editor do **prompt mestre** (textarea grande, monospace, versionamento simples via `updated_at`).
+- Seletor de `default_model` + checkbox dos `allowed_models`.
+- Sliders: `default_temperature`, `max_tokens_per_call`.
+- Tabela CRUD de `ai_tone_presets` (criar/editar/desativar — por tipo).
+- Dashboard de uso: chamadas/dia, custo/dia, top orgs consumidoras (lê `ai_actions`).
+
+### 5.2 Org admin (`/dashboard/settings`)
+Nova aba "IA da marca":
+- Form do `ai_org_profile` (brand_voice, product, ICP, value_prop, CTA, forbidden_words como chips, defaults de mood/approach/language em dropdowns alimentados por `listAiTonePresets`).
+- Aviso visual: "O prompt mestre da plataforma é aplicado automaticamente. Aqui você só ajusta a voz da sua marca."
+
+### 5.3 Usuário no Builder (step de IA dentro do fluxo)
+No painel lateral do step `ai_message`/`ai_rewrite` em `FlowEditor.tsx`:
+- 4 dropdowns curtos: Humor, Abordagem, Tamanho, Idioma (defaults vêm do `ai_org_profile`).
+- 2 textareas curtas (280 chars): "Contexto extra deste step", "Precisa mencionar".
+- Botão "Pré-visualizar com lead de teste" → chama `previewAiMessage`, mostra resultado + tokens + custo estimado.
+- Nada de chave, modelo ou temperatura — escondidos do usuário comum.
 
 ## 6. Segurança
 
-- **Chave nunca volta pro client** — `integration_credentials.value_encrypted`, decrypt só em `apollo.server.ts`.
-- **RLS** em `apollo_api_calls`, `apollo_search_cache`: `is_org_member` para SELECT; INSERT só via service role (serverFn usa `supabaseAdmin`).
-- **Rate limit local** evita banimento da chave do cliente.
-- **Telemetria** dá ao master_admin visibilidade de uso (matar dívida #6 parcialmente).
+- `OPENAI_API_KEY` só lida dentro de handlers de server function (`process.env`).
+- Prompt mestre nunca trafega pro client — `previewAiMessage` retorna só o output final.
+- Validação Zod em todos os inputs (slugs, comprimentos, model dentro de `allowed_models`).
+- Auditoria: toda mudança no `ai_platform_settings` e `ai_tone_presets` grava em `audit_logs`.
 
----
+## 7. Milestones (ordem de execução)
 
-## 7. Marcos de entrega
+1. **Migration** — 3 tabelas + grants + RLS + seeds dos presets + seed singleton de `ai_platform_settings` com prompt mestre placeholder.
+2. **Secret** — registrar `OPENAI_API_KEY` (já temos a chave — usar `add_secret`).
+3. **Backend** — `openai.server.ts`, `ai-prompt-builder.server.ts`, `ai.functions.ts` + integração no `flow-executor.server.ts`.
+4. **UI master** — rota `/master/ai` (prompt mestre, modelos, presets, uso).
+5. **UI org** — aba "IA da marca" em `/dashboard/settings`.
+6. **UI builder** — painel do step IA com dropdowns + textareas + preview.
+7. **Escopo** — atualizar §6.4, §6.6 e adicionar §6.8.
 
-```text
-M1  Migration (tabelas + ALTER leads + grants + RLS + provider 'apollo')
-M2  apollo.server.ts (HTTP client + cache + telemetria + rate-limit)
-M3  apollo.functions.ts (6 serverFns) + ApolloConnectDialog
-M4  Card Apollo em /dashboard/integrations conectando/testando
-M5  Rota /dashboard/leads/apollo (busca + resultados + import)
-M6  Botão "Enriquecer com Apollo" no detalhe do lead
-M7  Atualizar escopo-leaderei.md §5.3 + §4.8 (Apollo deixa de ser placeholder)
-```
+## 8. Fora de escopo (próximas fases)
 
-Cada marco roda independente e é testável. Posso entregar M1+M2+M3 em uma rodada e o resto em outra, ou tudo de uma vez — sua escolha.
-
----
-
-## 8. O que NÃO faz parte (para evitar escopo creep)
-
-- OpenAI / módulo de IA (próximo passo após este)
-- Templates de mensagem usando dados do Apollo (depende do módulo de IA)
-- Enriquecimento automático em background (depende do executor de fluxos)
-- Sync bidirecional ou listas salvas no Apollo (raro, fora do MVP)
-
----
+- Fallback multi-provider (Claude/Gemini).
+- Negociação Cal.com em linguagem natural (§5.4).
+- Score comportamental (§6.7).
+- ElevenLabs / áudio.
+- Fine-tune próprio.
 
 ## 9. Pré-requisito do usuário
 
-Você precisa ter uma **conta Apollo paga** (plano Basic já dá acesso à API). A chave fica em **Settings → API Keys** no painel do Apollo. **Não me envie a chave no chat** — quando começarmos a build, vou usar o fluxo seguro do `add_secret`/dialog para você colar.
-
----
-
-Confirma se as decisões da seção 2 batem com o que tem em mente. Se sim, eu sigo para build.
+Confirmar para eu seguir: **registro o secret `OPENAI_API_KEY` agora** (via fluxo seguro de `add_secret` — você cola a chave numa caixa segura, não no chat). OK?
