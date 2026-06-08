@@ -1,49 +1,63 @@
-# Ajustes no Builder
+Criar `docs/user/UPDATES.md` — um histórico de evolução da plataforma Leaderei em linguagem simples, organizado por **versão** (não por data), focado no que o cliente percebe: módulos entregues e integrações conectadas (com status de teste).
 
-Dois ajustes pontuais, ambos sem mexer em regras de negócio:
+## Estrutura do arquivo
 
-## 1. Exclusão e religação de conexões entre nós
+1. **Cabeçalho curto** — explica que é o histórico de evolução da plataforma, organizado por versão. Cada versão lista o que foi entregue e o status das integrações.
 
-Hoje o canvas não oferece uma forma visível de remover ou redirecionar uma seta — o usuário fica preso à conexão original.
+2. **Legenda de status de integrações**:
+   - ✅ Testada e funcionando em produção
+   - 🧪 Implementada, em fase de testes
+   - ⏳ Estrutura pronta, aguardando ativação
 
-Vamos habilitar três caminhos complementares, todos no `FlowEditor.tsx`:
+3. **Versões** (da mais recente para a mais antiga):
 
-- **Clique na conexão → botão de excluir**: ao clicar numa seta, ela fica selecionada (destacada com cor mais forte e traço mais grosso) e aparece um pequeno botão "✕" flutuante no meio da linha. Clicar no botão remove a conexão (com `confirm` simples) e marca o documento como sujo.
-- **Tecla Delete/Backspace**: com a conexão selecionada, apertar Delete também remove (configurando `deleteKeyCode={["Delete","Backspace"]}` no `<ReactFlow>` e tratando no `handleEdgesChange`, que já existe).
-- **Religar arrastando a ponta**: habilitar `onReconnect` do React Flow. O usuário pega a ponta da seta (origem ou destino) e arrasta para outro nó — a conexão é atualizada, respeitando as regras já validadas (sem auto-conexão, sem duplicar ramo "yes/no", etc.). Se a nova ligação violar uma regra, exibe `toast.error` e mantém a original.
+   - **v0.5 — IA e Builder maduro**
+     - Módulo de IA da marca (painel Master)
+     - Builder: exclusão e religação de conexões entre nós
+     - Novo nó inicial padrão "Mensagem com IA"
+     - Reforço de segurança em acesso a dados
 
-Sem mudanças no backend: o `saveBuilderDocument` já recebe a lista de transições atual e remove as ausentes.
+   - **v0.4 — Comunicação e integrações externas**
+     - WhatsApp via Hook7 (conexão por QR Code, instâncias por organização ou por usuário) — 🧪
+     - Resend para email transacional (chave global + chave por organização) — ✅
+     - Apollo (busca e enriquecimento de leads) — 🧪
+     - Pipedrive (sincronização) — ⏳
+     - Cal.com (agendamentos) — ⏳
 
-## 2. Nó inicial padrão = "Mensagem com IA"
+   - **v0.3 — Campanhas, Builder e Inbox**
+     - CRUD completo de campanhas (criar, editar, duplicar, iniciar, pausar, arquivar)
+     - Builder visual de fluxos (criar, editar blocos, salvar com versão, publicar)
+     - Inbox em 3 colunas (lista, conversa, painel do lead)
+     - Auto-link entre nós ao arrastar do painel
 
-Quando uma campanha é aberta pela primeira vez no builder e nenhum documento existe ainda, `getBuilderDocumentByCampaign` (em `src/lib/builder.functions.ts`) semeia um nó inicial do tipo `message_email`. Vamos trocar para `ai_message` com a configuração padrão equivalente à do builder:
+   - **v0.2 — Leads e Dashboard**
+     - Lista de leads com busca e filtros
+     - Criação, edição e arquivamento de leads
+     - Importação de leads via CSV
+     - Dashboard com KPIs reais por organização
 
-```ts
-type: "ai_message",
-config: {
-  channel: "whatsapp",
-  task_instruction: "",
-  mood_slug: null,
-  approach_slug: null,
-  length_slug: null,
-  language_slug: null,
-  extra_context: "",
-  must_include: "",
-},
-```
+   - **v0.1 — Fundação**
+     - Login e cadastro
+     - Onboarding inicial
+     - Estrutura multi-organização (workspaces)
+     - Configurações da organização e convite de membros por email
+     - Área Master (administrador da plataforma): organizações, usuários, planos, logs
 
-Documentos já existentes não são afetados — a troca só vale para novos fluxos criados a partir daí.
+4. **Próximas entregas** (seção curta no fim, sem versão ainda):
+   - Disparo real de campanhas em loop
+   - Webhooks de bounce/delivered do Resend
+   - Editor avançado de blocos no Builder (templates, condições compostas, ramificações múltiplas)
+   - Ativação completa de Pipedrive e Cal.com
+
+## Manutenção contínua
+
+Sempre que uma nova entrega for feita, o arquivo será atualizado:
+- Funcionalidade nova relevante → entra em uma versão futura (ex: v0.6)
+- Integração que avança de status → atualizar o ícone (⏳ → 🧪 → ✅)
+- Correções menores não entram (mantém a leitura limpa para o cliente)
 
 ## Detalhes técnicos
 
-- `FlowEditor.tsx`:
-  - Adicionar estado `selectedEdgeId` e handler `onEdgeClick` que define seleção e limpa `selectedId` de nó.
-  - Estilizar edge selecionada (strokeWidth maior, animated opcional).
-  - Renderizar um `EdgeLabelRenderer` custom (ou um botão posicionado via `getBezierPath`/`getSmoothStepPath`) só na edge selecionada, com botão "✕" que chama `deleteEdge(id)`.
-  - `deleteEdge`: `setEdges(eds => eds.filter(e => e.id !== id))` + `markDirty()`.
-  - Adicionar `onReconnect={onReconnect}` validando: sem self-loop, e — se mudar a origem — sem ramo duplicado para condition_replied. Em caso de erro: `toast.error` e retorna a edge original.
-  - Passar `deleteKeyCode={["Delete","Backspace"]}` e `edgesReconnectable` no `<ReactFlow>`.
-  - Limpar `selectedEdgeId` no `onPaneClick`.
-- `src/lib/builder.functions.ts`: alterar o `insert` do step semente em `getBuilderDocumentByCampaign` para `type: "ai_message"` com o config acima.
-
-Sem migrações de banco, sem mudanças no executor de fluxos.
+- Arquivo único: `docs/user/UPDATES.md`
+- Markdown simples, sem jargão técnico (sem "RLS", "edge function", "migration", etc.)
+- Versionamento semântico simplificado por marcos de produto (0.1, 0.2, …) — não atrelado ao versionamento de código
