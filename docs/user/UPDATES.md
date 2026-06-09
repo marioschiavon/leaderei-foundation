@@ -22,6 +22,7 @@
 ## v0.5 — IA e Builder maduro
 
 - **Módulo de IA no painel Master**: o administrador cria o *prompt mestre* (as regras-base que a IA segue em todas as mensagens) e monta um catálogo de opções de estilo (humor, abordagem, tamanho, idioma) que ficam disponíveis para as organizações. Na organização, o usuário preenche os dados da marca (nome, voz, produto, ICP, proposta de valor, CTA, palavras proibidas) e escolhe nas listas as opções liberadas pelo Master. A IA então gera cada mensagem combinando: prompt mestre + dados da marca + escolhas do usuário — ou seja, o Master define como a IA deve se comportar, e a mensagem final é montada a partir do que cada usuário decidir.
+- **Conexão Pipedrive simplificada**: o usuário agora cola apenas o API token; o domínio da empresa é detectado automaticamente pela própria API do Pipedrive, eliminando o erro mais comum ("domínio não encontrado") na hora de conectar.
 - **Builder mais flexível**: agora é possível **excluir uma conexão** entre nós e **religar** arrastando a ponta da seta para outro nó.
 - **Novo nó inicial padrão**: novos fluxos já abrem com o nó "Mensagem com IA" no lugar do antigo nó de email.
 - **Reforço de segurança** no acesso aos dados entre organizações.
