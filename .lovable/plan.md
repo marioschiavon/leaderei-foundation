@@ -1,58 +1,34 @@
+## Problema
 
-# Migrar envio de email: Resend → Lovable Emails
+Ao clicar **Conectar** no Apollo, a resposta vem com **404** após ~3s. Não há linhas em `apollo_api_calls` porque o erro vem direto da Apollo antes de qualquer outra coisa funcionar.
 
-Replicar a arquitetura de email do `lead-automate`: infra nativa Lovable (Mailgun via NS delegation), fila pgmq com retry/DLQ, templates React Email, suppression list e unsubscribe automáticos. Subdomínio: **`notify.leaderei.com.br`**.
+**Causa raiz:** em `src/lib/apollo.server.ts` a constante `BASE` aponta para `https://api.apollo.io/v1`. A Apollo migrou a API para `https://api.apollo.io/api/v1` — o caminho antigo agora responde 404 em todos os endpoints (`auth/health`, `mixed_people/search`, `people/match`).
 
-## Etapas
+## Mudanças
 
-### 1. Provisionar domínio + infraestrutura
-- Abrir diálogo de setup (`<presentation-open-email-setup>`) para `notify.leaderei.com.br`. Usuário adiciona NS records (`ns3/ns4.lovable.cloud`) no registrador do `leaderei.com.br`. Lovable gerencia SPF/DKIM/MX automaticamente.
-- Rodar `email_domain--setup_email_infra`: cria pgmq (`auth_emails`, `transactional_emails`), RPCs (`enqueue_email`, `read_email_batch`, `delete_email`, `move_to_dlq`), tabelas (`email_send_state`, `suppressed_emails`, `email_unsubscribe_tokens`), atualiza `email_send_log`, pg_cron 5s em `/lovable/email/queue/process`.
+### 1. `src/lib/apollo.server.ts` — corrigir base URL
+- Trocar `const BASE = "https://api.apollo.io/v1"` por `const BASE = "https://api.apollo.io/api/v1"`.
+- Manter os paths atuais (`auth/health`, `mixed_people/search`, `people/match`) — eles estão corretos sob a nova base.
+- Continuar enviando o header `X-Api-Key` (suportado) e também o body `{ api_key }` no `validateApolloKey` (compatível com ambos os modos de auth da Apollo, evita regressão se algum ambiente exigir um ou outro).
 
-### 2. Scaffold app emails (transacional)
-- Rodar `email_domain--scaffold_transactional_email`: cria rotas `/lovable/email/transactional/send`, `/preview`, `/email/unsubscribe`, `/lovable/email/suppression` e `src/lib/email-templates/registry.ts`.
-- Criar `src/lib/email-templates/invitation.tsx` em React Email (`Html`, `Head`, `Body`, `Container`, `Heading`, `Text`, `Button`, `Preview`) usando paleta atual: laranja `#e04e01`, fundo `#ffffff`, fonte system. Sem footer de unsubscribe manual — o sistema injeta.
-- Registrar `invitation` no `registry.ts` com props tipadas (`org_name`, `inviter_name`, `role_label`, `invite_url`, `expires_at`).
+### 2. Mensagem de 404 mais clara
+No `humanizeApolloError`, adicionar tratamento para `status === 404`:
+> "Endpoint Apollo não encontrado (404). Pode ser uma versão de API desatualizada — avise o suporte."
 
-### 3. Scaffold auth emails (auth)
-- Rodar `email_domain--scaffold_auth_email_templates`: cria webhook `/lovable/email/auth/webhook` e 6 templates (`signup`, `magiclink`, `recovery`, `invite`, `email-change`, `reauthentication`).
-- Estilizar os 6 com identidade Leaderei (logo, laranja, footer S7).
-- Substitui automaticamente os emails padrão do Supabase (reset de senha, confirmação).
+Assim, se a Apollo mudar a base de novo, a mensagem não fica genérica.
 
-### 4. Substituir sender atual
-- Reescrever `src/lib/email.functions.ts`: `sendEmailInternal` passa a POSTar `/lovable/email/transactional/send` com `{ templateName, recipientEmail, idempotencyKey, templateData }`. Eliminar fetch a `api.resend.com`, `getGlobalConfig`, `getOrgConfig`, leitura de `resend_global_api_key`.
-- Atualizar call sites (`tenant.functions.ts` etc.) para passar `templateName: 'invitation'` + `templateData`, em vez de HTML pronto. Idempotency key: `invitation-${invitation_id}`.
-- Apagar `src/lib/email-templates/base.ts` e `invitation.ts` (HTML antigo).
-
-### 5. Página de unsubscribe brandada
-- Scaffold devolve um path sugerido (ex.: `/descadastrar`). Criar `src/routes/descadastrar.tsx` que lê `?token=`, faz GET em `/email/unsubscribe` para validar, POST para confirmar, com visual Leaderei (estados: confirmar, já cancelado, inválido, sucesso).
-
-### 6. Remover Resend
-- Tirar UI "Resend Global API Key" / "From Email/Name" de `_master.master.platform.tsx`.
-- Tirar card Resend por organização em `dashboard/integrations`; remover `src/lib/integrations.functions.ts` (`getOrgResendConnection`, `saveOrgResendConnection`, `disconnectOrgResend`).
-- Migration: `DELETE` provider `resend` em `integration_providers` + cleanup de `organization_integrations` e `integration_credentials` órfãos.
-- Manter por enquanto a chave `resend_global_api_key` em `platform_settings` (rollback seguro), mas parar de ler.
-
-### 7. Documentação
-- Atualizar `docs/user/UPDATES.md` (v0.6) explicando: emails agora nativos Lovable, zero chave externa, retry/DLQ automático, suppression, unsubscribe e templates de auth + convite brandados.
-
-## O que NÃO muda
-- `email_send_log` (compatível com `setup_email_infra`).
-- Convites de organização (`organization_invitations`, `accept_invitation`) — só muda o canal.
-- Login/signup Supabase — só os templates ficam brandados.
+### 3. Validar manualmente após o deploy
+- Reabrir o dialog **Integrações → Apollo**, colar a chave e clicar **Conectar**.
+- Esperado: badge **Conectado**, linha em `organization_integrations` (status `connected`) e uma linha em `apollo_api_calls` com endpoint `auth/health` e `status_code = 200`.
+- Em seguida testar uma busca em `/dashboard/leads/apollo` para garantir que `mixed_people/search` também funciona com a nova base.
 
 ## Detalhes técnicos
-- `SENDER_DOMAIN` = `notify.leaderei.com.br`; `FROM_DOMAIN` pode ser exibido como `leaderei.com.br` se ativar `display_from_root`.
-- Throughput padrão ~120/min, ajustável em `email_send_state`.
-- Bounces/queixas entram em `suppressed_emails` via webhook Mailgun; `/transactional/send` checa antes de enfileirar.
-- Auth emails só ativam após DNS verificar (monitorar em **Cloud → Emails**); app emails podem ser scaffoldados antes.
-- TTL auth 15min, app 60min.
 
-## Ordem de execução (no build mode)
-1. Diálogo de domínio (espera DNS do usuário).
-2. `setup_email_infra` → `scaffold_transactional_email` → `scaffold_auth_email_templates`.
-3. Templates React Email + registry.
-4. Rewrite `email.functions.ts` + call sites.
-5. Página `/descadastrar`.
-6. Limpeza Resend + migration.
-7. UPDATES.md.
+- Não é necessário mexer em `apollo.functions.ts`, no dialog, em telemetria, cache ou schema do banco. A correção é isolada à constante de base URL.
+- Cache `apollo_search_cache` continua válido — a chave é hash dos filtros, não do endpoint.
+- Sem migração de banco.
+- Sem nova dependência.
+
+## Arquivos afetados
+
+- `src/lib/apollo.server.ts` (1 constante + 1 branch no `humanizeApolloError`)
