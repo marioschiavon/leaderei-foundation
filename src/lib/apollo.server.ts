@@ -175,8 +175,7 @@ export async function validateApolloKey(args: {
 }): Promise<{ ok: true }> {
   await callApollo<any>({
     endpoint: "auth/health",
-    method: "POST",
-    body: { api_key: args.apiKey },
+    method: "GET",
     apiKey: args.apiKey,
     organization_id: args.organization_id,
     supabase: args.supabase,
