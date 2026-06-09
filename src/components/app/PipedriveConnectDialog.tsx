@@ -281,10 +281,9 @@ export function PipedriveConnectDialog({ open, onOpenChange }: Props) {
           <Button
             disabled={
               saveMut.isPending ||
-              companyDomain.trim().length < 3 ||
-              (!isConnected && apiToken.trim().length < 10) ||
-              (isConnected && apiToken.length > 0 && apiToken.trim().length < 10)
+              apiToken.trim().length < 10
             }
+
             onClick={() => {
               if (!apiToken.trim()) {
                 if (isConnected) {
