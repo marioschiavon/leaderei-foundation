@@ -98,7 +98,6 @@ export const getPipedriveConnection = createServerFn({ method: "GET" })
 
 const SaveSchema = z.object({
   api_token: z.string().trim().min(10).max(200),
-  company_domain: z.string().trim().min(3).max(120),
 });
 
 export const savePipedriveConnection = createServerFn({ method: "POST" })
@@ -109,8 +108,11 @@ export const savePipedriveConnection = createServerFn({ method: "POST" })
     const organization_id = await getActiveOrgId(supabase, userId);
     const provider_id = await getPipedriveProviderId(supabase);
 
-    const company_domain = normalizeCompanyDomain(data.company_domain);
-    const me = await validatePipedriveToken({ api_token: data.api_token, company_domain });
+    // Discover the company subdomain automatically from the token. The user
+    // no longer needs to type their Pipedrive URL.
+    const me = await discoverCompanyDomain(data.api_token);
+    const company_domain = me.company_domain;
+
 
     const { data: existing } = await supabase
       .from("organization_integrations")
