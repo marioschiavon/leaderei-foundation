@@ -243,7 +243,7 @@ export async function searchPeopleWithCache(args: {
 
   // 2) call Apollo
   const data = await callApollo<{ people: ApolloPerson[]; pagination: any }>({
-    endpoint: "mixed_people/search",
+    endpoint: "mixed_people/api_search",
     method: "POST",
     body: normalized,
     apiKey: args.apiKey,
