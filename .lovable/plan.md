@@ -1,34 +1,41 @@
-## Problema
+## Diagnóstico (testado direto na API)
 
-Ao clicar **Conectar** no Apollo, a resposta vem com **404** após ~3s. Não há linhas em `apollo_api_calls` porque o erro vem direto da Apollo antes de qualquer outra coisa funcionar.
+Testei a chave `-aK3mJrvIQcF46ktJOtHgA` contra cada endpoint:
 
-**Causa raiz:** em `src/lib/apollo.server.ts` a constante `BASE` aponta para `https://api.apollo.io/v1`. A Apollo migrou a API para `https://api.apollo.io/api/v1` — o caminho antigo agora responde 404 em todos os endpoints (`auth/health`, `mixed_people/search`, `people/match`).
+| Endpoint | Método usado hoje | Resultado | Esperado |
+|---|---|---|---|
+| `/api/v1/auth/health` | POST + body | **404** | **GET** + header `X-Api-Key` → `200 {"healthy":true,"is_logged_in":true}` |
+| `/api/v1/mixed_people/search` | POST | **422 deprecated** | Trocar para `/api/v1/mixed_people/api_search` (POST) → `200` |
+| `/api/v1/people/match` | POST | **200** | Já está correto |
 
-## Mudanças
+A chave da Apollo é **válida**. As duas chamadas que estavam quebradas são o handshake (`auth/health`) e a busca (`mixed_people/search`). A base `https://api.apollo.io/api/v1` está correta — manter.
 
-### 1. `src/lib/apollo.server.ts` — corrigir base URL
-- Trocar `const BASE = "https://api.apollo.io/v1"` por `const BASE = "https://api.apollo.io/api/v1"`.
-- Manter os paths atuais (`auth/health`, `mixed_people/search`, `people/match`) — eles estão corretos sob a nova base.
-- Continuar enviando o header `X-Api-Key` (suportado) e também o body `{ api_key }` no `validateApolloKey` (compatível com ambos os modos de auth da Apollo, evita regressão se algum ambiente exigir um ou outro).
+## Mudanças (todas em `src/lib/apollo.server.ts`)
 
-### 2. Mensagem de 404 mais clara
-No `humanizeApolloError`, adicionar tratamento para `status === 404`:
-> "Endpoint Apollo não encontrado (404). Pode ser uma versão de API desatualizada — avise o suporte."
+### 1. `validateApolloKey` — usar GET
+Trocar o objeto passado para `callApollo`:
+- `method: "POST"` → `method: "GET"`
+- Remover `body: { api_key: args.apiKey }` (não usado em GET; autenticação já vai pelo header `X-Api-Key`)
 
-Assim, se a Apollo mudar a base de novo, a mensagem não fica genérica.
+### 2. `searchPeopleWithCache` — novo endpoint
+- Trocar `endpoint: "mixed_people/search"` por `endpoint: "mixed_people/api_search"`
+- Body e shape de resposta (`people[]`, `pagination`, `total_entries`) permanecem iguais — confirmado no teste.
 
-### 3. Validar manualmente após o deploy
-- Reabrir o dialog **Integrações → Apollo**, colar a chave e clicar **Conectar**.
-- Esperado: badge **Conectado**, linha em `organization_integrations` (status `connected`) e uma linha em `apollo_api_calls` com endpoint `auth/health` e `status_code = 200`.
-- Em seguida testar uma busca em `/dashboard/leads/apollo` para garantir que `mixed_people/search` também funciona com a nova base.
+### 3. `callApollo` — pequeno ajuste defensivo
+Hoje o header `Content-Type: application/json` é enviado mesmo em GET. Manter como está (Apollo aceita), porém **não** enviar `body` quando `method === "GET"` (já é o caso). Nada a fazer aqui além de confirmar.
 
-## Detalhes técnicos
+### 4. Mensagem 404
+Manter o branch novo no `humanizeApolloError` (`"Endpoint Apollo não encontrado (404)..."`) — útil para futuras quebras.
 
-- Não é necessário mexer em `apollo.functions.ts`, no dialog, em telemetria, cache ou schema do banco. A correção é isolada à constante de base URL.
-- Cache `apollo_search_cache` continua válido — a chave é hash dos filtros, não do endpoint.
-- Sem migração de banco.
-- Sem nova dependência.
+## Observação sobre dados retornados
+O `mixed_people/api_search` é o endpoint público e por padrão **não devolve email/telefone reais** (devolve `has_email: true`, `last_name_obfuscated`). Isso é igual ao comportamento que o `lead-automate` usa hoje — quando o usuário importa um lead, o enrichment via `people/match` é quem traz email/telefone gastando crédito. O fluxo do app hoje já está alinhado com isso: a busca é exploratória, e o `enrichLeadWithApollo` é quem revela email.
+
+Nenhuma mudança em UI, cache, dedupe, schema de banco, ou `apollo.functions.ts`. Apenas as 2 linhas em `apollo.server.ts`.
+
+## Validação após o build
+1. Abrir o dialog Apollo, colar a chave e clicar **Conectar** → badge **Conectado** e `apollo_api_calls` registra `auth/health` com `status_code = 200`.
+2. Em `/dashboard/leads/apollo`, fazer uma busca (qualquer cargo) → resultados aparecem, `apollo_api_calls` registra `mixed_people/api_search` com `status_code = 200`.
+3. Em um lead com email, rodar enriquecimento → `people/match` com `status_code = 200`.
 
 ## Arquivos afetados
-
-- `src/lib/apollo.server.ts` (1 constante + 1 branch no `humanizeApolloError`)
+- `src/lib/apollo.server.ts` (2 alterações pontuais)
