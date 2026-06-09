@@ -49,7 +49,7 @@ export function emptySyncStats(): SyncStats {
 export function normalizeCompanyDomain(input: string): string {
   let v = input.trim().toLowerCase();
   v = v.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!v) throw new Error("Informe o domínio da empresa no Pipedrive.");
+  if (!v) throw new Error("Domínio da empresa Pipedrive ausente.");
   if (!/^[a-z0-9-]+\.pipedrive\.com(\.br)?$/.test(v)) {
     if (/^[a-z0-9-]+$/.test(v)) v = `${v}.pipedrive.com`;
     else throw new Error("Domínio inválido. Use o formato suaempresa.pipedrive.com");
@@ -57,8 +57,48 @@ export function normalizeCompanyDomain(input: string): string {
   return v;
 }
 
+/**
+ * Discover the company's Pipedrive subdomain from the API token alone, by
+ * hitting the global endpoint `https://api.pipedrive.com/v1/users/me`. The
+ * response includes `data.company_domain`, which we turn into the full
+ * `{slug}.pipedrive.com` host used by the v2 sync calls.
+ */
+export async function discoverCompanyDomain(
+  api_token: string,
+): Promise<{ user_id: number; name: string; company_domain: string }> {
+  const url = `https://api.pipedrive.com/v1/users/me?api_token=${encodeURIComponent(api_token)}`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: ctrl.signal });
+  } catch (e: any) {
+    clearTimeout(timer);
+    throw new Error(`Falha ao contactar Pipedrive: ${e?.message ?? e}`);
+  }
+  clearTimeout(timer);
+  if (res.status === 401 || res.status === 403) {
+    throw new Error("Token inválido — verifique em Pipedrive → Configurações pessoais → API.");
+  }
+  if (!res.ok) throw new Error(`Pipedrive retornou ${res.status}.`);
+  const body = (await res.json()) as any;
+  if (!body?.success || !body?.data) {
+    throw new Error("Resposta inesperada do Pipedrive ao validar o token.");
+  }
+  const slug = String(body.data.company_domain ?? "").trim().toLowerCase();
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    throw new Error("Não foi possível detectar o domínio da empresa no Pipedrive.");
+  }
+  return {
+    user_id: Number(body.data.id),
+    name: String(body.data.name ?? ""),
+    company_domain: `${slug}.pipedrive.com`,
+  };
+}
+
 export async function validatePipedriveToken(creds: PipedriveCredentials): Promise<{ user_id: number; name: string }> {
   const url = `https://${creds.company_domain}/api/v2/users/me?api_token=${encodeURIComponent(creds.api_token)}`;
+
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10000);
   let res: Response;
