@@ -8,7 +8,7 @@ import type {
   ApolloSearchResult,
 } from "./apollo.types";
 
-const BASE = "https://api.apollo.io/v1";
+const BASE = "https://api.apollo.io/api/v1";
 const TIMEOUT_MS = 15000;
 const RATE_LIMIT_PER_MIN = 30;
 const CACHE_TTL_HOURS = 24;
@@ -153,6 +153,9 @@ function safeJson(text: string): any {
 function humanizeApolloError(status: number, msg: string): string {
   if (status === 401 || status === 403) {
     return "API key Apollo inválida ou sem permissão. Verifique em Apollo → Settings → API.";
+  }
+  if (status === 404) {
+    return "Endpoint Apollo não encontrado (404). Pode ser uma versão de API desatualizada — avise o suporte.";
   }
   if (status === 422) return `Filtros inválidos: ${msg}`;
   if (status === 429) return "Apollo retornou 429 (rate limit). Aguarde alguns minutos.";
