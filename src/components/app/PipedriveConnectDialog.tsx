@@ -132,19 +132,12 @@ export function PipedriveConnectDialog({ open, onOpenChange }: Props) {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="pd-domain">Domínio da empresa no Pipedrive</Label>
-              <Input
-                id="pd-domain"
-                placeholder="suaempresa.pipedrive.com"
-                value={companyDomain}
-                onChange={(e) => setCompanyDomain(e.target.value)}
-                autoComplete="off"
-              />
-              <p className="text-2xs text-muted-foreground">
-                É a URL que você usa para acessar o Pipedrive (sem https://).
+            {!isConnected && (
+              <p className="text-xs text-muted-foreground">
+                Cole apenas o seu API token — vamos detectar o domínio da sua conta Pipedrive automaticamente.
               </p>
-            </div>
+            )}
+
 
             <div className="space-y-1.5">
               <Label htmlFor="pd-token">
