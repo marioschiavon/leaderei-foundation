@@ -40,14 +40,12 @@ export function PipedriveConnectDialog({ open, onOpenChange }: Props) {
     queryFn: () => listRuns(),
   });
 
-  const [companyDomain, setCompanyDomain] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [clearCursors, setClearCursors] = useState(false);
 
   useEffect(() => {
     if (connQuery.data && open) {
-      setCompanyDomain(connQuery.data.company_domain ?? "");
       setApiToken("");
       setShowToken(false);
       setClearCursors(false);
@@ -55,7 +53,7 @@ export function PipedriveConnectDialog({ open, onOpenChange }: Props) {
   }, [connQuery.data, open]);
 
   const saveMut = useMutation({
-    mutationFn: () => save({ data: { api_token: apiToken.trim(), company_domain: companyDomain.trim() } }),
+    mutationFn: () => save({ data: { api_token: apiToken.trim() } }),
     onSuccess: () => {
       toast.success("Pipedrive conectado.");
       qc.invalidateQueries({ queryKey: ["integrations"] });
@@ -64,6 +62,7 @@ export function PipedriveConnectDialog({ open, onOpenChange }: Props) {
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao conectar Pipedrive."),
   });
+
 
   const disconnectMut = useMutation({
     mutationFn: () => disconnect({ data: { clear_cursors: clearCursors } }),
