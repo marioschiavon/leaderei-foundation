@@ -2,11 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  normalizeCompanyDomain,
+  discoverCompanyDomain,
   runPipedriveSync,
-  validatePipedriveToken,
   type SyncCursors,
 } from "./pipedrive.server";
+
 
 async function getActiveOrgId(supabase: any, userId: string) {
   const { data, error } = await supabase
