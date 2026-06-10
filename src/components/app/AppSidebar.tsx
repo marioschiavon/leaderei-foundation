@@ -13,6 +13,7 @@ import {
   Shield,
   Blocks,
   KanbanSquare,
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -57,6 +58,7 @@ const WORKSPACE: NavItem[] = [
 ];
 
 const TOOLS: NavItem[] = [
+  { title: "Buscar no Apollo", url: "/dashboard/leads/apollo", icon: Sparkles },
   { title: "Integrações", url: "/dashboard/integrations", icon: Plug },
   { title: "Builder", url: "/dashboard/builder", icon: Blocks, badge: "Beta" },
 ];
