@@ -1,77 +1,45 @@
-# Repaginar Leads + acessar Apollo Search
+# Corrigir página dedicada do Lead
 
-Dois problemas resolvidos juntos: (1) a busca Apollo existia mas não tinha link no menu, e (2) o detalhe do lead aparecia num painel lateral apertado, mostrando só parte dos dados e sem edição completa.
+## Diagnóstico
 
-## 1. Acesso ao Apollo Search
+`/dashboard/leads/<leadId>` abre em branco (só o spinner do shell). Razão técnica:
 
-- Adicionar botão **"Buscar no Apollo"** no header da página `/dashboard/leads` (ao lado de "Importar" e "Novo lead"), apontando para `/dashboard/leads/apollo`.
-- Adicionar entrada **"Buscar no Apollo"** no sidebar, dentro do grupo *Ferramentas*, com ícone de busca (visível só quando a integração Apollo estiver conectada — quando desconectada, mostra greyed-out com tooltip "Conecte o Apollo em Integrações").
+- Existem 3 arquivos irmãos: `_app.dashboard.leads.tsx` (lista), `_app.dashboard.leads.$leadId.tsx` (detalhe) e `_app.dashboard.leads.apollo.tsx` (busca).
+- No TanStack Router, quando há arquivos com prefixo `leads.`, o `leads.tsx` vira **rota pai** de `$leadId` e `apollo`. Confirmado no `routeTree.gen.ts`: `getParentRoute: () => AppDashboardLeadsRoute`.
+- Uma rota pai precisa renderizar `<Outlet />` para a filha aparecer. Hoje o componente `LeadsPage` renderiza a lista direto e **não tem `<Outlet />`** — então o filho casa, mas nada mostra; a UI continua exibindo a lista (ou fica em branco enquanto a query do detalhe carrega).
 
-## 2. Página dedicada do Lead
+O mesmo bug afeta `/dashboard/leads/apollo` — provavelmente nunca abriu de verdade.
 
-Hoje `LeadsPage` mostra lista + `<aside>` com `LeadDetailPanel`. Vamos transformar em **rota própria**: `/dashboard/leads/$leadId`, ocupando a largura inteira.
+## Correção
 
-Comportamento:
-- Lista de leads (`/dashboard/leads`) continua igual, mas clicar num lead **navega** para `/dashboard/leads/$leadId` (não mais selecionar in-place).
-- Botão "Voltar para Leads" no topo da página de detalhe.
-- O `<aside>` antigo é removido — a lista volta a ocupar toda a largura.
+Padrão recomendado pelo TanStack quando uma rota "vira layout": mover o conteúdo para `*.index.tsx` e transformar o arquivo pai em layout puro.
 
-Layout da página do lead (2 colunas em telas grandes):
+1. **Renomear** `src/routes/_app.dashboard.leads.tsx` → `src/routes/_app.dashboard.leads.index.tsx`.
+2. Dentro do arquivo renomeado, trocar:
+   ```ts
+   createFileRoute("/_app/dashboard/leads")
+   ```
+   por:
+   ```ts
+   createFileRoute("/_app/dashboard/leads/")
+   ```
+   (o resto do componente `LeadsPage` permanece igual).
+3. **Criar** novo `src/routes/_app.dashboard.leads.tsx` mínimo, só layout:
+   ```tsx
+   import { createFileRoute, Outlet } from "@tanstack/react-router";
+   export const Route = createFileRoute("/_app/dashboard/leads")({
+     component: () => <Outlet />,
+   });
+   ```
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│  ← Voltar    [Nome do Lead]              [Status] [Editar] │
-│              cargo · empresa            [Arquivar] [Apollo]│
-├────────────────────────────────────────────────────────────┤
-│  COLUNA PRINCIPAL (2/3)         │  COLUNA LATERAL (1/3)    │
-│                                  │                          │
-│  ▸ Dados de contato              │  ▸ Resumo comercial      │
-│    email, secondary, personal    │    score, temperatura    │
-│    phone, mobile, corporate      │    valor estimado        │
-│                                  │    próximo follow-up     │
-│  ▸ Empresa & cargo               │    último contato        │
-│    company, job, seniority,      │                          │
-│    departamento, indústria,      │  ▸ Origem & owner        │
-│    nº funcionários               │                          │
-│                                  │  ▸ Tags (editáveis)      │
-│  ▸ Localização                   │                          │
-│    cidade, estado, país          │  ▸ Links                 │
-│                                  │    LinkedIn, Website     │
-│  ▸ Campanhas                     │                          │
-│    lista de enrollments          │  ▸ Enrichment (Apollo)   │
-│    (campanha, status, datas)     │    provider, confiança,  │
-│                                  │    highlights            │
-│  ▸ Reuniões agendadas            │                          │
-│    (lead_bookings)               │  ▸ IDs externos          │
-│                                  │    apollo_id, pipedrive  │
-│  ▸ Atividade recente             │                          │
-│    timeline completa             │                          │
-└────────────────────────────────────────────────────────────┘
-```
+Resultado:
+- `/dashboard/leads` → continua mostrando a lista (vinda do `index`).
+- `/dashboard/leads/<id>` → mostra a página dedicada do lead.
+- `/dashboard/leads/apollo` → mostra a busca Apollo.
 
-Modo edição:
-- Botão "Editar" troca a página para formulário inline (mesma estrutura, inputs no lugar dos textos) — não usa Sheet/modal.
-- Campos editáveis: full_name, email, secondary_email, personal_email, phone, mobile_phone, corporate_phone, company_name, job_title, seniority, department, industry, employee_count, website_url, linkedin_url, city, state, country, status, temperature, score, estimated_value, currency, next_followup_at, tags, source_id.
-- "Salvar" / "Cancelar" no topo e no rodapé.
+Nenhuma mudança no detalhe do lead, na navegação ou nos server functions — o bug é só estrutural de rotas. O `routeTree.gen.ts` é regenerado automaticamente.
 
-## Detalhes técnicos
+## Fora de escopo
 
-**Backend (`src/lib/tenant.functions.ts`):**
-- `getLeadDetail`: ampliar `select` para todos os campos da tabela `leads` (incluir secondary_email, personal_email, mobile_phone, corporate_phone, seniority, department, industry, employee_count, state, apollo_person_id, pipedrive_person_id, owner_user_id, custom_fields, enrichment_data, archived_at, updated_at). Adicionar 2 queries em paralelo: `campaign_enrollments` (com join em `campaigns(name, status, channel)`) e `lead_bookings` filtradas por `lead_id`.
-- `updateLead` (`UpdateLeadSchema`): adicionar os campos novos editáveis listados acima + tags (array string) + source_id (uuid nullable).
-
-**Rotas (TanStack file-based):**
-- Novo arquivo `src/routes/_app.dashboard.leads.$leadId.tsx` com `createFileRoute("/_app/dashboard/leads/$leadId")`. Recebe `leadId` via `Route.useParams()`, busca via `getLeadDetail`, renderiza o layout acima. Inclui `errorComponent` e `notFoundComponent`.
-- Em `_app.dashboard.leads.tsx`: clique no item da lista usa `<Link to="/dashboard/leads/$leadId" params={{ leadId: lead.id }}>`. Remover `<aside>` e o componente `LeadDetailPanel` (mover lógica para a nova rota). Remover `selectedLeadId` state.
-
-**Sidebar (`src/components/app/AppSidebar.tsx`):**
-- Adicionar `{ title: "Buscar no Apollo", url: "/dashboard/leads/apollo", icon: Search }` no array `TOOLS`.
-
-**Header da Leads (`PageHeader actions`):**
-- Adicionar `<Button variant="outline" asChild><Link to="/dashboard/leads/apollo">Buscar no Apollo</Link></Button>` antes de "Importar".
-
-## Fora de escopo (próximos passos, se quiser)
-
-- Edição inline de atividades (criar nova nota/atividade manual).
-- Histórico de mensagens (conversations/messages) na timeline do lead.
-- Mover lead entre owners.
+- Nada muda no layout, dados, edição ou enriquecimento do lead.
+- Sidebar e botões de header já estão corretos.

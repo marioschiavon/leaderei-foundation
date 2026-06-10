@@ -49,7 +49,7 @@ import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Check } from "lucide-react";
 
-export const Route = createFileRoute("/_app/dashboard/leads")({
+export const Route = createFileRoute("/_app/dashboard/leads/")({
   component: LeadsPage,
 });
 
