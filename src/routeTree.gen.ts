@@ -32,6 +32,7 @@ import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.l
 import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dashboard.integrations'
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
+import { Route as AppDashboardLeadsIndexRouteImport } from './routes/_app.dashboard.leads.index'
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
 import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
 import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
@@ -154,6 +155,11 @@ const AppDashboardCampaignsRoute = AppDashboardCampaignsRouteImport.update({
   path: '/campaigns',
   getParentRoute: () => AppDashboardRoute,
 } as any)
+const AppDashboardLeadsIndexRoute = AppDashboardLeadsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppDashboardLeadsRoute,
+} as any)
 const AppDashboardBuilderIndexRoute =
   AppDashboardBuilderIndexRouteImport.update({
     id: '/builder/',
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
+  '/dashboard/leads/': typeof AppDashboardLeadsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -227,7 +234,6 @@ export interface FileRoutesByTo {
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
-  '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/ai': typeof MasterMasterAiRoute
@@ -244,6 +250,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
+  '/dashboard/leads': typeof AppDashboardLeadsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -276,6 +283,7 @@ export interface FileRoutesById {
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
+  '/_app/dashboard/leads/': typeof AppDashboardLeadsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -307,6 +315,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder/'
+    | '/dashboard/leads/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -318,7 +327,6 @@ export interface FileRouteTypes {
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
     | '/dashboard/integrations'
-    | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
     | '/master/ai'
@@ -335,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder'
+    | '/dashboard/leads'
   id:
     | '__root__'
     | '/'
@@ -366,6 +375,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/_app/dashboard/builder/'
+    | '/_app/dashboard/leads/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -544,6 +554,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardCampaignsRouteImport
       parentRoute: typeof AppDashboardRoute
     }
+    '/_app/dashboard/leads/': {
+      id: '/_app/dashboard/leads/'
+      path: '/'
+      fullPath: '/dashboard/leads/'
+      preLoaderRoute: typeof AppDashboardLeadsIndexRouteImport
+      parentRoute: typeof AppDashboardLeadsRoute
+    }
     '/_app/dashboard/builder/': {
       id: '/_app/dashboard/builder/'
       path: '/builder'
@@ -592,11 +609,13 @@ declare module '@tanstack/react-router' {
 interface AppDashboardLeadsRouteChildren {
   AppDashboardLeadsLeadIdRoute: typeof AppDashboardLeadsLeadIdRoute
   AppDashboardLeadsApolloRoute: typeof AppDashboardLeadsApolloRoute
+  AppDashboardLeadsIndexRoute: typeof AppDashboardLeadsIndexRoute
 }
 
 const AppDashboardLeadsRouteChildren: AppDashboardLeadsRouteChildren = {
   AppDashboardLeadsLeadIdRoute: AppDashboardLeadsLeadIdRoute,
   AppDashboardLeadsApolloRoute: AppDashboardLeadsApolloRoute,
+  AppDashboardLeadsIndexRoute: AppDashboardLeadsIndexRoute,
 }
 
 const AppDashboardLeadsRouteWithChildren =
