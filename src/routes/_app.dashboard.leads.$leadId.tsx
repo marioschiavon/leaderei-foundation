@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
-  ArrowLeft, ArrowUpRight, Archive, Building2, CalendarClock, CheckCircle2,
+  ArrowLeft, ArrowUpRight, Archive, Building2, CalendarClock,
   CircleDollarSign, Loader2, Mail, MapPin, Pencil, Phone, Save, Send,
   Sparkles, Tag as TagIcon, Linkedin, Globe, X, AlertCircle,
 } from "lucide-react";
