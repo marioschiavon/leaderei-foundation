@@ -1,28 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
-  Archive,
-  ArrowUpRight,
   Building2,
-  CalendarClock,
-  CircleDollarSign,
   Inbox as InboxIcon,
-  Link2,
   Loader2,
-  Mail,
-  Pencil,
-  Phone,
   Plus,
   Search,
   Sparkles,
   Upload,
-  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
@@ -48,14 +39,11 @@ import {
   acceptLead,
   archiveLead,
   createLead,
-  getLeadDetail,
   getLeadsNeedingReviewCount,
   listLeads,
   listLeadsNeedingReview,
   listLeadSources,
-  updateLead,
 } from "@/lib/tenant.functions";
-import { enrichLeadWithApollo } from "@/lib/apollo.functions";
 
 import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
