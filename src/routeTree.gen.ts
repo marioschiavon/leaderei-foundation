@@ -36,6 +36,7 @@ import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dash
 import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
 import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
 import { Route as AppDashboardLeadsApolloRouteImport } from './routes/_app.dashboard.leads.apollo'
+import { Route as AppDashboardLeadsLeadIdRouteImport } from './routes/_app.dashboard.leads.$leadId'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
 
 const SignupRoute = SignupRouteImport.update({
@@ -175,6 +176,11 @@ const AppDashboardLeadsApolloRoute = AppDashboardLeadsApolloRouteImport.update({
   path: '/apollo',
   getParentRoute: () => AppDashboardLeadsRoute,
 } as any)
+const AppDashboardLeadsLeadIdRoute = AppDashboardLeadsLeadIdRouteImport.update({
+  id: '/$leadId',
+  path: '/$leadId',
+  getParentRoute: () => AppDashboardLeadsRoute,
+} as any)
 const AppDashboardBuilderDocumentIdRoute =
   AppDashboardBuilderDocumentIdRouteImport.update({
     id: '/builder/$documentId',
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AppDashboardIndexRoute
   '/master/': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardIndexRoute
   '/master': typeof MasterMasterIndexRoute
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
@@ -263,6 +271,7 @@ export interface FileRoutesById {
   '/_app/dashboard/': typeof AppDashboardIndexRoute
   '/_master/master/': typeof MasterMasterIndexRoute
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
+  '/_app/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/_app/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/master/'
     | '/dashboard/builder/$documentId'
+    | '/dashboard/leads/$leadId'
     | '/dashboard/leads/apollo'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/master'
     | '/dashboard/builder/$documentId'
+    | '/dashboard/leads/$leadId'
     | '/dashboard/leads/apollo'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/'
     | '/_master/master/'
     | '/_app/dashboard/builder/$documentId'
+    | '/_app/dashboard/leads/$leadId'
     | '/_app/dashboard/leads/apollo'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
@@ -560,6 +572,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardLeadsApolloRouteImport
       parentRoute: typeof AppDashboardLeadsRoute
     }
+    '/_app/dashboard/leads/$leadId': {
+      id: '/_app/dashboard/leads/$leadId'
+      path: '/$leadId'
+      fullPath: '/dashboard/leads/$leadId'
+      preLoaderRoute: typeof AppDashboardLeadsLeadIdRouteImport
+      parentRoute: typeof AppDashboardLeadsRoute
+    }
     '/_app/dashboard/builder/$documentId': {
       id: '/_app/dashboard/builder/$documentId'
       path: '/builder/$documentId'
@@ -571,10 +590,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppDashboardLeadsRouteChildren {
+  AppDashboardLeadsLeadIdRoute: typeof AppDashboardLeadsLeadIdRoute
   AppDashboardLeadsApolloRoute: typeof AppDashboardLeadsApolloRoute
 }
 
 const AppDashboardLeadsRouteChildren: AppDashboardLeadsRouteChildren = {
+  AppDashboardLeadsLeadIdRoute: AppDashboardLeadsLeadIdRoute,
   AppDashboardLeadsApolloRoute: AppDashboardLeadsApolloRoute,
 }
 
@@ -657,13 +678,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

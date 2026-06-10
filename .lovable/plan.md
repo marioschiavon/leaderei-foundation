@@ -1,41 +1,77 @@
-## Diagnóstico (testado direto na API)
+# Repaginar Leads + acessar Apollo Search
 
-Testei a chave `-aK3mJrvIQcF46ktJOtHgA` contra cada endpoint:
+Dois problemas resolvidos juntos: (1) a busca Apollo existia mas não tinha link no menu, e (2) o detalhe do lead aparecia num painel lateral apertado, mostrando só parte dos dados e sem edição completa.
 
-| Endpoint | Método usado hoje | Resultado | Esperado |
-|---|---|---|---|
-| `/api/v1/auth/health` | POST + body | **404** | **GET** + header `X-Api-Key` → `200 {"healthy":true,"is_logged_in":true}` |
-| `/api/v1/mixed_people/search` | POST | **422 deprecated** | Trocar para `/api/v1/mixed_people/api_search` (POST) → `200` |
-| `/api/v1/people/match` | POST | **200** | Já está correto |
+## 1. Acesso ao Apollo Search
 
-A chave da Apollo é **válida**. As duas chamadas que estavam quebradas são o handshake (`auth/health`) e a busca (`mixed_people/search`). A base `https://api.apollo.io/api/v1` está correta — manter.
+- Adicionar botão **"Buscar no Apollo"** no header da página `/dashboard/leads` (ao lado de "Importar" e "Novo lead"), apontando para `/dashboard/leads/apollo`.
+- Adicionar entrada **"Buscar no Apollo"** no sidebar, dentro do grupo *Ferramentas*, com ícone de busca (visível só quando a integração Apollo estiver conectada — quando desconectada, mostra greyed-out com tooltip "Conecte o Apollo em Integrações").
 
-## Mudanças (todas em `src/lib/apollo.server.ts`)
+## 2. Página dedicada do Lead
 
-### 1. `validateApolloKey` — usar GET
-Trocar o objeto passado para `callApollo`:
-- `method: "POST"` → `method: "GET"`
-- Remover `body: { api_key: args.apiKey }` (não usado em GET; autenticação já vai pelo header `X-Api-Key`)
+Hoje `LeadsPage` mostra lista + `<aside>` com `LeadDetailPanel`. Vamos transformar em **rota própria**: `/dashboard/leads/$leadId`, ocupando a largura inteira.
 
-### 2. `searchPeopleWithCache` — novo endpoint
-- Trocar `endpoint: "mixed_people/search"` por `endpoint: "mixed_people/api_search"`
-- Body e shape de resposta (`people[]`, `pagination`, `total_entries`) permanecem iguais — confirmado no teste.
+Comportamento:
+- Lista de leads (`/dashboard/leads`) continua igual, mas clicar num lead **navega** para `/dashboard/leads/$leadId` (não mais selecionar in-place).
+- Botão "Voltar para Leads" no topo da página de detalhe.
+- O `<aside>` antigo é removido — a lista volta a ocupar toda a largura.
 
-### 3. `callApollo` — pequeno ajuste defensivo
-Hoje o header `Content-Type: application/json` é enviado mesmo em GET. Manter como está (Apollo aceita), porém **não** enviar `body` quando `method === "GET"` (já é o caso). Nada a fazer aqui além de confirmar.
+Layout da página do lead (2 colunas em telas grandes):
 
-### 4. Mensagem 404
-Manter o branch novo no `humanizeApolloError` (`"Endpoint Apollo não encontrado (404)..."`) — útil para futuras quebras.
+```text
+┌────────────────────────────────────────────────────────────┐
+│  ← Voltar    [Nome do Lead]              [Status] [Editar] │
+│              cargo · empresa            [Arquivar] [Apollo]│
+├────────────────────────────────────────────────────────────┤
+│  COLUNA PRINCIPAL (2/3)         │  COLUNA LATERAL (1/3)    │
+│                                  │                          │
+│  ▸ Dados de contato              │  ▸ Resumo comercial      │
+│    email, secondary, personal    │    score, temperatura    │
+│    phone, mobile, corporate      │    valor estimado        │
+│                                  │    próximo follow-up     │
+│  ▸ Empresa & cargo               │    último contato        │
+│    company, job, seniority,      │                          │
+│    departamento, indústria,      │  ▸ Origem & owner        │
+│    nº funcionários               │                          │
+│                                  │  ▸ Tags (editáveis)      │
+│  ▸ Localização                   │                          │
+│    cidade, estado, país          │  ▸ Links                 │
+│                                  │    LinkedIn, Website     │
+│  ▸ Campanhas                     │                          │
+│    lista de enrollments          │  ▸ Enrichment (Apollo)   │
+│    (campanha, status, datas)     │    provider, confiança,  │
+│                                  │    highlights            │
+│  ▸ Reuniões agendadas            │                          │
+│    (lead_bookings)               │  ▸ IDs externos          │
+│                                  │    apollo_id, pipedrive  │
+│  ▸ Atividade recente             │                          │
+│    timeline completa             │                          │
+└────────────────────────────────────────────────────────────┘
+```
 
-## Observação sobre dados retornados
-O `mixed_people/api_search` é o endpoint público e por padrão **não devolve email/telefone reais** (devolve `has_email: true`, `last_name_obfuscated`). Isso é igual ao comportamento que o `lead-automate` usa hoje — quando o usuário importa um lead, o enrichment via `people/match` é quem traz email/telefone gastando crédito. O fluxo do app hoje já está alinhado com isso: a busca é exploratória, e o `enrichLeadWithApollo` é quem revela email.
+Modo edição:
+- Botão "Editar" troca a página para formulário inline (mesma estrutura, inputs no lugar dos textos) — não usa Sheet/modal.
+- Campos editáveis: full_name, email, secondary_email, personal_email, phone, mobile_phone, corporate_phone, company_name, job_title, seniority, department, industry, employee_count, website_url, linkedin_url, city, state, country, status, temperature, score, estimated_value, currency, next_followup_at, tags, source_id.
+- "Salvar" / "Cancelar" no topo e no rodapé.
 
-Nenhuma mudança em UI, cache, dedupe, schema de banco, ou `apollo.functions.ts`. Apenas as 2 linhas em `apollo.server.ts`.
+## Detalhes técnicos
 
-## Validação após o build
-1. Abrir o dialog Apollo, colar a chave e clicar **Conectar** → badge **Conectado** e `apollo_api_calls` registra `auth/health` com `status_code = 200`.
-2. Em `/dashboard/leads/apollo`, fazer uma busca (qualquer cargo) → resultados aparecem, `apollo_api_calls` registra `mixed_people/api_search` com `status_code = 200`.
-3. Em um lead com email, rodar enriquecimento → `people/match` com `status_code = 200`.
+**Backend (`src/lib/tenant.functions.ts`):**
+- `getLeadDetail`: ampliar `select` para todos os campos da tabela `leads` (incluir secondary_email, personal_email, mobile_phone, corporate_phone, seniority, department, industry, employee_count, state, apollo_person_id, pipedrive_person_id, owner_user_id, custom_fields, enrichment_data, archived_at, updated_at). Adicionar 2 queries em paralelo: `campaign_enrollments` (com join em `campaigns(name, status, channel)`) e `lead_bookings` filtradas por `lead_id`.
+- `updateLead` (`UpdateLeadSchema`): adicionar os campos novos editáveis listados acima + tags (array string) + source_id (uuid nullable).
 
-## Arquivos afetados
-- `src/lib/apollo.server.ts` (2 alterações pontuais)
+**Rotas (TanStack file-based):**
+- Novo arquivo `src/routes/_app.dashboard.leads.$leadId.tsx` com `createFileRoute("/_app/dashboard/leads/$leadId")`. Recebe `leadId` via `Route.useParams()`, busca via `getLeadDetail`, renderiza o layout acima. Inclui `errorComponent` e `notFoundComponent`.
+- Em `_app.dashboard.leads.tsx`: clique no item da lista usa `<Link to="/dashboard/leads/$leadId" params={{ leadId: lead.id }}>`. Remover `<aside>` e o componente `LeadDetailPanel` (mover lógica para a nova rota). Remover `selectedLeadId` state.
+
+**Sidebar (`src/components/app/AppSidebar.tsx`):**
+- Adicionar `{ title: "Buscar no Apollo", url: "/dashboard/leads/apollo", icon: Search }` no array `TOOLS`.
+
+**Header da Leads (`PageHeader actions`):**
+- Adicionar `<Button variant="outline" asChild><Link to="/dashboard/leads/apollo">Buscar no Apollo</Link></Button>` antes de "Importar".
+
+## Fora de escopo (próximos passos, se quiser)
+
+- Edição inline de atividades (criar nova nota/atividade manual).
+- Histórico de mensagens (conversations/messages) na timeline do lead.
+- Mover lead entre owners.

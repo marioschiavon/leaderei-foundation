@@ -166,35 +166,12 @@ export const getLeadDetail = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     const { leadId } = data;
 
-    const [leadRes, activitiesRes, enrichmentRes] = await Promise.all([
+    const [leadRes, activitiesRes, enrichmentRes, enrollmentsRes, bookingsRes] = await Promise.all([
       context.supabase
         .from("leads")
         .select(`
-          id,
-          full_name,
-          email,
-          phone,
-          company_name,
-          job_title,
-          status,
-          temperature,
-          score,
-          city,
-          country,
-          linkedin_url,
-          website_url,
-          tags,
-          currency,
-          estimated_value,
-          next_followup_at,
-          last_contact_at,
-          created_at,
-          lead_sources (
-            id,
-            name,
-            slug,
-            color
-          )
+          *,
+          lead_sources ( id, name, slug, color )
         `)
         .eq("id", leadId)
         .maybeSingle(),
@@ -203,7 +180,7 @@ export const getLeadDetail = createServerFn({ method: "GET" })
         .select("id, type, title, description, created_at")
         .eq("lead_id", leadId)
         .order("created_at", { ascending: false })
-        .limit(12),
+        .limit(50),
       context.supabase
         .from("lead_enrichment")
         .select("id, provider, confidence, fetched_at, payload")
@@ -211,16 +188,35 @@ export const getLeadDetail = createServerFn({ method: "GET" })
         .order("fetched_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      context.supabase
+        .from("campaign_enrollments")
+        .select(`
+          id, status, enrolled_at, completed_at, next_run_at, last_error,
+          campaigns ( id, name, status, channel )
+        `)
+        .eq("lead_id", leadId)
+        .order("enrolled_at", { ascending: false })
+        .limit(20),
+      context.supabase
+        .from("lead_bookings")
+        .select("id, title, status, start_at, end_at, meeting_url, location, organizer_email, attendee_email, event_type_slug, campaign_id, created_at")
+        .eq("lead_id", leadId)
+        .order("start_at", { ascending: false })
+        .limit(20),
     ]);
 
     if (leadRes.error) throw new Error(leadRes.error.message);
     if (activitiesRes.error) throw new Error(activitiesRes.error.message);
     if (enrichmentRes.error) throw new Error(enrichmentRes.error.message);
+    if (enrollmentsRes.error) throw new Error(enrollmentsRes.error.message);
+    if (bookingsRes.error) throw new Error(bookingsRes.error.message);
 
     return {
       lead: leadRes.data,
       activities: activitiesRes.data ?? [],
       enrichment: enrichmentRes.data ?? null,
+      enrollments: enrollmentsRes.data ?? [],
+      bookings: bookingsRes.data ?? [],
     };
   });
 
@@ -454,25 +450,55 @@ export const createLead = createServerFn({ method: "POST" })
     return inserted;
   });
 
+const NullableStr = (max: number) =>
+  z.union([z.string().trim().max(max), z.null()]).optional();
+
+const NullableEmail = z
+  .union([z.string().trim().email().max(255), z.literal(""), z.null()])
+  .optional()
+  .transform((v) => (v === "" || v === undefined ? v : v));
+
 const UpdateLeadSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string().trim().min(1).max(120).optional(),
-  email: z.string().trim().email().max(255).nullable().optional(),
-  phone: z.string().trim().max(40).nullable().optional(),
-  company_name: z.string().trim().max(160).nullable().optional(),
-  job_title: z.string().trim().max(160).nullable().optional(),
+  email: NullableEmail,
+  secondary_email: NullableEmail,
+  personal_email: NullableEmail,
+  phone: NullableStr(40),
+  mobile_phone: NullableStr(40),
+  corporate_phone: NullableStr(40),
+  company_name: NullableStr(160),
+  job_title: NullableStr(160),
+  seniority: NullableStr(80),
+  department: NullableStr(80),
+  industry: NullableStr(120),
+  employee_count: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  website_url: NullableStr(255),
+  linkedin_url: NullableStr(255),
+  city: NullableStr(120),
+  state: NullableStr(120),
+  country: NullableStr(120),
   status: z.enum(LEAD_STATUSES).optional(),
   temperature: z.enum(LEAD_TEMPERATURES).optional(),
   score: z.number().int().min(0).max(100).optional(),
   estimated_value: z.number().min(0).nullable().optional(),
-  next_followup_at: z.string().datetime().nullable().optional(),
+  currency: z.string().trim().min(3).max(3).optional(),
+  next_followup_at: z.union([z.string().datetime(), z.literal(""), z.null()]).optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
+  source_id: z.union([z.string().uuid(), z.literal(""), z.null()]).optional(),
 });
 
 export const updateLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => UpdateLeadSchema.parse(input))
   .handler(async ({ context, data }) => {
-    const { id, ...patch } = data;
+    const { id, ...rest } = data;
+    // Normalize "" to null for nullable fields
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (v === undefined) continue;
+      patch[k] = v === "" ? null : v;
+    }
     const { data: updated, error } = await context.supabase
       .from("leads")
       .update({ ...patch, updated_at: new Date().toISOString() })
