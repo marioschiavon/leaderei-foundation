@@ -296,8 +296,10 @@ function LeadsPage() {
                     <Button size="sm" onClick={() => acceptMut.mutate(l.id)} disabled={acceptMut.isPending}>
                       Aceitar
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedLeadId(l.id); setTab("all"); }}>
-                      Editar e aceitar
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to="/dashboard/leads/$leadId" params={{ leadId: l.id }}>
+                        Editar
+                      </Link>
                     </Button>
                     <Button size="sm" variant="destructive" onClick={() => discardMut.mutate(l.id)} disabled={discardMut.isPending}>
                       Descartar
@@ -309,92 +311,89 @@ function LeadsPage() {
           )}
         </div>
       ) : (
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_360px]">
-        <section className="space-y-4">
-          <div className="flex flex-col gap-3 rounded-xl border bg-surface p-3 lg:flex-row lg:items-center">
-            <div className="relative w-full max-w-sm">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar por nome, empresa, email ou origem..."
-                className="h-9 pl-9"
-              />
-            </div>
-
-            <div className="flex flex-1 flex-wrap items-center gap-2">
-              <FilterPills
-                label="Status"
-                value={statusFilter}
-                onChange={setStatusFilter}
-                items={[{ value: "all", label: "Todos" }, ...statuses.map((status) => ({
-                  value: status,
-                  label: STATUS_META[status]?.label ?? status,
-                }))]}
-              />
-              <FilterPills
-                label="Origem"
-                value={sourceFilter}
-                onChange={setSourceFilter}
-                items={[{ value: "all", label: "Todas" }, ...(sources ?? []).map((source) => ({
-                  value: source.slug,
-                  label: source.name,
-                }))]}
-              />
-            </div>
-
-            <div className="ml-auto text-xs text-muted-foreground">
-              {isLoading ? "Carregando..." : `${filtered.length} lead${filtered.length !== 1 ? "s" : ""}`}
-            </div>
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-xl border bg-surface p-3 lg:flex-row lg:items-center">
+          <div className="relative w-full max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por nome, empresa, email ou origem..."
+              className="h-9 pl-9"
+            />
           </div>
 
-          {error ? (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {(error as Error).message}
-            </div>
-          ) : isLoading ? (
-            <div className="space-y-2 rounded-xl border bg-surface p-4">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded bg-surface-muted/50" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              icon={InboxIcon}
-              title={query || statusFilter !== "all" || sourceFilter !== "all" ? "Nenhum lead encontrado" : "Ainda sem leads"}
-              description={
-                query || statusFilter !== "all" || sourceFilter !== "all"
-                  ? "Ajuste os filtros ou a busca para encontrar outros contatos."
-                  : "Comece importando uma lista ou adicionando o primeiro contato."
-              }
-              action={
-                !query && statusFilter === "all" && sourceFilter === "all" && (
-                  <div className="flex gap-2">
-                    <Button onClick={() => setNewLeadOpen(true)}>
-                      <Plus className="h-4 w-4" />
-                      Adicionar lead
-                    </Button>
-                    <Button variant="outline" onClick={() => setImportOpen(true)}>
-                      <Upload className="h-4 w-4" />
-                      Importar CSV
-                    </Button>
-                  </div>
-                )
-              }
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <FilterPills
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              items={[{ value: "all", label: "Todos" }, ...statuses.map((status) => ({
+                value: status,
+                label: STATUS_META[status]?.label ?? status,
+              }))]}
             />
-          ) : (
-            <div className="overflow-hidden rounded-xl border bg-surface">
-              <ul className="divide-y">
-                {filtered.map((lead) => {
-                  const meta = STATUS_META[lead.status] ?? STATUS_META.new;
-                  return (
-                    <li
-                      key={lead.id}
-                      onClick={() => setSelectedLeadId(lead.id)}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-muted/40",
-                        lead.id === selectedLeadId && "bg-surface-muted/30",
-                      )}
+            <FilterPills
+              label="Origem"
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              items={[{ value: "all", label: "Todas" }, ...(sources ?? []).map((source) => ({
+                value: source.slug,
+                label: source.name,
+              }))]}
+            />
+          </div>
+
+          <div className="ml-auto text-xs text-muted-foreground">
+            {isLoading ? "Carregando..." : `${filtered.length} lead${filtered.length !== 1 ? "s" : ""}`}
+          </div>
+        </div>
+
+        {error ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {(error as Error).message}
+          </div>
+        ) : isLoading ? (
+          <div className="space-y-2 rounded-xl border bg-surface p-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded bg-surface-muted/50" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={InboxIcon}
+            title={query || statusFilter !== "all" || sourceFilter !== "all" ? "Nenhum lead encontrado" : "Ainda sem leads"}
+            description={
+              query || statusFilter !== "all" || sourceFilter !== "all"
+                ? "Ajuste os filtros ou a busca para encontrar outros contatos."
+                : "Comece importando uma lista ou adicionando o primeiro contato."
+            }
+            action={
+              !query && statusFilter === "all" && sourceFilter === "all" && (
+                <div className="flex gap-2">
+                  <Button onClick={() => setNewLeadOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar lead
+                  </Button>
+                  <Button variant="outline" onClick={() => setImportOpen(true)}>
+                    <Upload className="h-4 w-4" />
+                    Importar CSV
+                  </Button>
+                </div>
+              )
+            }
+          />
+        ) : (
+          <div className="overflow-hidden rounded-xl border bg-surface">
+            <ul className="divide-y">
+              {filtered.map((lead) => {
+                const meta = STATUS_META[lead.status] ?? STATUS_META.new;
+                return (
+                  <li key={lead.id}>
+                    <Link
+                      to="/dashboard/leads/$leadId"
+                      params={{ leadId: lead.id }}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-surface-muted/40"
                     >
                       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-foreground text-xs font-semibold text-background">
                         {lead.full_name
@@ -438,38 +437,14 @@ function LeadsPage() {
                         <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
                         {meta.label}
                       </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </section>
-
-        <aside className="rounded-xl border bg-surface">
-          {!selectedLeadId || !detail?.lead ? (
-            <div className="flex h-full min-h-[360px] items-center justify-center p-6">
-              <EmptyState
-                icon={InboxIcon}
-                title="Selecione um lead"
-                description="O detalhe mostra atividade recente, origem e próximos passos do contato escolhido."
-              />
-            </div>
-          ) : loadingDetail ? (
-            <div className="space-y-3 p-5">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-12 animate-pulse rounded bg-surface-muted/50" />
-              ))}
-            </div>
-          ) : (
-            <LeadDetailPanel
-              detail={detail}
-              sources={sources ?? []}
-              onArchived={() => setSelectedLeadId(null)}
-            />
-          )}
-        </aside>
-      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </section>
       )}
 
 
