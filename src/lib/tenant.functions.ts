@@ -492,7 +492,13 @@ export const updateLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => UpdateLeadSchema.parse(input))
   .handler(async ({ context, data }) => {
-    const { id, ...patch } = data;
+    const { id, ...rest } = data;
+    // Normalize "" to null for nullable fields
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (v === undefined) continue;
+      patch[k] = v === "" ? null : v;
+    }
     const { data: updated, error } = await context.supabase
       .from("leads")
       .update({ ...patch, updated_at: new Date().toISOString() })
