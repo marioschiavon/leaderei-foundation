@@ -129,7 +129,6 @@ type LeadDetailData = {
 function LeadsPage() {
   const fetchLeads = useServerFn(listLeads);
   const fetchSources = useServerFn(listLeadSources);
-  const fetchLeadDetail = useServerFn(getLeadDetail);
 
   const { data: leads, isLoading, error } = useQuery({
     queryKey: ["leads"],
@@ -143,7 +142,6 @@ function LeadsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [tab, setTab] = useState<"all" | "review">("all");
@@ -202,24 +200,6 @@ function LeadsPage() {
     });
   }, [leads, query, sourceFilter, statusFilter]);
 
-  useEffect(() => {
-    if (!filtered.length) {
-      setSelectedLeadId(null);
-      return;
-    }
-
-    const stillSelected = filtered.some((lead) => lead.id === selectedLeadId);
-    if (!stillSelected) {
-      setSelectedLeadId(filtered[0]?.id ?? null);
-    }
-  }, [filtered, selectedLeadId]);
-
-  const { data: detail, isLoading: loadingDetail } = useQuery({
-    enabled: !!selectedLeadId,
-    queryKey: ["leads", "detail", selectedLeadId],
-    queryFn: () => fetchLeadDetail({ data: { leadId: selectedLeadId! } }),
-  });
-
   const statuses = useMemo(
     () =>
       Array.from(
@@ -235,6 +215,12 @@ function LeadsPage() {
         description="Pipeline comercial com origem, contexto e atividade real por contato."
         actions={
           <>
+            <Button variant="outline" asChild>
+              <Link to="/dashboard/leads/apollo">
+                <Sparkles className="h-4 w-4" />
+                Buscar no Apollo
+              </Link>
+            </Button>
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
               Importar
