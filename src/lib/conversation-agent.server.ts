@@ -275,8 +275,8 @@ async function decideAction(args: {
     });
     tokensIn = resp.usage?.prompt_tokens ?? 0;
     tokensOut = resp.usage?.completion_tokens ?? 0;
-    const call = resp.choices[0]?.message?.tool_calls?.[0];
-    const raw = call?.function?.arguments;
+    const call: any = resp.choices[0]?.message?.tool_calls?.[0];
+    const raw: string | undefined = call?.function?.arguments;
     if (!raw) throw new Error("Modelo não retornou tool_call.");
     const parsed = JSON.parse(raw);
     if (!parsed?.action || !["responder","oferecer_horarios","confirmar_agendamento","marcar_quente_humano","encerrar_cadencia","ignorar"].includes(parsed.action)) {
