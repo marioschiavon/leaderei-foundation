@@ -28,7 +28,11 @@ type Profile = {
   default_approach_slug: string | null;
   default_length_slug: string | null;
   default_language_slug: string;
+  conversation_agent_goal: string | null;
 };
+
+const DEFAULT_GOAL =
+  "Seu objetivo principal é conduzir a conversa de forma natural e consultiva, identificar o momento de interesse do lead, e propor agendar uma reunião assim que houver abertura. Priorize sempre avançar a conversa em direção ao agendamento, sem ser insistente ou repetitivo.";
 
 const EMPTY: Profile = {
   brand_name: "",
@@ -42,6 +46,7 @@ const EMPTY: Profile = {
   default_approach_slug: null,
   default_length_slug: null,
   default_language_slug: "pt-BR",
+  conversation_agent_goal: "",
 };
 
 export function AiBrandTab({ isAdmin }: { isAdmin: boolean }) {
@@ -187,6 +192,29 @@ export function AiBrandTab({ isAdmin }: { isAdmin: boolean }) {
             <PresetSelect label="Abordagem" value={form.default_approach_slug} options={byKind("approach")} onChange={(v) => setForm({ ...form, default_approach_slug: v })} disabled={disabled} />
             <PresetSelect label="Tamanho" value={form.default_length_slug} options={byKind("length")} onChange={(v) => setForm({ ...form, default_length_slug: v })} disabled={disabled} />
             <PresetSelect label="Idioma" value={form.default_language_slug} options={byKind("language")} onChange={(v) => setForm({ ...form, default_language_slug: v ?? "pt-BR" })} disabled={disabled} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-surface p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand" />
+            <h2 className="font-display text-lg font-semibold">Agente de conversa</h2>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quando um lead responde, a IA assume a conversa (WhatsApp/email) e decide entre responder, oferecer horários, agendar reunião, sinalizar para humano ou encerrar. Este texto orienta esse comportamento.
+          </p>
+          <div className="mt-4">
+            <Field label="Objetivo do agente" hint="Até 2000 caracteres" maxLength={2000} count={form.conversation_agent_goal?.length ?? 0}>
+              <Textarea
+                rows={6}
+                maxLength={2000}
+                value={form.conversation_agent_goal ?? ""}
+                onChange={(e) => setForm({ ...form, conversation_agent_goal: e.target.value })}
+                disabled={disabled}
+                placeholder={DEFAULT_GOAL}
+              />
+            </Field>
+            <p className="mt-2 text-[11px] text-muted-foreground">Se vazio, usa o objetivo padrão orientado a agendamento.</p>
           </div>
         </div>
 

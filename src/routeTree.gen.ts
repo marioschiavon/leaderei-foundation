@@ -36,6 +36,7 @@ import { Route as AppDashboardLeadsIndexRouteImport } from './routes/_app.dashbo
 import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dashboard.builder.index'
 import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
 import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
+import { Route as ApiPublicHooksAgentTickRouteImport } from './routes/api/public/hooks/agent-tick'
 import { Route as AppDashboardLeadsApolloRouteImport } from './routes/_app.dashboard.leads.apollo'
 import { Route as AppDashboardLeadsLeadIdRouteImport } from './routes/_app.dashboard.leads.$leadId'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
@@ -177,6 +178,11 @@ const ApiPublicHooksCalcomRoute = ApiPublicHooksCalcomRouteImport.update({
   path: '/api/public/hooks/calcom',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksAgentTickRoute = ApiPublicHooksAgentTickRouteImport.update({
+  id: '/api/public/hooks/agent-tick',
+  path: '/api/public/hooks/agent-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppDashboardLeadsApolloRoute = AppDashboardLeadsApolloRouteImport.update({
   id: '/apollo',
   path: '/apollo',
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
   '/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
+  '/api/public/hooks/agent-tick': typeof ApiPublicHooksAgentTickRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByTo {
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
   '/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
+  '/api/public/hooks/agent-tick': typeof ApiPublicHooksAgentTickRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/dashboard/builder': typeof AppDashboardBuilderIndexRoute
@@ -280,6 +288,7 @@ export interface FileRoutesById {
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
   '/_app/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/_app/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
+  '/api/public/hooks/agent-tick': typeof ApiPublicHooksAgentTickRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
   '/_app/dashboard/builder/': typeof AppDashboardBuilderIndexRoute
@@ -312,6 +321,7 @@ export interface FileRouteTypes {
     | '/dashboard/builder/$documentId'
     | '/dashboard/leads/$leadId'
     | '/dashboard/leads/apollo'
+    | '/api/public/hooks/agent-tick'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder/'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/dashboard/builder/$documentId'
     | '/dashboard/leads/$leadId'
     | '/dashboard/leads/apollo'
+    | '/api/public/hooks/agent-tick'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/dashboard/builder'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/builder/$documentId'
     | '/_app/dashboard/leads/$leadId'
     | '/_app/dashboard/leads/apollo'
+    | '/api/public/hooks/agent-tick'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
     | '/_app/dashboard/builder/'
@@ -387,6 +399,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiPublicHooksAgentTickRoute: typeof ApiPublicHooksAgentTickRoute
   ApiPublicHooksCalcomRoute: typeof ApiPublicHooksCalcomRoute
   ApiPublicHooksRunFlowTickRoute: typeof ApiPublicHooksRunFlowTickRoute
 }
@@ -582,6 +595,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCalcomRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/agent-tick': {
+      id: '/api/public/hooks/agent-tick'
+      path: '/api/public/hooks/agent-tick'
+      fullPath: '/api/public/hooks/agent-tick'
+      preLoaderRoute: typeof ApiPublicHooksAgentTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/dashboard/leads/apollo': {
       id: '/_app/dashboard/leads/apollo'
       path: '/apollo'
@@ -691,6 +711,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiPublicHooksAgentTickRoute: ApiPublicHooksAgentTickRoute,
   ApiPublicHooksCalcomRoute: ApiPublicHooksCalcomRoute,
   ApiPublicHooksRunFlowTickRoute: ApiPublicHooksRunFlowTickRoute,
 }

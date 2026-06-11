@@ -21,6 +21,7 @@ import {
 import { listConversations, getMyContext, acceptLead, archiveLead } from "@/lib/tenant.functions";
 import { getConversationMessages } from "@/lib/inbox.functions";
 import { sendWhatsAppMessage } from "@/lib/hook7.functions";
+import { assumeConversation, returnToAgent } from "@/lib/conversation-agent.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -212,12 +213,22 @@ function InboxPage() {
                           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5">
                             <span className={cn("h-1 w-1 rounded-full", st.dot)} />{st.label}
                           </span>
+                          {c.needs_human && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 font-medium text-red-700">
+                              <AlertCircle className="h-2.5 w-2.5" /> Atenção
+                            </span>
+                          )}
+                          {c.agent_paused && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
+                              humano
+                            </span>
+                          )}
                           {lead?.needs_review && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-700">
                               <AlertTriangle className="h-2.5 w-2.5" /> Revisar
                             </span>
                           )}
-                          {c.ai_enabled && (
+                          {c.ai_enabled && !c.agent_paused && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-1.5 py-0.5 text-brand">
                               <Bot className="h-2.5 w-2.5" /> IA
                             </span>
@@ -241,6 +252,9 @@ function InboxPage() {
                 <ConversationThread
                   convId={active.id}
                   fallbackChannel={active.channel}
+                  needsHuman={!!active.needs_human}
+                  needsHumanReason={active.needs_human_reason ?? null}
+                  agentPaused={!!active.agent_paused}
                   detailsOpen={detailsOpen}
                   onToggleDetails={() => setDetailsOpen((v) => !v)}
                 />
@@ -266,18 +280,40 @@ function InboxPage() {
 }
 
 function ConversationThread({
-  convId, fallbackChannel, detailsOpen, onToggleDetails,
+  convId, fallbackChannel, needsHuman, needsHumanReason, agentPaused, detailsOpen, onToggleDetails,
 }: {
   convId: string; fallbackChannel: string;
+  needsHuman: boolean; needsHumanReason: string | null; agentPaused: boolean;
   detailsOpen: boolean; onToggleDetails: () => void;
 }) {
   const fetchMsgs = useServerFn(getConversationMessages);
+  const assumeFn = useServerFn(assumeConversation);
+  const returnFn = useServerFn(returnToAgent);
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["conv-messages", convId],
     queryFn: () => fetchMsgs({ data: { conversation_id: convId } }),
   });
+  const assumeMut = useMutation({
+    mutationFn: () => assumeFn({ data: { conversation_id: convId } }),
+    onSuccess: () => {
+      toast.success("Você assumiu esta conversa. O agente não responderá mais aqui.");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const returnMut = useMutation({
+    mutationFn: () => returnFn({ data: { conversation_id: convId } }),
+    onSuccess: () => {
+      toast.success("Agente reativado nesta conversa.");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [data?.messages?.length]);
+
+
 
   const conv: any = data?.conversation;
   const lead = conv && (Array.isArray(conv.leads) ? conv.leads[0] : conv.leads);
@@ -316,6 +352,33 @@ function ConversationThread({
           </Button>
         </div>
       </div>
+
+      {needsHuman && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-red-500/10 px-4 py-2 text-sm">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <div>
+              <div className="font-medium text-red-700">Agente sinalizou: precisa de humano</div>
+              {needsHumanReason && <div className="text-xs text-red-700/80">{needsHumanReason}</div>}
+            </div>
+          </div>
+          <Button size="sm" onClick={() => assumeMut.mutate()} disabled={assumeMut.isPending}>
+            {assumeMut.isPending ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+            Assumir conversa
+          </Button>
+        </div>
+      )}
+      {agentPaused && !needsHuman && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted px-4 py-2 text-xs">
+          <span className="text-muted-foreground">🤖 Agente pausado — você está respondendo manualmente.</span>
+          <Button size="sm" variant="outline" onClick={() => returnMut.mutate()} disabled={returnMut.isPending}>
+            {returnMut.isPending ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+            Devolver ao agente
+          </Button>
+        </div>
+      )}
+
+
 
       <div className={cn(
         "flex-1 overflow-y-auto p-4 space-y-2 max-h-[calc(100vh-360px)]",

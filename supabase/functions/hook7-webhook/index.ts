@@ -261,6 +261,25 @@ async function handleMessage(supabase: any, instance: any, data: any) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", conv.id);
+
+  // Trigger conversation agent on INBOUND only, when not paused by human.
+  if (!isOutbound) {
+    const { data: convCheck } = await supabase
+      .from("conversations")
+      .select("agent_paused, ai_enabled")
+      .eq("id", conv.id)
+      .maybeSingle();
+    if (convCheck && !convCheck.agent_paused && convCheck.ai_enabled !== false) {
+      const { error: schedErr } = await supabase.rpc("schedule_agent_response", {
+        _organization_id: instance.organization_id,
+        _conversation_id: conv.id,
+        _lead_id: lead.id,
+      });
+      if (schedErr) {
+        console.error("[hook7-webhook] schedule_agent_response failed", { error: schedErr.message });
+      }
+    }
+  }
 }
 
 async function handleReceipt(supabase: any, instance: any, data: any, state: any) {

@@ -72,6 +72,7 @@ export type Database = {
         Row: {
           brand_name: string | null
           brand_voice: string | null
+          conversation_agent_goal: string | null
           created_at: string
           default_approach_slug: string | null
           default_cta: string | null
@@ -89,6 +90,7 @@ export type Database = {
         Insert: {
           brand_name?: string | null
           brand_voice?: string | null
+          conversation_agent_goal?: string | null
           created_at?: string
           default_approach_slug?: string | null
           default_cta?: string | null
@@ -106,6 +108,7 @@ export type Database = {
         Update: {
           brand_name?: string | null
           brand_voice?: string | null
+          conversation_agent_goal?: string | null
           created_at?: string
           default_approach_slug?: string | null
           default_cta?: string | null
@@ -648,7 +651,10 @@ export type Database = {
       }
       conversations: {
         Row: {
+          agent_context: Json
+          agent_paused: boolean
           ai_enabled: boolean
+          assigned_to: string | null
           assigned_user_id: string | null
           channel: Database["public"]["Enums"]["message_channel"]
           created_at: string
@@ -657,6 +663,8 @@ export type Database = {
           last_message_at: string | null
           last_message_preview: string | null
           lead_id: string | null
+          needs_human: boolean
+          needs_human_reason: string | null
           organization_id: string
           status: Database["public"]["Enums"]["conversation_status"]
           subject: string | null
@@ -664,7 +672,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_context?: Json
+          agent_paused?: boolean
           ai_enabled?: boolean
+          assigned_to?: string | null
           assigned_user_id?: string | null
           channel: Database["public"]["Enums"]["message_channel"]
           created_at?: string
@@ -673,6 +684,8 @@ export type Database = {
           last_message_at?: string | null
           last_message_preview?: string | null
           lead_id?: string | null
+          needs_human?: boolean
+          needs_human_reason?: string | null
           organization_id: string
           status?: Database["public"]["Enums"]["conversation_status"]
           subject?: string | null
@@ -680,7 +693,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_context?: Json
+          agent_paused?: boolean
           ai_enabled?: boolean
+          assigned_to?: string | null
           assigned_user_id?: string | null
           channel?: Database["public"]["Enums"]["message_channel"]
           created_at?: string
@@ -689,6 +705,8 @@ export type Database = {
           last_message_at?: string | null
           last_message_preview?: string | null
           lead_id?: string | null
+          needs_human?: boolean
+          needs_human_reason?: string | null
           organization_id?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           subject?: string | null
@@ -2638,6 +2656,14 @@ export type Database = {
           _user_id: string
         }
         Returns: string
+      }
+      schedule_agent_response: {
+        Args: {
+          _conversation_id: string
+          _lead_id: string
+          _organization_id: string
+        }
+        Returns: undefined
       }
       set_hook7_instance_token: {
         Args: { _instance_id: string; _token: string }
