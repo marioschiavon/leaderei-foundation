@@ -114,37 +114,107 @@ export const getDashboardSummary = createServerFn({ method: "GET" })
     };
   });
 
+const ListLeadsInput = z.object({
+  search: z.string().trim().max(120).optional().default(""),
+  status: z.string().trim().max(40).optional().default("all"),
+  source_slug: z.string().trim().max(80).optional().default("all"),
+  channel: z.enum(["any", "email", "whatsapp", "both"]).optional().default("any"),
+  page: z.number().int().min(1).optional().default(1),
+  page_size: z.number().int().min(10).max(200).optional().default(50),
+});
+
+const LEAD_COLUMNS = `
+  id,
+  full_name,
+  email,
+  phone,
+  company_name,
+  job_title,
+  status,
+  temperature,
+  score,
+  source_id,
+  estimated_value,
+  next_followup_at,
+  created_at,
+  last_contact_at,
+  lead_sources (
+    id,
+    name,
+    slug,
+    color
+  )
+`;
+
+function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any }>(
+  query: T,
+  filters: { status: string; source_slug: string; channel: string; search: string },
+): T {
+  let q: any = query;
+  if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
+  if (filters.source_slug && filters.source_slug !== "all") {
+    q = q.eq("lead_sources.slug", filters.source_slug);
+  }
+  if (filters.channel === "email") q = q.not("email", "is", null);
+  else if (filters.channel === "whatsapp") q = q.not("phone", "is", null);
+  else if (filters.channel === "both") {
+    q = q.not("email", "is", null).not("phone", "is", null);
+  }
+  if (filters.search) {
+    const s = filters.search.replace(/[%,]/g, " ").trim();
+    if (s) {
+      const like = `%${s}%`;
+      q = q.or(
+        `full_name.ilike.${like},email.ilike.${like},company_name.ilike.${like},job_title.ilike.${like},phone.ilike.${like}`,
+      );
+    }
+  }
+  return q as T;
+}
+
 export const listLeads = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("leads")
-      .select(`
-        id,
-        full_name,
-        email,
-        phone,
-        company_name,
-        job_title,
-        status,
-        temperature,
-        score,
-        source_id,
-        estimated_value,
-        next_followup_at,
-        created_at,
-        last_contact_at,
-        lead_sources (
-          id,
-          name,
-          slug,
-          color
-        )
-      `)
+  .inputValidator((i: unknown) => ListLeadsInput.parse(i ?? {}))
+  .handler(async ({ context, data }) => {
+    const { supabase } = context;
+    const page = data.page;
+    const pageSize = data.page_size;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const rowsQuery = applyLeadFilters(
+      supabase.from("leads").select(LEAD_COLUMNS, { count: "exact" }),
+      data,
+    )
       .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    return data ?? [];
+      .range(from, to);
+
+    const [rowsRes, totalRes, withEmailRes, withPhoneRes, withBothRes] = await Promise.all([
+      rowsQuery,
+      supabase.from("leads").select("id", { count: "exact", head: true }),
+      supabase.from("leads").select("id", { count: "exact", head: true }).not("email", "is", null),
+      supabase.from("leads").select("id", { count: "exact", head: true }).not("phone", "is", null),
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .not("email", "is", null)
+        .not("phone", "is", null),
+    ]);
+
+    if (rowsRes.error) throw new Error(rowsRes.error.message);
+
+    return {
+      rows: rowsRes.data ?? [],
+      total: rowsRes.count ?? 0,
+      page,
+      page_size: pageSize,
+      counts: {
+        total: totalRes.count ?? 0,
+        with_email: withEmailRes.count ?? 0,
+        with_phone: withPhoneRes.count ?? 0,
+        with_both: withBothRes.count ?? 0,
+      },
+    };
   });
 
 export const listLeadSources = createServerFn({ method: "GET" })
