@@ -1,45 +1,49 @@
-# Corrigir página dedicada do Lead
-
 ## Diagnóstico
 
-`/dashboard/leads/<leadId>` abre em branco (só o spinner do shell). Razão técnica:
+Sua organização tem **5.013 leads** no banco, mas a página `/dashboard/leads` mostra no máximo **200**. O motivo está em `src/lib/tenant.functions.ts` na função `listLeads`:
 
-- Existem 3 arquivos irmãos: `_app.dashboard.leads.tsx` (lista), `_app.dashboard.leads.$leadId.tsx` (detalhe) e `_app.dashboard.leads.apollo.tsx` (busca).
-- No TanStack Router, quando há arquivos com prefixo `leads.`, o `leads.tsx` vira **rota pai** de `$leadId` e `apollo`. Confirmado no `routeTree.gen.ts`: `getParentRoute: () => AppDashboardLeadsRoute`.
-- Uma rota pai precisa renderizar `<Outlet />` para a filha aparecer. Hoje o componente `LeadsPage` renderiza a lista direto e **não tem `<Outlet />`** — então o filho casa, mas nada mostra; a UI continua exibindo a lista (ou fica em branco enquanto a query do detalhe carrega).
+```ts
+.order("created_at", { ascending: false })
+.limit(200);   // ← trava em 200
+```
 
-O mesmo bug afeta `/dashboard/leads/apollo` — provavelmente nunca abriu de verdade.
+A query retorna só os 200 leads mais recentes. Todo o filtro de busca/status/origem hoje é feito **no cliente, em cima desses 200**, então qualquer lead fora dessa janela some — inclusive os antigos com WhatsApp/email válidos que você quer usar nas campanhas.
 
-## Correção
+Como contexto adicional: do total, **4.398 não têm email** e **4.938 não têm telefone**. Isso não é o que está "escondendo" os leads na tela (o filtro de elegibilidade só roda quando você ativa uma campanha), mas é importante mostrar isso no UI pra você saber quantos leads são realmente acionáveis por canal.
 
-Padrão recomendado pelo TanStack quando uma rota "vira layout": mover o conteúdo para `*.index.tsx` e transformar o arquivo pai em layout puro.
+## Plano
 
-1. **Renomear** `src/routes/_app.dashboard.leads.tsx` → `src/routes/_app.dashboard.leads.index.tsx`.
-2. Dentro do arquivo renomeado, trocar:
-   ```ts
-   createFileRoute("/_app/dashboard/leads")
-   ```
-   por:
-   ```ts
-   createFileRoute("/_app/dashboard/leads/")
-   ```
-   (o resto do componente `LeadsPage` permanece igual).
-3. **Criar** novo `src/routes/_app.dashboard.leads.tsx` mínimo, só layout:
-   ```tsx
-   import { createFileRoute, Outlet } from "@tanstack/react-router";
-   export const Route = createFileRoute("/_app/dashboard/leads")({
-     component: () => <Outlet />,
-   });
-   ```
+### 1. Backend — `listLeads` com paginação, filtros e contagem real
+Reescrever `listLeads` em `src/lib/tenant.functions.ts` para aceitar:
+- `search` (nome / email / empresa / cargo / telefone — via `ilike` e `or`)
+- `status` (string opcional)
+- `source_slug` (string opcional, join em `lead_sources.slug`)
+- `channel_ready` (`"any" | "email" | "whatsapp" | "both"`) — usa `email is not null` e/ou `phone is not null`
+- `page` e `page_size` (default 50, máx 200)
 
-Resultado:
-- `/dashboard/leads` → continua mostrando a lista (vinda do `index`).
-- `/dashboard/leads/<id>` → mostra a página dedicada do lead.
-- `/dashboard/leads/apollo` → mostra a busca Apollo.
+Retorno:
+```ts
+{ rows: Lead[], total: number, page, page_size,
+  counts: { total, with_email, with_phone, with_both } }
+```
+Filtros aplicados via `.eq/.ilike/.or/.not("email","is",null)` e paginação com `.range(from, to)`. `total` vem de uma segunda query `select("id", { count: "exact", head: true })` com os mesmos filtros.
 
-Nenhuma mudança no detalhe do lead, na navegação ou nos server functions — o bug é só estrutural de rotas. O `routeTree.gen.ts` é regenerado automaticamente.
+Remover o `.limit(200)`.
 
-## Fora de escopo
+### 2. Frontend — `src/routes/_app.dashboard.leads.index.tsx`
+- Mover `query`, `statusFilter`, `sourceFilter` + novos `channelFilter` e `page` para search params da rota (`validateSearch`), com `useNavigate` para atualizar.
+- `useQuery` com `queryKey` incluindo todos os filtros + página; chamar `listLeads` com esses parâmetros (deixa de filtrar no cliente).
+- Adicionar barra com chips de canal: **Todos / Com email / Com WhatsApp / Com ambos** (usando os `counts` retornados).
+- Adicionar paginação simples no rodapé (Anterior / Próximo + "X–Y de N leads") e seletor de tamanho de página (50 / 100 / 200).
+- Mostrar no header "5.013 leads · 615 com email · 75 com WhatsApp" (números reais do backend).
 
-- Nada muda no layout, dados, edição ou enriquecimento do lead.
-- Sidebar e botões de header já estão corretos.
+### 3. Pré-visualização de elegibilidade na campanha
+Hoje `previewCampaignEligibility` já calcula `eligible_count` e `ineligible_count`, mas a lista de leads não mostra essa informação antes de abrir a campanha. Adicionar na página de leads, ao lado de cada linha, um pequeno marcador de canais disponíveis (ícone de email / WhatsApp em cinza quando ausente). Isso responde direto ao seu ponto "90% das campanhas vão usar WhatsApp e email" — você consegue ver de relance quais leads atendem.
+
+### 4. Sem mudanças em RLS / schema
+Os 5.013 leads já estão acessíveis via RLS (a query confirma). Não é necessário tocar em policies, grants ou migrations.
+
+## Resultado esperado
+- Você passa a ver e paginar **todos os 5.013 leads**, não só 200.
+- Filtros (status, origem, busca, canal) rodam no banco, então funcionam sobre o conjunto inteiro.
+- Cada lead mostra quais canais (email/WhatsApp) estão prontos para campanha, batendo com o filtro de elegibilidade que `activateCampaign` já aplica.
