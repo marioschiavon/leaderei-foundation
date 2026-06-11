@@ -252,6 +252,9 @@ function InboxPage() {
                 <ConversationThread
                   convId={active.id}
                   fallbackChannel={active.channel}
+                  needsHuman={!!active.needs_human}
+                  needsHumanReason={active.needs_human_reason ?? null}
+                  agentPaused={!!active.agent_paused}
                   detailsOpen={detailsOpen}
                   onToggleDetails={() => setDetailsOpen((v) => !v)}
                 />
