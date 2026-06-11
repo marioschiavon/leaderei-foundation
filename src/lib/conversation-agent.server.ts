@@ -495,10 +495,10 @@ async function executeAction(
     agent_context: Json;
   },
 ) {
-  const baseActivity = {
+  const baseActivity: any = {
     organization_id: ctx.organization_id,
     lead_id: ctx.lead.id,
-    payload: { agent: true, action: decision.action, conversation_id: ctx.conversation_id } as any,
+    payload: { agent: true, action: decision.action, conversation_id: ctx.conversation_id },
   };
 
   switch (decision.action) {
