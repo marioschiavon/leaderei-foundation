@@ -195,6 +195,29 @@ export function AiBrandTab({ isAdmin }: { isAdmin: boolean }) {
           </div>
         </div>
 
+        <div className="rounded-xl border bg-surface p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand" />
+            <h2 className="font-display text-lg font-semibold">Agente de conversa</h2>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quando um lead responde, a IA assume a conversa (WhatsApp/email) e decide entre responder, oferecer horários, agendar reunião, sinalizar para humano ou encerrar. Este texto orienta esse comportamento.
+          </p>
+          <div className="mt-4">
+            <Field label="Objetivo do agente" hint="Até 2000 caracteres" maxLength={2000} count={form.conversation_agent_goal?.length ?? 0}>
+              <Textarea
+                rows={6}
+                maxLength={2000}
+                value={form.conversation_agent_goal ?? ""}
+                onChange={(e) => setForm({ ...form, conversation_agent_goal: e.target.value })}
+                disabled={disabled}
+                placeholder={DEFAULT_GOAL}
+              />
+            </Field>
+            <p className="mt-2 text-[11px] text-muted-foreground">Se vazio, usa o objetivo padrão orientado a agendamento.</p>
+          </div>
+        </div>
+
         <div className="flex justify-end">
           <Button onClick={() => mut.mutate()} disabled={disabled || mut.isPending}>
             {mut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
