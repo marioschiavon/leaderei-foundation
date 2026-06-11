@@ -165,7 +165,7 @@ async function sendEmailFromAgent(args: {
     subject: subj,
     text: args.text,
     html: `<p>${args.text.replace(/\n/g, "<br/>")}</p>`,
-    purpose: "agent",
+    purpose: "inbox_reply",
     organization_id: args.organization_id,
     template_key: `agent:reply`,
     metadata: { conversation_id: args.conversation_id, agent: true },
@@ -498,7 +498,7 @@ async function executeAction(
   const baseActivity = {
     organization_id: ctx.organization_id,
     lead_id: ctx.lead.id,
-    payload: { agent: true, action: decision.action, conversation_id: ctx.conversation_id } as Json,
+    payload: { agent: true, action: decision.action, conversation_id: ctx.conversation_id } as any,
   };
 
   switch (decision.action) {
