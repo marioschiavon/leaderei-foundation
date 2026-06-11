@@ -1,49 +1,76 @@
-## Diagnóstico
+## Objetivo
 
-Sua organização tem **5.013 leads** no banco, mas a página `/dashboard/leads` mostra no máximo **200**. O motivo está em `src/lib/tenant.functions.ts` na função `listLeads`:
+No card de campanha, ao abrir "Leads" → aba "Adicionar", o usuário precisa ver **todos** os leads elegíveis ao canal da campanha (não um subconjunto truncado), com paginação, busca real e indicação clara de quantos leads ficaram de fora por falta de email/WhatsApp.
 
-```ts
-.order("created_at", { ascending: false })
-.limit(200);   // ← trava em 200
-```
+## O que muda
 
-A query retorna só os 200 leads mais recentes. Todo o filtro de busca/status/origem hoje é feito **no cliente, em cima desses 200**, então qualquer lead fora dessa janela some — inclusive os antigos com WhatsApp/email válidos que você quer usar nas campanhas.
+### 1. Backend — `listEligibleLeadsForCampaign` vira paginado e filtra no banco
 
-Como contexto adicional: do total, **4.398 não têm email** e **4.938 não têm telefone**. Isso não é o que está "escondendo" os leads na tela (o filtro de elegibilidade só roda quando você ativa uma campanha), mas é importante mostrar isso no UI pra você saber quantos leads são realmente acionáveis por canal.
+Arquivo: `src/lib/campaigns.functions.ts`
 
-## Plano
+- Aceitar input novo: `{ campaign_id, page?, page_size?, search?, only_new? }` (default `page=1`, `page_size=50`, `only_new=true` = esconde quem já está inscrito).
+- Aplicar **no banco** (sem trazer 5000 linhas para memória):
+  - `organization_id = campanha.org`
+  - `archived_at is null`
+  - filtro de canal:
+    - canal `whatsapp` → `phone is not null and phone <> ''`
+    - canal `email` → `email is not null and email <> ''`
+    - canal `linkedin` → `linkedin_url is not null` (ou regra equivalente já existente)
+  - `search` opcional via `or(full_name.ilike, email.ilike, phone.ilike, company_name.ilike)`
+  - excluir leads já em `campaign_enrollments` com status `active`/`paused` da mesma campanha quando `only_new=true` (subquery `not in`).
+- Usar `.range(from, to)` + `count: "exact"` para devolver `total` e `rows` da página.
+- Devolver, em uma única chamada:
+  ```
+  {
+    channel,
+    page, page_size, total,           // página de elegíveis novos
+    rows,                             // leads desta página
+    counts: {
+      org_total,                      // todos os leads da org (não arquivados)
+      eligible_total,                 // elegíveis pelo canal
+      already_enrolled,               // já inscritos active/paused
+      missing_channel                 // org_total - eligible_total
+    }
+  }
+  ```
+- Os campos legados (`eligible`, `ineligible`, `eligible_count`, `new_eligible_count`, `active_lead_ids`) continuam sendo usados pelo diálogo de **ativação** (`ActivateCampaignDialog`). Para não quebrar isso, criar uma **server fn nova** `listEligibleLeadsPage` com o shape paginado e **manter** `listEligibleLeadsForCampaign` para o fluxo de ativação inicial (que ainda precisa de contagens agregadas). O modal "Adicionar" passa a usar a nova.
 
-### 1. Backend — `listLeads` com paginação, filtros e contagem real
-Reescrever `listLeads` em `src/lib/tenant.functions.ts` para aceitar:
-- `search` (nome / email / empresa / cargo / telefone — via `ilike` e `or`)
-- `status` (string opcional)
-- `source_slug` (string opcional, join em `lead_sources.slug`)
-- `channel_ready` (`"any" | "email" | "whatsapp" | "both"`) — usa `email is not null` e/ou `phone is not null`
-- `page` e `page_size` (default 50, máx 200)
+### 2. Frontend — diálogo "Adicionar lead" no card de campanhas
 
-Retorno:
-```ts
-{ rows: Lead[], total: number, page, page_size,
-  counts: { total, with_email, with_phone, with_both } }
-```
-Filtros aplicados via `.eq/.ilike/.or/.not("email","is",null)` e paginação com `.range(from, to)`. `total` vem de uma segunda query `select("id", { count: "exact", head: true })` com os mesmos filtros.
+Arquivo: `src/routes/_app.dashboard.campaigns.tsx` (componente `ManageEnrollmentsDialog`, linhas ~730–960)
 
-Remover o `.limit(200)`.
+- Estado local: `page`, `pageSize` (default 50), `search` (com debounce de 250 ms). Resetam ao abrir/fechar o modal.
+- `useQuery` chama a nova `listEligibleLeadsPage` com esses parâmetros (keepPreviousData para não piscar entre páginas).
+- Topo do painel "Adicionar":
+  - linha-resumo: `5.013 leads na org · 75 elegíveis para WhatsApp · 12 já inscritos · 4.938 sem WhatsApp cadastrado`
+  - quando `missing_channel > 0`, mostrar um aviso curto com link para `/dashboard/leads?channel=<canal>` filtrando a lista de leads no canal certo, para o usuário enriquecer os dados.
+- Lista substitui o `filter` em memória pelo conteúdo de `rows`. Busca é server-side.
+- "Selecionar todos" passa a ter dois modos: **"Selecionar página"** (rows atuais) e **"Selecionar todos os N elegíveis"** (só habilita quando `total ≤ 1000` para evitar enrolar milhares por engano; acima disso, mostra mensagem pedindo refinar o filtro).
+- Paginação no rodapé: `Anterior / Próximo` + `X–Y de N`.
+- O contador da aba ("Adicionar · N") usa `counts.eligible_total - counts.already_enrolled`, não mais o tamanho do array em memória.
 
-### 2. Frontend — `src/routes/_app.dashboard.leads.index.tsx`
-- Mover `query`, `statusFilter`, `sourceFilter` + novos `channelFilter` e `page` para search params da rota (`validateSearch`), com `useNavigate` para atualizar.
-- `useQuery` com `queryKey` incluindo todos os filtros + página; chamar `listLeads` com esses parâmetros (deixa de filtrar no cliente).
-- Adicionar barra com chips de canal: **Todos / Com email / Com WhatsApp / Com ambos** (usando os `counts` retornados).
-- Adicionar paginação simples no rodapé (Anterior / Próximo + "X–Y de N leads") e seletor de tamanho de página (50 / 100 / 200).
-- Mostrar no header "5.013 leads · 615 com email · 75 com WhatsApp" (números reais do backend).
+### 3. `activateCampaign` — remover o teto de 5000
 
-### 3. Pré-visualização de elegibilidade na campanha
-Hoje `previewCampaignEligibility` já calcula `eligible_count` e `ineligible_count`, mas a lista de leads não mostra essa informação antes de abrir a campanha. Adicionar na página de leads, ao lado de cada linha, um pequeno marcador de canais disponíveis (ícone de email / WhatsApp em cinza quando ausente). Isso responde direto ao seu ponto "90% das campanhas vão usar WhatsApp e email" — você consegue ver de relance quais leads atendem.
+Arquivo: `src/lib/campaigns.functions.ts` (linha ~225)
 
-### 4. Sem mudanças em RLS / schema
-Os 5.013 leads já estão acessíveis via RLS (a query confirma). Não é necessário tocar em policies, grants ou migrations.
+- Quando `lead_ids` for passado explicitamente (caso do modal de adicionar), processar em lotes (chunks de 500) em vez de um `.in()` único com `limit(5000)`. Isso garante que selecionar "todos os elegíveis" funcione mesmo com milhares de leads.
+- Quando `lead_ids` não vier (ativação geral), iterar páginas até esgotar via `.range()` em vez de `limit(5000)`.
 
-## Resultado esperado
-- Você passa a ver e paginar **todos os 5.013 leads**, não só 200.
-- Filtros (status, origem, busca, canal) rodam no banco, então funcionam sobre o conjunto inteiro.
-- Cada lead mostra quais canais (email/WhatsApp) estão prontos para campanha, batendo com o filtro de elegibilidade que `activateCampaign` já aplica.
+### 4. Sem mudança de schema
+
+Não precisa migration. Tudo é query/UI.
+
+## Restrições
+
+- Não mexer no Builder, Inbox, página de Leads, pg_cron, ou no executor de fluxo.
+- Manter o botão "Roda o worker manualmente" e o fluxo do `ActivateCampaignDialog` intactos (continuam usando a função antiga).
+- Não retornar PII além do que o modal já mostra hoje (`full_name`, `email`, `phone`, `company_name`).
+
+## Gate de aceite
+
+1. Abrir "Leads" em uma campanha WhatsApp da sua org mostra contagem real (`75 elegíveis para WhatsApp` em vez de uma lista pequena sem explicação).
+2. Busca por nome/email/telefone retorna resultados de toda a base elegível, não só dos 50 da página atual.
+3. Paginação Anterior/Próximo funciona e mantém a busca.
+4. Aviso "X leads sem WhatsApp cadastrado" aparece quando faz sentido, com link para a página de Leads filtrada.
+5. Adicionar 500+ leads de uma vez não estoura nem trunca silenciosamente.
+6. Diálogo de ativação inicial da campanha continua funcionando exatamente como hoje.
