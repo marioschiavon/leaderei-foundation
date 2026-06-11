@@ -21,6 +21,7 @@ import {
 import { listConversations, getMyContext, acceptLead, archiveLead } from "@/lib/tenant.functions";
 import { getConversationMessages } from "@/lib/inbox.functions";
 import { sendWhatsAppMessage } from "@/lib/hook7.functions";
+import { assumeConversation, returnToAgent } from "@/lib/conversation-agent.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
