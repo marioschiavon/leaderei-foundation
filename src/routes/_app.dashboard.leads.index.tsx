@@ -224,7 +224,7 @@ function LeadsPage() {
 
       <div className="flex gap-1 border-b">
         <button
-          onClick={() => navigate({ search: (prev) => ({ ...prev, tab: "all" }) })}
+          onClick={() => navigate({ search: (prev: typeof search) => ({ ...prev, tab: "all" }) })}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
             tab === "all" ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground",
