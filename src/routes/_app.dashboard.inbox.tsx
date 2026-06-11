@@ -353,6 +353,33 @@ function ConversationThread({
         </div>
       </div>
 
+      {needsHuman && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-red-500/10 px-4 py-2 text-sm">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <div>
+              <div className="font-medium text-red-700">Agente sinalizou: precisa de humano</div>
+              {needsHumanReason && <div className="text-xs text-red-700/80">{needsHumanReason}</div>}
+            </div>
+          </div>
+          <Button size="sm" onClick={() => assumeMut.mutate()} disabled={assumeMut.isPending}>
+            {assumeMut.isPending ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+            Assumir conversa
+          </Button>
+        </div>
+      )}
+      {agentPaused && !needsHuman && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted px-4 py-2 text-xs">
+          <span className="text-muted-foreground">🤖 Agente pausado — você está respondendo manualmente.</span>
+          <Button size="sm" variant="outline" onClick={() => returnMut.mutate()} disabled={returnMut.isPending}>
+            {returnMut.isPending ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : null}
+            Devolver ao agente
+          </Button>
+        </div>
+      )}
+
+
+
       <div className={cn(
         "flex-1 overflow-y-auto p-4 space-y-2 max-h-[calc(100vh-360px)]",
         isWhatsApp && "bg-[#ece5dd]/40",
