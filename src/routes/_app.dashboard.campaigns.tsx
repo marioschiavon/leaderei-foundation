@@ -736,7 +736,7 @@ function ManageLeadsDialog({
 }) {
   const queryClient = useQueryClient();
   const enrollmentsFn = useServerFn(listCampaignEnrollments);
-  const eligibleFn = useServerFn(listEligibleLeadsForCampaign);
+  const eligiblePageFn = useServerFn(listEligibleLeadsPage);
   const cancelFn = useServerFn(cancelEnrollment);
   const activateFn = useServerFn(activateCampaign);
 
@@ -746,10 +746,45 @@ function ManageLeadsDialog({
     queryFn: () =>
       enrollmentsFn({ data: { campaign_id: campaignId, status: "all", limit: 500 } }),
   });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (!open) {
+      setSelected(new Set());
+      setSearch("");
+      setDebouncedSearch("");
+      setPage(1);
+    }
+  }, [open]);
+
   const eligibleQ = useQuery({
     enabled: open,
-    queryKey: ["eligible-leads-manage", campaignId],
-    queryFn: () => eligibleFn({ data: { campaign_id: campaignId } }),
+    queryKey: ["eligible-leads-page", campaignId, debouncedSearch, page, pageSize],
+    queryFn: () =>
+      eligiblePageFn({
+        data: {
+          campaign_id: campaignId,
+          page,
+          page_size: pageSize,
+          search: debouncedSearch,
+          only_new: true,
+        },
+      }),
+    placeholderData: (prev) => prev,
   });
 
   const cancelMut = useMutation({
@@ -763,31 +798,30 @@ function ManageLeadsDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    if (!open) {
-      setSelected(new Set());
-      setSearch("");
-    }
-  }, [open]);
-
-  const activeLeadIds = new Set((eligibleQ.data?.active_lead_ids ?? []) as string[]);
-  const availableLeads = ((eligibleQ.data?.eligible ?? []) as Array<{
-    id: string; full_name: string | null; email: string | null; phone: string | null; company_name: string | null;
-  }>).filter((l) => !activeLeadIds.has(l.id));
-  const filteredAvailable = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return availableLeads;
-    return availableLeads.filter(
-      (l) =>
-        (l.full_name ?? "").toLowerCase().includes(q) ||
-        (l.email ?? "").toLowerCase().includes(q) ||
-        (l.phone ?? "").toLowerCase().includes(q) ||
-        (l.company_name ?? "").toLowerCase().includes(q),
-    );
-  }, [availableLeads, search]);
+  const pageRows = (eligibleQ.data?.rows ?? []) as Array<{
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    company_name: string | null;
+  }>;
+  const counts = eligibleQ.data?.counts;
+  const total = eligibleQ.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const channelLabel =
+    channel === "whatsapp" || channel === "sms"
+      ? "WhatsApp"
+      : channel === "email"
+        ? "email"
+        : channel === "linkedin"
+          ? "LinkedIn"
+          : channel;
+  const missingChannelHref =
+    channel === "email"
+      ? "/dashboard/leads?channel=email"
+      : channel === "whatsapp" || channel === "sms"
+        ? "/dashboard/leads?channel=whatsapp"
+        : "/dashboard/leads";
 
   const addMut = useMutation({
     mutationFn: (ids: string[]) =>
@@ -801,6 +835,7 @@ function ManageLeadsDialog({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const enrollments = (enrollmentsQ.data ?? []) as Array<any>;
   const liveEnrollments = enrollments.filter((r) => r.status !== "cancelled");
