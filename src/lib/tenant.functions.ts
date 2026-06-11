@@ -400,8 +400,9 @@ export const listConversations = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("conversations")
-      .select("id, subject, channel, status, last_message_preview, last_message_at, unread_count, ai_enabled, lead_id, leads(id, full_name, company_name, phone, needs_review)")
+      .select("id, subject, channel, status, last_message_preview, last_message_at, unread_count, ai_enabled, lead_id, needs_human, needs_human_reason, agent_paused, assigned_to, leads(id, full_name, company_name, phone, needs_review)")
       .in("channel", ["email", "whatsapp"])
+      .order("needs_human", { ascending: false })
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(200);
     if (error) throw new Error(error.message);
