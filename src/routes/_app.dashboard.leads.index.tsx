@@ -1,15 +1,22 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Building2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
   Inbox as InboxIcon,
   Loader2,
+  Mail,
+  MessageCircle,
   Plus,
   Search,
   Sparkles,
@@ -47,20 +54,38 @@ import {
 
 import { ImportLeadsSheet } from "@/components/app/ImportLeadsSheet";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Check } from "lucide-react";
+
+const searchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  status: fallback(z.string(), "all").default("all"),
+  source: fallback(z.string(), "all").default("all"),
+  channel: fallback(z.enum(["any", "email", "whatsapp", "both"]), "any").default("any"),
+  page: fallback(z.number().int().min(1), 1).default(1),
+  page_size: fallback(z.number().int().min(10).max(200), 50).default(50),
+  tab: fallback(z.enum(["all", "review"]), "all").default("all"),
+});
 
 export const Route = createFileRoute("/_app/dashboard/leads/")({
+  validateSearch: zodValidator(searchSchema),
   component: LeadsPage,
 });
 
-const LEAD_STATUSES = [
-  "new",
-  "contacted",
-  "qualified",
-  "proposal",
-  "won",
-  "lost",
-  "archived",
+const STATUS_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: "new", label: "Novo" },
+  { value: "contacted", label: "Contatado" },
+  { value: "qualified", label: "Qualificado" },
+  { value: "proposal", label: "Proposta" },
+  { value: "won", label: "Ganho" },
+  { value: "lost", label: "Perdido" },
+  { value: "archived", label: "Arquivado" },
+];
+
+const CHANNEL_OPTIONS = [
+  { value: "any", label: "Todos" },
+  { value: "email", label: "Com email" },
+  { value: "whatsapp", label: "Com WhatsApp" },
+  { value: "both", label: "Email + WhatsApp" },
 ] as const;
 
 const STATUS_META: Record<string, { label: string; chip: string; dot: string }> = {
@@ -87,26 +112,42 @@ type LeadSource = {
   color: string | null;
 };
 
+function nfmt(n: number) {
+  return new Intl.NumberFormat("pt-BR").format(n);
+}
 
 function LeadsPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/dashboard/leads/" });
   const fetchLeads = useServerFn(listLeads);
   const fetchSources = useServerFn(listLeadSources);
 
-  const { data: leads, isLoading, error } = useQuery({
-    queryKey: ["leads"],
-    queryFn: () => fetchLeads(),
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: ["leads", search.q, search.status, search.source, search.channel, search.page, search.page_size],
+    queryFn: () =>
+      fetchLeads({
+        data: {
+          search: search.q,
+          status: search.status,
+          source_slug: search.source,
+          channel: search.channel,
+          page: search.page,
+          page_size: search.page_size,
+        },
+      }),
+    placeholderData: (prev) => prev,
   });
   const { data: sources } = useQuery({
     queryKey: ["leads", "sources"],
     queryFn: () => fetchSources(),
   });
 
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [tab, setTab] = useState<"all" | "review">("all");
+
+  const updateSearch = (patch: Partial<typeof search>) => {
+    navigate({ search: (prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }) });
+  };
 
   const fetchReview = useServerFn(listLeadsNeedingReview);
   const fetchReviewCount = useServerFn(getLeadsNeedingReviewCount);
@@ -143,38 +184,24 @@ function LeadsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filtered = useMemo(() => {
-    return (leads ?? []).filter((lead) => {
-      if (statusFilter !== "all" && lead.status !== statusFilter) return false;
-      if (sourceFilter !== "all" && lead.lead_sources?.slug !== sourceFilter) return false;
-      if (!query) return true;
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const counts = data?.counts;
+  const totalPages = Math.max(1, Math.ceil(total / search.page_size));
+  const rangeFrom = total === 0 ? 0 : (search.page - 1) * search.page_size + 1;
+  const rangeTo = Math.min(total, search.page * search.page_size);
 
-      const q = query.toLowerCase();
-      return [
-        lead.full_name,
-        lead.email,
-        lead.company_name,
-        lead.job_title,
-        lead.lead_sources?.name,
-      ]
-        .filter(Boolean)
-        .some((value) => value?.toLowerCase().includes(q));
-    });
-  }, [leads, query, sourceFilter, statusFilter]);
-
-  const statuses = useMemo(
-    () =>
-      Array.from(
-        new Set((leads ?? []).map((lead) => lead.status).filter(Boolean)),
-      ),
-    [leads],
-  );
+  const tab = search.tab;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Leads"
-        description="Pipeline comercial com origem, contexto e atividade real por contato."
+        description={
+          counts
+            ? `${nfmt(counts.total)} leads · ${nfmt(counts.with_email)} com email · ${nfmt(counts.with_phone)} com WhatsApp · ${nfmt(counts.with_both)} com ambos`
+            : "Pipeline comercial com origem, contexto e atividade real por contato."
+        }
         actions={
           <>
             <Button variant="outline" asChild>
@@ -197,7 +224,7 @@ function LeadsPage() {
 
       <div className="flex gap-1 border-b">
         <button
-          onClick={() => setTab("all")}
+          onClick={() => navigate({ search: (prev) => ({ ...prev, tab: "all" }) })}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
             tab === "all" ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground",
@@ -206,7 +233,7 @@ function LeadsPage() {
           Todos
         </button>
         <button
-          onClick={() => setTab("review")}
+          onClick={() => navigate({ search: (prev) => ({ ...prev, tab: "review" }) })}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors inline-flex items-center gap-2",
             tab === "review" ? "border-amber-500 text-amber-700" : "border-transparent text-muted-foreground hover:text-foreground",
@@ -278,9 +305,9 @@ function LeadsPage() {
           <div className="relative w-full max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nome, empresa, email ou origem..."
+              value={search.q}
+              onChange={(e) => updateSearch({ q: e.target.value })}
+              placeholder="Buscar por nome, empresa, email, cargo ou telefone..."
               className="h-9 pl-9"
             />
           </div>
@@ -288,17 +315,20 @@ function LeadsPage() {
           <div className="flex flex-1 flex-wrap items-center gap-2">
             <FilterPills
               label="Status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              items={[{ value: "all", label: "Todos" }, ...statuses.map((status) => ({
-                value: status,
-                label: STATUS_META[status]?.label ?? status,
-              }))]}
+              value={search.status}
+              onChange={(v) => updateSearch({ status: v })}
+              items={STATUS_OPTIONS}
+            />
+            <FilterPills
+              label="Canal"
+              value={search.channel}
+              onChange={(v) => updateSearch({ channel: v as typeof search.channel })}
+              items={CHANNEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
             />
             <FilterPills
               label="Origem"
-              value={sourceFilter}
-              onChange={setSourceFilter}
+              value={search.source}
+              onChange={(v) => updateSearch({ source: v })}
               items={[{ value: "all", label: "Todas" }, ...(sources ?? []).map((source) => ({
                 value: source.slug,
                 label: source.name,
@@ -306,8 +336,27 @@ function LeadsPage() {
             />
           </div>
 
-          <div className="ml-auto text-xs text-muted-foreground">
-            {isLoading ? "Carregando..." : `${filtered.length} lead${filtered.length !== 1 ? "s" : ""}`}
+          <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              {isLoading
+                ? "Carregando..."
+                : total === 0
+                ? "0 leads"
+                : `${nfmt(rangeFrom)}–${nfmt(rangeTo)} de ${nfmt(total)}`}
+            </span>
+            <Select
+              value={String(search.page_size)}
+              onValueChange={(v) => updateSearch({ page_size: Number(v) })}
+            >
+              <SelectTrigger className="h-8 w-[88px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[50, 100, 200].map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n} / pág</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -321,17 +370,17 @@ function LeadsPage() {
               <div key={i} className="h-16 animate-pulse rounded bg-surface-muted/50" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             icon={InboxIcon}
-            title={query || statusFilter !== "all" || sourceFilter !== "all" ? "Nenhum lead encontrado" : "Ainda sem leads"}
+            title={search.q || search.status !== "all" || search.source !== "all" || search.channel !== "any" ? "Nenhum lead encontrado" : "Ainda sem leads"}
             description={
-              query || statusFilter !== "all" || sourceFilter !== "all"
+              search.q || search.status !== "all" || search.source !== "all" || search.channel !== "any"
                 ? "Ajuste os filtros ou a busca para encontrar outros contatos."
                 : "Comece importando uma lista ou adicionando o primeiro contato."
             }
             action={
-              !query && statusFilter === "all" && sourceFilter === "all" && (
+              !search.q && search.status === "all" && search.source === "all" && search.channel === "any" && (
                 <div className="flex gap-2">
                   <Button onClick={() => setNewLeadOpen(true)}>
                     <Plus className="h-4 w-4" />
@@ -346,10 +395,13 @@ function LeadsPage() {
             }
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border bg-surface">
+          <>
+          <div className={cn("overflow-hidden rounded-xl border bg-surface", isFetching && "opacity-70")}>
             <ul className="divide-y">
-              {filtered.map((lead) => {
+              {rows.map((lead) => {
                 const meta = STATUS_META[lead.status] ?? STATUS_META.new;
+                const hasEmail = !!lead.email;
+                const hasPhone = !!lead.phone;
                 return (
                   <li key={lead.id}>
                     <Link
@@ -361,7 +413,7 @@ function LeadsPage() {
                         {lead.full_name
                           .split(" ")
                           .slice(0, 2)
-                          .map((segment) => segment[0])
+                          .map((segment: string) => segment[0])
                           .join("")
                           .toUpperCase()}
                       </div>
@@ -389,6 +441,10 @@ function LeadsPage() {
                           )}
                         </div>
                       </div>
+                      <div className="hidden items-center gap-1 md:flex" title="Canais disponíveis">
+                        <Mail className={cn("h-3.5 w-3.5", hasEmail ? "text-brand" : "text-muted-foreground/30")} />
+                        <MessageCircle className={cn("h-3.5 w-3.5", hasPhone ? "text-emerald-600" : "text-muted-foreground/30")} />
+                      </div>
                       <div className="hidden text-right lg:block">
                         <div className="text-sm font-medium tabular-nums">{lead.score ?? 0}</div>
                         <div className="text-[11px] text-muted-foreground">
@@ -405,11 +461,36 @@ function LeadsPage() {
               })}
             </ul>
           </div>
+
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Página {search.page} de {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={search.page <= 1 || isFetching}
+                onClick={() => updateSearch({ page: search.page - 1 })}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={search.page >= totalPages || isFetching}
+                onClick={() => updateSearch({ page: search.page + 1 })}
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          </>
         )}
       </section>
       )}
-
-
 
       <NewLeadSheet
         open={newLeadOpen}
@@ -458,7 +539,6 @@ function FilterPills({
     </div>
   );
 }
-
 
 const newLeadSchema = z.object({
   full_name: z.string().trim().min(1, "Nome obrigatório").max(120),
