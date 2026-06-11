@@ -213,6 +213,7 @@ const OrgProfileSchema = z.object({
   default_approach_slug: z.string().max(48).optional().nullable(),
   default_length_slug: z.string().max(48).optional().nullable(),
   default_language_slug: z.string().max(48).default("pt-BR"),
+  conversation_agent_goal: z.string().max(2000).optional().nullable(),
 });
 
 export const updateAiOrgProfile = createServerFn({ method: "POST" })
