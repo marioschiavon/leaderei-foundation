@@ -54,6 +54,8 @@ import {
   activateCampaign,
   getCampaignExecutorStats,
   listEligibleLeadsForCampaign,
+  listEligibleLeadsPage,
+
   forceFlowTick,
   getEnrollmentRuns,
   cancelEnrollment,
@@ -734,7 +736,7 @@ function ManageLeadsDialog({
 }) {
   const queryClient = useQueryClient();
   const enrollmentsFn = useServerFn(listCampaignEnrollments);
-  const eligibleFn = useServerFn(listEligibleLeadsForCampaign);
+  const eligiblePageFn = useServerFn(listEligibleLeadsPage);
   const cancelFn = useServerFn(cancelEnrollment);
   const activateFn = useServerFn(activateCampaign);
 
@@ -744,10 +746,45 @@ function ManageLeadsDialog({
     queryFn: () =>
       enrollmentsFn({ data: { campaign_id: campaignId, status: "all", limit: 500 } }),
   });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (!open) {
+      setSelected(new Set());
+      setSearch("");
+      setDebouncedSearch("");
+      setPage(1);
+    }
+  }, [open]);
+
   const eligibleQ = useQuery({
     enabled: open,
-    queryKey: ["eligible-leads-manage", campaignId],
-    queryFn: () => eligibleFn({ data: { campaign_id: campaignId } }),
+    queryKey: ["eligible-leads-page", campaignId, debouncedSearch, page, pageSize],
+    queryFn: () =>
+      eligiblePageFn({
+        data: {
+          campaign_id: campaignId,
+          page,
+          page_size: pageSize,
+          search: debouncedSearch,
+          only_new: true,
+        },
+      }),
+    placeholderData: (prev) => prev,
   });
 
   const cancelMut = useMutation({
@@ -761,31 +798,30 @@ function ManageLeadsDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    if (!open) {
-      setSelected(new Set());
-      setSearch("");
-    }
-  }, [open]);
-
-  const activeLeadIds = new Set((eligibleQ.data?.active_lead_ids ?? []) as string[]);
-  const availableLeads = ((eligibleQ.data?.eligible ?? []) as Array<{
-    id: string; full_name: string | null; email: string | null; phone: string | null; company_name: string | null;
-  }>).filter((l) => !activeLeadIds.has(l.id));
-  const filteredAvailable = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return availableLeads;
-    return availableLeads.filter(
-      (l) =>
-        (l.full_name ?? "").toLowerCase().includes(q) ||
-        (l.email ?? "").toLowerCase().includes(q) ||
-        (l.phone ?? "").toLowerCase().includes(q) ||
-        (l.company_name ?? "").toLowerCase().includes(q),
-    );
-  }, [availableLeads, search]);
+  const pageRows = (eligibleQ.data?.rows ?? []) as Array<{
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    company_name: string | null;
+  }>;
+  const counts = eligibleQ.data?.counts;
+  const total = eligibleQ.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const channelLabel =
+    channel === "whatsapp" || channel === "sms"
+      ? "WhatsApp"
+      : channel === "email"
+        ? "email"
+        : channel === "linkedin"
+          ? "LinkedIn"
+          : channel;
+  const missingChannelHref =
+    channel === "email"
+      ? "/dashboard/leads?channel=email"
+      : channel === "whatsapp" || channel === "sms"
+        ? "/dashboard/leads?channel=whatsapp"
+        : "/dashboard/leads";
 
   const addMut = useMutation({
     mutationFn: (ids: string[]) =>
@@ -799,6 +835,7 @@ function ManageLeadsDialog({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const enrollments = (enrollmentsQ.data ?? []) as Array<any>;
   const liveEnrollments = enrollments.filter((r) => r.status !== "cancelled");
@@ -820,8 +857,9 @@ function ManageLeadsDialog({
               Inscritos · {liveEnrollments.length}
             </TabsTrigger>
             <TabsTrigger value="add">
-              Adicionar · {availableLeads.length}
+              Adicionar · {total}
             </TabsTrigger>
+
           </TabsList>
 
           <TabsContent value="enrolled" className="mt-3">
@@ -881,12 +919,44 @@ function ManageLeadsDialog({
           </TabsContent>
 
           <TabsContent value="add" className="mt-3 space-y-3">
-            {eligibleQ.isLoading ? (
+            {eligibleQ.isLoading && !eligibleQ.data ? (
               <div className="grid place-items-center py-8 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : (
               <>
+                {counts && (
+                  <div className="rounded-md border bg-surface-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    <div>
+                      <strong className="text-foreground">
+                        {counts.org_total.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      leads na org ·{" "}
+                      <strong className="text-foreground">
+                        {counts.eligible_total.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      elegíveis para {channelLabel} ·{" "}
+                      <strong className="text-foreground">
+                        {counts.already_enrolled.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      já inscritos
+                    </div>
+                    {counts.missing_channel > 0 && (
+                      <div className="mt-1">
+                        {counts.missing_channel.toLocaleString("pt-BR")} sem{" "}
+                        {channelLabel} cadastrado —{" "}
+                        <a
+                          href={missingChannelHref}
+                          className="text-primary underline-offset-2 hover:underline"
+                        >
+                          ver na lista de leads
+                        </a>
+                        .
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -901,31 +971,39 @@ function ManageLeadsDialog({
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      setSelected(
-                        selected.size === filteredAvailable.length
-                          ? new Set()
-                          : new Set(filteredAvailable.map((l) => l.id)),
-                      )
-                    }
-                    disabled={filteredAvailable.length === 0}
+                    onClick={() => {
+                      const pageIds = pageRows.map((l) => l.id);
+                      const allPageSelected =
+                        pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+                      const next = new Set(selected);
+                      if (allPageSelected) {
+                        for (const id of pageIds) next.delete(id);
+                      } else {
+                        for (const id of pageIds) next.add(id);
+                      }
+                      setSelected(next);
+                    }}
+                    disabled={pageRows.length === 0}
                   >
-                    {selected.size === filteredAvailable.length && filteredAvailable.length > 0
-                      ? "Limpar"
-                      : "Selecionar todos"}
+                    {pageRows.length > 0 &&
+                    pageRows.every((l) => selected.has(l.id))
+                      ? "Limpar página"
+                      : "Selecionar página"}
                   </Button>
                 </div>
 
                 <div className="max-h-[45vh] overflow-y-auto rounded-md border">
-                  {filteredAvailable.length === 0 ? (
+                  {pageRows.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
-                      {availableLeads.length === 0
-                        ? "Todos os leads elegíveis já estão inscritos."
+                      {total === 0
+                        ? debouncedSearch
+                          ? "Nenhum lead corresponde à busca."
+                          : "Todos os leads elegíveis já estão inscritos."
                         : "Nenhum lead corresponde à busca."}
                     </div>
                   ) : (
                     <ul className="divide-y">
-                      {filteredAvailable.map((l) => {
+                      {pageRows.map((l) => {
                         const checked = selected.has(l.id);
                         return (
                           <li
@@ -959,11 +1037,37 @@ function ManageLeadsDialog({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-muted-foreground">
-                    {selected.size} de {filteredAvailable.length} selecionado
-                    {selected.size !== 1 ? "s" : ""}.
+                    {total > 0
+                      ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} de ${total.toLocaleString("pt-BR")}`
+                      : "0 de 0"}{" "}
+                    · {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
                   </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1 || eligibleQ.isFetching}
+                    >
+                      Anterior
+                    </Button>
+                    <span className="px-2 text-xs text-muted-foreground">
+                      {page} / {totalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages || eligibleQ.isFetching}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end">
                   <Button
                     onClick={() => addMut.mutate(Array.from(selected))}
                     disabled={addMut.isPending || selected.size === 0}
@@ -976,6 +1080,7 @@ function ManageLeadsDialog({
                 </div>
               </>
             )}
+
           </TabsContent>
         </Tabs>
 

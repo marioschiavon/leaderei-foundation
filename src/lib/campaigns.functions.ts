@@ -192,6 +192,151 @@ export const listEligibleLeadsForCampaign = createServerFn({ method: "POST" })
 
 
 // ---------------------------------------------------------------------------
+// Paginated eligible-leads picker — used by the "Adicionar leads" tab
+// (avoids the 5000-row in-memory cap of listEligibleLeadsForCampaign).
+// ---------------------------------------------------------------------------
+
+function applyChannelFilter(q: any, channel: string) {
+  switch (channel) {
+    case "whatsapp":
+    case "sms":
+      return q.not("phone", "is", null).neq("phone", "");
+    case "email":
+      return q.not("email", "is", null).neq("email", "").like("email", "%@%");
+    case "multi":
+      return q.or(
+        "and(phone.not.is.null,phone.neq.),and(email.not.is.null,email.like.*@*)",
+      );
+    case "linkedin":
+    default:
+      return q;
+  }
+}
+
+export const listEligibleLeadsPage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        campaign_id: z.string().uuid(),
+        page: z.number().int().min(1).default(1),
+        page_size: z.number().int().min(1).max(200).default(50),
+        search: z.string().trim().max(120).default(""),
+        only_new: z.boolean().default(true),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .select("id, organization_id, channel")
+      .eq("id", data.campaign_id)
+      .maybeSingle();
+    if (!campaign) throw new Error("Campanha não encontrada.");
+    const orgId = campaign.organization_id as string;
+    const channel = campaign.channel as string;
+
+    const totalQ = supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .is("archived_at", null);
+    const eligibleQ = applyChannelFilter(
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .is("archived_at", null),
+      channel,
+    );
+    const enrolledQ = supabase
+      .from("campaign_enrollments")
+      .select("lead_id")
+      .eq("campaign_id", data.campaign_id)
+      .in("status", ["active", "paused"])
+      .limit(10000);
+
+    const [totalRes, eligibleRes, enrolledRes] = await Promise.all([
+      totalQ,
+      eligibleQ,
+      enrolledQ,
+    ]);
+
+    const org_total = totalRes.count ?? 0;
+    const eligible_total = eligibleRes.count ?? 0;
+    const enrolledIds = ((enrolledRes.data ?? []) as Array<{ lead_id: string }>).map(
+      (r) => r.lead_id,
+    );
+    const already_enrolled = enrolledIds.length;
+
+    let rowsQ = applyChannelFilter(
+      supabase
+        .from("leads")
+        .select("id, full_name, email, phone, company_name", { count: "exact" })
+        .eq("organization_id", orgId)
+        .is("archived_at", null),
+      channel,
+    );
+
+    const q = data.search.trim();
+    if (q) {
+      const safe = q.replace(/[(),]/g, " ");
+      rowsQ = rowsQ.or(
+        `full_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%,company_name.ilike.%${safe}%`,
+      );
+    }
+
+    if (data.only_new && enrolledIds.length > 0 && enrolledIds.length <= 1000) {
+      rowsQ = rowsQ.not("id", "in", `(${enrolledIds.join(",")})`);
+    }
+
+    const from = (data.page - 1) * data.page_size;
+    const to = from + data.page_size - 1;
+    rowsQ = rowsQ
+      .order("full_name", { ascending: true, nullsFirst: false })
+      .range(from, to);
+
+    const { data: rows, count: pageCount, error } = await rowsQ;
+    if (error) throw new Error(error.message);
+
+    let pageRows = (rows ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      email: string | null;
+      phone: string | null;
+      company_name: string | null;
+    }>;
+    if (data.only_new && enrolledIds.length > 1000) {
+      const set = new Set(enrolledIds);
+      pageRows = pageRows.filter((r) => !set.has(r.id));
+    }
+
+    const total = data.only_new
+      ? Math.max(0, eligible_total - already_enrolled)
+      : eligible_total;
+
+    return {
+      channel,
+      page: data.page,
+      page_size: data.page_size,
+      total,
+      page_total: pageCount ?? 0,
+      rows: pageRows,
+      counts: {
+        org_total,
+        eligible_total,
+        already_enrolled,
+        missing_channel: Math.max(0, org_total - eligible_total),
+      },
+    };
+  });
+
+
+
+
+// ---------------------------------------------------------------------------
 // Activate campaign — enrolls eligible leads (or a manually-selected subset)
 // ---------------------------------------------------------------------------
 
@@ -214,19 +359,46 @@ export const activateCampaign = createServerFn({ method: "POST" })
     const { document_id, entry_step_id } = await resolveDocumentAndEntry(supabase, data.campaign_id);
 
     // Pull candidates (either explicit ids or all org leads), then filter by channel.
-    let query = supabase
-      .from("leads")
-      .select("id, email, phone")
-      .eq("organization_id", orgId)
-      .is("archived_at", null);
-    if (data.lead_ids && data.lead_ids.length > 0) {
-      query = query.in("id", data.lead_ids);
-    }
-    const { data: leads } = await query.limit(5000);
-
     const channel = campaign.channel as string;
-    const candidates = ((leads ?? []) as Array<{ id: string; email: string | null; phone: string | null }>)
-      .filter((l) => isLeadEligibleForChannel(l, channel));
+    type LeadRow = { id: string; email: string | null; phone: string | null };
+    let leadsRaw: LeadRow[] = [];
+
+    if (data.lead_ids && data.lead_ids.length > 0) {
+      // Chunk explicit ids to avoid URL/parameter-length limits on huge selections.
+      const CHUNK = 300;
+      for (let i = 0; i < data.lead_ids.length; i += CHUNK) {
+        const slice = data.lead_ids.slice(i, i + CHUNK);
+        const { data: rows } = await supabase
+          .from("leads")
+          .select("id, email, phone")
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("id", slice);
+        if (rows) leadsRaw.push(...(rows as LeadRow[]));
+      }
+    } else {
+      // Whole-org activation: paginate so we don't cap at 5000.
+      const PAGE = 1000;
+      let page = 0;
+      while (true) {
+        const { data: rows } = await supabase
+          .from("leads")
+          .select("id, email, phone")
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .order("id", { ascending: true })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        const batch = (rows ?? []) as LeadRow[];
+        if (batch.length === 0) break;
+        leadsRaw.push(...batch);
+        if (batch.length < PAGE) break;
+        page += 1;
+        if (page > 100) break; // safety: 100k cap
+      }
+    }
+
+    const candidates = leadsRaw.filter((l) => isLeadEligibleForChannel(l, channel));
+
 
     let enrolled = 0;
     let skipped = 0;
@@ -264,7 +436,7 @@ export const activateCampaign = createServerFn({ method: "POST" })
       total_enrolled: enrolled,
     }).eq("id", data.campaign_id);
 
-    return { ok: true, enrolled, skipped, requested: (data.lead_ids?.length ?? leads?.length ?? 0) };
+    return { ok: true, enrolled, skipped, requested: (data.lead_ids?.length ?? leadsRaw.length) };
   });
 
 // ---------------------------------------------------------------------------
