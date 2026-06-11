@@ -857,8 +857,9 @@ function ManageLeadsDialog({
               Inscritos · {liveEnrollments.length}
             </TabsTrigger>
             <TabsTrigger value="add">
-              Adicionar · {availableLeads.length}
+              Adicionar · {total}
             </TabsTrigger>
+
           </TabsList>
 
           <TabsContent value="enrolled" className="mt-3">
