@@ -280,18 +280,40 @@ function InboxPage() {
 }
 
 function ConversationThread({
-  convId, fallbackChannel, detailsOpen, onToggleDetails,
+  convId, fallbackChannel, needsHuman, needsHumanReason, agentPaused, detailsOpen, onToggleDetails,
 }: {
   convId: string; fallbackChannel: string;
+  needsHuman: boolean; needsHumanReason: string | null; agentPaused: boolean;
   detailsOpen: boolean; onToggleDetails: () => void;
 }) {
   const fetchMsgs = useServerFn(getConversationMessages);
+  const assumeFn = useServerFn(assumeConversation);
+  const returnFn = useServerFn(returnToAgent);
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["conv-messages", convId],
     queryFn: () => fetchMsgs({ data: { conversation_id: convId } }),
   });
+  const assumeMut = useMutation({
+    mutationFn: () => assumeFn({ data: { conversation_id: convId } }),
+    onSuccess: () => {
+      toast.success("Você assumiu esta conversa. O agente não responderá mais aqui.");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const returnMut = useMutation({
+    mutationFn: () => returnFn({ data: { conversation_id: convId } }),
+    onSuccess: () => {
+      toast.success("Agente reativado nesta conversa.");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [data?.messages?.length]);
+
+
 
   const conv: any = data?.conversation;
   const lead = conv && (Array.isArray(conv.leads) ? conv.leads[0] : conv.leads);
