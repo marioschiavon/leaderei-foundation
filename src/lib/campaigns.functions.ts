@@ -436,7 +436,7 @@ export const activateCampaign = createServerFn({ method: "POST" })
       total_enrolled: enrolled,
     }).eq("id", data.campaign_id);
 
-    return { ok: true, enrolled, skipped, requested: (data.lead_ids?.length ?? leads?.length ?? 0) };
+    return { ok: true, enrolled, skipped, requested: (data.lead_ids?.length ?? leadsRaw.length) };
   });
 
 // ---------------------------------------------------------------------------
