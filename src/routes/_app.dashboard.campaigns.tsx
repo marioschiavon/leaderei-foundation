@@ -919,12 +919,44 @@ function ManageLeadsDialog({
           </TabsContent>
 
           <TabsContent value="add" className="mt-3 space-y-3">
-            {eligibleQ.isLoading ? (
+            {eligibleQ.isLoading && !eligibleQ.data ? (
               <div className="grid place-items-center py-8 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : (
               <>
+                {counts && (
+                  <div className="rounded-md border bg-surface-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    <div>
+                      <strong className="text-foreground">
+                        {counts.org_total.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      leads na org ·{" "}
+                      <strong className="text-foreground">
+                        {counts.eligible_total.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      elegíveis para {channelLabel} ·{" "}
+                      <strong className="text-foreground">
+                        {counts.already_enrolled.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      já inscritos
+                    </div>
+                    {counts.missing_channel > 0 && (
+                      <div className="mt-1">
+                        {counts.missing_channel.toLocaleString("pt-BR")} sem{" "}
+                        {channelLabel} cadastrado —{" "}
+                        <a
+                          href={missingChannelHref}
+                          className="text-primary underline-offset-2 hover:underline"
+                        >
+                          ver na lista de leads
+                        </a>
+                        .
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -939,31 +971,39 @@ function ManageLeadsDialog({
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      setSelected(
-                        selected.size === filteredAvailable.length
-                          ? new Set()
-                          : new Set(filteredAvailable.map((l) => l.id)),
-                      )
-                    }
-                    disabled={filteredAvailable.length === 0}
+                    onClick={() => {
+                      const pageIds = pageRows.map((l) => l.id);
+                      const allPageSelected =
+                        pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+                      const next = new Set(selected);
+                      if (allPageSelected) {
+                        for (const id of pageIds) next.delete(id);
+                      } else {
+                        for (const id of pageIds) next.add(id);
+                      }
+                      setSelected(next);
+                    }}
+                    disabled={pageRows.length === 0}
                   >
-                    {selected.size === filteredAvailable.length && filteredAvailable.length > 0
-                      ? "Limpar"
-                      : "Selecionar todos"}
+                    {pageRows.length > 0 &&
+                    pageRows.every((l) => selected.has(l.id))
+                      ? "Limpar página"
+                      : "Selecionar página"}
                   </Button>
                 </div>
 
                 <div className="max-h-[45vh] overflow-y-auto rounded-md border">
-                  {filteredAvailable.length === 0 ? (
+                  {pageRows.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
-                      {availableLeads.length === 0
-                        ? "Todos os leads elegíveis já estão inscritos."
+                      {total === 0
+                        ? debouncedSearch
+                          ? "Nenhum lead corresponde à busca."
+                          : "Todos os leads elegíveis já estão inscritos."
                         : "Nenhum lead corresponde à busca."}
                     </div>
                   ) : (
                     <ul className="divide-y">
-                      {filteredAvailable.map((l) => {
+                      {pageRows.map((l) => {
                         const checked = selected.has(l.id);
                         return (
                           <li
@@ -997,11 +1037,37 @@ function ManageLeadsDialog({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-muted-foreground">
-                    {selected.size} de {filteredAvailable.length} selecionado
-                    {selected.size !== 1 ? "s" : ""}.
+                    {total > 0
+                      ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} de ${total.toLocaleString("pt-BR")}`
+                      : "0 de 0"}{" "}
+                    · {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
                   </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1 || eligibleQ.isFetching}
+                    >
+                      Anterior
+                    </Button>
+                    <span className="px-2 text-xs text-muted-foreground">
+                      {page} / {totalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages || eligibleQ.isFetching}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end">
                   <Button
                     onClick={() => addMut.mutate(Array.from(selected))}
                     disabled={addMut.isPending || selected.size === 0}
@@ -1014,6 +1080,7 @@ function ManageLeadsDialog({
                 </div>
               </>
             )}
+
           </TabsContent>
         </Tabs>
 
