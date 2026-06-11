@@ -359,19 +359,46 @@ export const activateCampaign = createServerFn({ method: "POST" })
     const { document_id, entry_step_id } = await resolveDocumentAndEntry(supabase, data.campaign_id);
 
     // Pull candidates (either explicit ids or all org leads), then filter by channel.
-    let query = supabase
-      .from("leads")
-      .select("id, email, phone")
-      .eq("organization_id", orgId)
-      .is("archived_at", null);
-    if (data.lead_ids && data.lead_ids.length > 0) {
-      query = query.in("id", data.lead_ids);
-    }
-    const { data: leads } = await query.limit(5000);
-
     const channel = campaign.channel as string;
-    const candidates = ((leads ?? []) as Array<{ id: string; email: string | null; phone: string | null }>)
-      .filter((l) => isLeadEligibleForChannel(l, channel));
+    type LeadRow = { id: string; email: string | null; phone: string | null };
+    let leadsRaw: LeadRow[] = [];
+
+    if (data.lead_ids && data.lead_ids.length > 0) {
+      // Chunk explicit ids to avoid URL/parameter-length limits on huge selections.
+      const CHUNK = 300;
+      for (let i = 0; i < data.lead_ids.length; i += CHUNK) {
+        const slice = data.lead_ids.slice(i, i + CHUNK);
+        const { data: rows } = await supabase
+          .from("leads")
+          .select("id, email, phone")
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("id", slice);
+        if (rows) leadsRaw.push(...(rows as LeadRow[]));
+      }
+    } else {
+      // Whole-org activation: paginate so we don't cap at 5000.
+      const PAGE = 1000;
+      let page = 0;
+      while (true) {
+        const { data: rows } = await supabase
+          .from("leads")
+          .select("id, email, phone")
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .order("id", { ascending: true })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        const batch = (rows ?? []) as LeadRow[];
+        if (batch.length === 0) break;
+        leadsRaw.push(...batch);
+        if (batch.length < PAGE) break;
+        page += 1;
+        if (page > 100) break; // safety: 100k cap
+      }
+    }
+
+    const candidates = leadsRaw.filter((l) => isLeadEligibleForChannel(l, channel));
+
 
     let enrolled = 0;
     let skipped = 0;
