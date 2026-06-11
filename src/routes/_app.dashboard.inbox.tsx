@@ -213,12 +213,22 @@ function InboxPage() {
                           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5">
                             <span className={cn("h-1 w-1 rounded-full", st.dot)} />{st.label}
                           </span>
+                          {c.needs_human && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 font-medium text-red-700">
+                              <AlertCircle className="h-2.5 w-2.5" /> Atenção
+                            </span>
+                          )}
+                          {c.agent_paused && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
+                              humano
+                            </span>
+                          )}
                           {lead?.needs_review && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-700">
                               <AlertTriangle className="h-2.5 w-2.5" /> Revisar
                             </span>
                           )}
-                          {c.ai_enabled && (
+                          {c.ai_enabled && !c.agent_paused && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-1.5 py-0.5 text-brand">
                               <Bot className="h-2.5 w-2.5" /> IA
                             </span>
