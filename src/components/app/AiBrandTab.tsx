@@ -28,7 +28,11 @@ type Profile = {
   default_approach_slug: string | null;
   default_length_slug: string | null;
   default_language_slug: string;
+  conversation_agent_goal: string | null;
 };
+
+const DEFAULT_GOAL =
+  "Seu objetivo principal é conduzir a conversa de forma natural e consultiva, identificar o momento de interesse do lead, e propor agendar uma reunião assim que houver abertura. Priorize sempre avançar a conversa em direção ao agendamento, sem ser insistente ou repetitivo.";
 
 const EMPTY: Profile = {
   brand_name: "",
@@ -42,6 +46,7 @@ const EMPTY: Profile = {
   default_approach_slug: null,
   default_length_slug: null,
   default_language_slug: "pt-BR",
+  conversation_agent_goal: "",
 };
 
 export function AiBrandTab({ isAdmin }: { isAdmin: boolean }) {
