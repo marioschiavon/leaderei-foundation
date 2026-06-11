@@ -146,7 +146,7 @@ function LeadsPage() {
   const [importOpen, setImportOpen] = useState(false);
 
   const updateSearch = (patch: Partial<typeof search>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }) });
+    navigate({ search: (prev: typeof search) => ({ ...prev, ...patch, page: patch.page ?? 1 }) });
   };
 
   const fetchReview = useServerFn(listLeadsNeedingReview);
