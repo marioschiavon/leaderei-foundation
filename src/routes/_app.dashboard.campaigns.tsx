@@ -751,6 +751,7 @@ function ManageLeadsDialog({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [channelFilter, setChannelFilter] = useState<"all" | "whatsapp" | "email">("all");
   const pageSize = 50;
 
   useEffect(() => {
@@ -760,7 +761,7 @@ function ManageLeadsDialog({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, channelFilter]);
 
   useEffect(() => {
     if (!open) {
@@ -768,12 +769,13 @@ function ManageLeadsDialog({
       setSearch("");
       setDebouncedSearch("");
       setPage(1);
+      setChannelFilter("all");
     }
   }, [open]);
 
   const eligibleQ = useQuery({
     enabled: open,
-    queryKey: ["eligible-leads-page", campaignId, debouncedSearch, page, pageSize],
+    queryKey: ["eligible-leads-page", campaignId, debouncedSearch, page, pageSize, channelFilter],
     queryFn: () =>
       eligiblePageFn({
         data: {
@@ -782,6 +784,7 @@ function ManageLeadsDialog({
           page_size: pageSize,
           search: debouncedSearch,
           only_new: true,
+          channel_filter: channelFilter,
         },
       }),
     placeholderData: (prev) => prev,
