@@ -1026,38 +1026,60 @@ function ManageLeadsDialog({
                 <div className="max-h-[45vh] overflow-y-auto rounded-md border">
                   {pageRows.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
-                      {total === 0
+                      {filteredTotal === 0
                         ? debouncedSearch
                           ? "Nenhum lead corresponde à busca."
-                          : "Todos os leads elegíveis já estão inscritos."
+                          : channelFilter !== "all"
+                            ? "Nenhum lead corresponde ao filtro."
+                            : "Todos os leads já estão inscritos."
                         : "Nenhum lead corresponde à busca."}
                     </div>
                   ) : (
                     <ul className="divide-y">
                       {pageRows.map((l) => {
                         const checked = selected.has(l.id);
+                        const eligible = l.eligible_for_campaign;
+                        const missingLabel =
+                          channel === "email"
+                            ? "Sem email"
+                            : channel === "whatsapp" || channel === "sms"
+                              ? "Sem WhatsApp"
+                              : "Sem contato";
                         return (
                           <li
                             key={l.id}
-                            className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface-muted/40"
+                            className={`flex items-center gap-3 px-3 py-2 ${
+                              eligible
+                                ? "cursor-pointer hover:bg-surface-muted/40"
+                                : "cursor-not-allowed opacity-60"
+                            }`}
+                            title={
+                              eligible
+                                ? undefined
+                                : `Lead não tem ${missingLabel.replace("Sem ", "").toLowerCase()} cadastrado — não pode ser adicionado a esta campanha`
+                            }
                             onClick={() => {
+                              if (!eligible) return;
                               const next = new Set(selected);
                               if (checked) next.delete(l.id);
                               else next.add(l.id);
                               setSelected(next);
                             }}
                           >
-                            <Checkbox checked={checked} />
+                            <Checkbox checked={checked} disabled={!eligible} />
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium">
-                                {l.full_name ?? "Sem nome"}
+                              <div className="flex items-center gap-2 truncate text-sm font-medium">
+                                <span className="truncate">
+                                  {l.full_name ?? "Sem nome"}
+                                </span>
+                                {!eligible && (
+                                  <span className="rounded bg-surface-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+                                    {missingLabel}
+                                  </span>
+                                )}
                               </div>
                               <div className="truncate text-xs text-muted-foreground">
-                                {channel === "email"
-                                  ? l.email
-                                  : channel === "whatsapp" || channel === "sms"
-                                    ? l.phone
-                                    : (l.email ?? l.phone ?? "—")}
+                                {l.email ?? l.phone ?? "—"}
                                 {l.company_name && ` · ${l.company_name}`}
                               </div>
                             </div>
@@ -1070,8 +1092,8 @@ function ManageLeadsDialog({
 
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-muted-foreground">
-                    {total > 0
-                      ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} de ${total.toLocaleString("pt-BR")}`
+                    {filteredTotal > 0
+                      ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredTotal)} de ${filteredTotal.toLocaleString("pt-BR")}`
                       : "0 de 0"}{" "}
                     · {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
                   </div>
