@@ -223,6 +223,7 @@ export const listEligibleLeadsPage = createServerFn({ method: "POST" })
         page_size: z.number().int().min(1).max(200).default(50),
         search: z.string().trim().max(120).default(""),
         only_new: z.boolean().default(true),
+        channel_filter: z.enum(["all", "whatsapp", "email"]).default("all"),
       })
       .parse(i),
   )
@@ -271,14 +272,14 @@ export const listEligibleLeadsPage = createServerFn({ method: "POST" })
     );
     const already_enrolled = enrolledIds.length;
 
-    let rowsQ = applyChannelFilter(
-      supabase
-        .from("leads")
-        .select("id, full_name, email, phone, company_name", { count: "exact" })
-        .eq("organization_id", orgId)
-        .is("archived_at", null),
-      channel,
-    );
+    let rowsQ = supabase
+      .from("leads")
+      .select("id, full_name, email, phone, company_name", { count: "exact" })
+      .eq("organization_id", orgId)
+      .is("archived_at", null);
+    if (data.channel_filter !== "all") {
+      rowsQ = applyChannelFilter(rowsQ, data.channel_filter);
+    }
 
     const q = data.search.trim();
     if (q) {
@@ -298,7 +299,7 @@ export const listEligibleLeadsPage = createServerFn({ method: "POST" })
       .order("full_name", { ascending: true, nullsFirst: false })
       .range(from, to);
 
-    const { data: rows, count: pageCount, error } = await rowsQ;
+    const { data: rows, count: filteredCount, error } = await rowsQ;
     if (error) throw new Error(error.message);
 
     let pageRows = (rows ?? []) as Array<{
@@ -313,6 +314,15 @@ export const listEligibleLeadsPage = createServerFn({ method: "POST" })
       pageRows = pageRows.filter((r) => !set.has(r.id));
     }
 
+    const annotated = pageRows.map((r) => ({
+      ...r,
+      eligible_for_campaign: isLeadEligibleForChannel(
+        { email: r.email, phone: r.phone },
+        channel,
+      ),
+    }));
+
+    const filtered_total = filteredCount ?? 0;
     const total = data.only_new
       ? Math.max(0, eligible_total - already_enrolled)
       : eligible_total;
@@ -322,8 +332,9 @@ export const listEligibleLeadsPage = createServerFn({ method: "POST" })
       page: data.page,
       page_size: data.page_size,
       total,
-      page_total: pageCount ?? 0,
-      rows: pageRows,
+      filtered_total,
+      page_total: filteredCount ?? 0,
+      rows: annotated,
       counts: {
         org_total,
         eligible_total,
