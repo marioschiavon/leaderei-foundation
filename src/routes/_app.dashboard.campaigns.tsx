@@ -751,6 +751,7 @@ function ManageLeadsDialog({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [channelFilter, setChannelFilter] = useState<"all" | "whatsapp" | "email">("all");
   const pageSize = 50;
 
   useEffect(() => {
@@ -760,7 +761,7 @@ function ManageLeadsDialog({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, channelFilter]);
 
   useEffect(() => {
     if (!open) {
@@ -768,12 +769,13 @@ function ManageLeadsDialog({
       setSearch("");
       setDebouncedSearch("");
       setPage(1);
+      setChannelFilter("all");
     }
   }, [open]);
 
   const eligibleQ = useQuery({
     enabled: open,
-    queryKey: ["eligible-leads-page", campaignId, debouncedSearch, page, pageSize],
+    queryKey: ["eligible-leads-page", campaignId, debouncedSearch, page, pageSize, channelFilter],
     queryFn: () =>
       eligiblePageFn({
         data: {
@@ -782,6 +784,7 @@ function ManageLeadsDialog({
           page_size: pageSize,
           search: debouncedSearch,
           only_new: true,
+          channel_filter: channelFilter,
         },
       }),
     placeholderData: (prev) => prev,
@@ -804,10 +807,12 @@ function ManageLeadsDialog({
     email: string | null;
     phone: string | null;
     company_name: string | null;
+    eligible_for_campaign: boolean;
   }>;
   const counts = eligibleQ.data?.counts;
   const total = eligibleQ.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const filteredTotal = eligibleQ.data?.filtered_total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / pageSize));
   const channelLabel =
     channel === "whatsapp" || channel === "sms"
       ? "WhatsApp"
@@ -933,6 +938,10 @@ function ManageLeadsDialog({
                       </strong>{" "}
                       leads na org ·{" "}
                       <strong className="text-foreground">
+                        {filteredTotal.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      no filtro atual ·{" "}
+                      <strong className="text-foreground">
                         {counts.eligible_total.toLocaleString("pt-BR")}
                       </strong>{" "}
                       elegíveis para {channelLabel} ·{" "}
@@ -967,66 +976,110 @@ function ManageLeadsDialog({
                       className="h-9 pl-9"
                     />
                   </div>
+                  <Select
+                    value={channelFilter}
+                    onValueChange={(v) =>
+                      setChannelFilter(v as "all" | "whatsapp" | "email")
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os leads</SelectItem>
+                      <SelectItem value="whatsapp">Com WhatsApp</SelectItem>
+                      <SelectItem value="email">Com email</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      const pageIds = pageRows.map((l) => l.id);
+                      const eligibleIds = pageRows
+                        .filter((l) => l.eligible_for_campaign)
+                        .map((l) => l.id);
                       const allPageSelected =
-                        pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+                        eligibleIds.length > 0 &&
+                        eligibleIds.every((id) => selected.has(id));
                       const next = new Set(selected);
                       if (allPageSelected) {
-                        for (const id of pageIds) next.delete(id);
+                        for (const id of eligibleIds) next.delete(id);
                       } else {
-                        for (const id of pageIds) next.add(id);
+                        for (const id of eligibleIds) next.add(id);
                       }
                       setSelected(next);
                     }}
-                    disabled={pageRows.length === 0}
+                    disabled={
+                      pageRows.filter((l) => l.eligible_for_campaign).length === 0
+                    }
                   >
-                    {pageRows.length > 0 &&
-                    pageRows.every((l) => selected.has(l.id))
-                      ? "Limpar página"
-                      : "Selecionar página"}
+                    {(() => {
+                      const elig = pageRows.filter((l) => l.eligible_for_campaign);
+                      return elig.length > 0 && elig.every((l) => selected.has(l.id))
+                        ? "Limpar página"
+                        : "Selecionar página";
+                    })()}
                   </Button>
                 </div>
 
                 <div className="max-h-[45vh] overflow-y-auto rounded-md border">
                   {pageRows.length === 0 ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
-                      {total === 0
+                      {filteredTotal === 0
                         ? debouncedSearch
                           ? "Nenhum lead corresponde à busca."
-                          : "Todos os leads elegíveis já estão inscritos."
+                          : channelFilter !== "all"
+                            ? "Nenhum lead corresponde ao filtro."
+                            : "Todos os leads já estão inscritos."
                         : "Nenhum lead corresponde à busca."}
                     </div>
                   ) : (
                     <ul className="divide-y">
                       {pageRows.map((l) => {
                         const checked = selected.has(l.id);
+                        const eligible = l.eligible_for_campaign;
+                        const missingLabel =
+                          channel === "email"
+                            ? "Sem email"
+                            : channel === "whatsapp" || channel === "sms"
+                              ? "Sem WhatsApp"
+                              : "Sem contato";
                         return (
                           <li
                             key={l.id}
-                            className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface-muted/40"
+                            className={`flex items-center gap-3 px-3 py-2 ${
+                              eligible
+                                ? "cursor-pointer hover:bg-surface-muted/40"
+                                : "cursor-not-allowed opacity-60"
+                            }`}
+                            title={
+                              eligible
+                                ? undefined
+                                : `Lead não tem ${missingLabel.replace("Sem ", "").toLowerCase()} cadastrado — não pode ser adicionado a esta campanha`
+                            }
                             onClick={() => {
+                              if (!eligible) return;
                               const next = new Set(selected);
                               if (checked) next.delete(l.id);
                               else next.add(l.id);
                               setSelected(next);
                             }}
                           >
-                            <Checkbox checked={checked} />
+                            <Checkbox checked={checked} disabled={!eligible} />
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium">
-                                {l.full_name ?? "Sem nome"}
+                              <div className="flex items-center gap-2 truncate text-sm font-medium">
+                                <span className="truncate">
+                                  {l.full_name ?? "Sem nome"}
+                                </span>
+                                {!eligible && (
+                                  <span className="rounded bg-surface-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+                                    {missingLabel}
+                                  </span>
+                                )}
                               </div>
                               <div className="truncate text-xs text-muted-foreground">
-                                {channel === "email"
-                                  ? l.email
-                                  : channel === "whatsapp" || channel === "sms"
-                                    ? l.phone
-                                    : (l.email ?? l.phone ?? "—")}
+                                {l.email ?? l.phone ?? "—"}
                                 {l.company_name && ` · ${l.company_name}`}
                               </div>
                             </div>
@@ -1039,8 +1092,8 @@ function ManageLeadsDialog({
 
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-muted-foreground">
-                    {total > 0
-                      ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} de ${total.toLocaleString("pt-BR")}`
+                    {filteredTotal > 0
+                      ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredTotal)} de ${filteredTotal.toLocaleString("pt-BR")}`
                       : "0 de 0"}{" "}
                     · {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
                   </div>
