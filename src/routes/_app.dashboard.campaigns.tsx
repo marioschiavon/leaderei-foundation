@@ -938,6 +938,10 @@ function ManageLeadsDialog({
                       </strong>{" "}
                       leads na org ·{" "}
                       <strong className="text-foreground">
+                        {filteredTotal.toLocaleString("pt-BR")}
+                      </strong>{" "}
+                      no filtro atual ·{" "}
+                      <strong className="text-foreground">
                         {counts.eligible_total.toLocaleString("pt-BR")}
                       </strong>{" "}
                       elegíveis para {channelLabel} ·{" "}
@@ -972,28 +976,50 @@ function ManageLeadsDialog({
                       className="h-9 pl-9"
                     />
                   </div>
+                  <Select
+                    value={channelFilter}
+                    onValueChange={(v) =>
+                      setChannelFilter(v as "all" | "whatsapp" | "email")
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os leads</SelectItem>
+                      <SelectItem value="whatsapp">Com WhatsApp</SelectItem>
+                      <SelectItem value="email">Com email</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      const pageIds = pageRows.map((l) => l.id);
+                      const eligibleIds = pageRows
+                        .filter((l) => l.eligible_for_campaign)
+                        .map((l) => l.id);
                       const allPageSelected =
-                        pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+                        eligibleIds.length > 0 &&
+                        eligibleIds.every((id) => selected.has(id));
                       const next = new Set(selected);
                       if (allPageSelected) {
-                        for (const id of pageIds) next.delete(id);
+                        for (const id of eligibleIds) next.delete(id);
                       } else {
-                        for (const id of pageIds) next.add(id);
+                        for (const id of eligibleIds) next.add(id);
                       }
                       setSelected(next);
                     }}
-                    disabled={pageRows.length === 0}
+                    disabled={
+                      pageRows.filter((l) => l.eligible_for_campaign).length === 0
+                    }
                   >
-                    {pageRows.length > 0 &&
-                    pageRows.every((l) => selected.has(l.id))
-                      ? "Limpar página"
-                      : "Selecionar página"}
+                    {(() => {
+                      const elig = pageRows.filter((l) => l.eligible_for_campaign);
+                      return elig.length > 0 && elig.every((l) => selected.has(l.id))
+                        ? "Limpar página"
+                        : "Selecionar página";
+                    })()}
                   </Button>
                 </div>
 
