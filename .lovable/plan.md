@@ -1,50 +1,63 @@
-## Objetivo
+## Diagnóstico (causa raiz, confirmada no banco)
 
-No modal "Adicionar lead" de uma campanha, mostrar **todos os leads da organização** por padrão (não só os elegíveis ao canal da campanha), e oferecer um **filtro de canal** opcional (Todos / Com WhatsApp / Com Email) para o usuário refinar quando quiser.
+Você **não renomeou** "teste" para "teste 2". São duas campanhas distintas, em organizações distintas:
 
-## Problema atual
+| Campanha | Org | Criada por | Quando |
+|---|---|---|---|
+| `teste` | **S7** (sua) | Mario | 07/06 |
+| `teste 2` | **Rafa Minoru INC** (não é sua) | Rafael Hirata | 11/06 |
 
-Hoje `listEligibleLeadsPage` força o filtro pelo `campaign.channel` no banco. Numa campanha WhatsApp, leads que só têm email somem da lista — o usuário vê uma lista vazia ou muito menor e não entende porquê.
+Você não conhece o Rafael — ele criou conta separada, com a própria organização. Até aí, tudo certo: contas e orgs estão de fato separadas no banco.
+
+**O bug real:** a "teste 2" aparece na sua tela `/dashboard/campaigns` porque toda tabela de tenant tem uma política RLS extra do tipo:
+
+```
+"Master admins manage all <tabela>"  USING (has_role(auth.uid(), 'master_admin'))
+```
+
+Existe em ~35 tabelas (campaigns, leads, conversations, messages, deals, lead_activities, builder_documents, flow_*, hook7_instances, etc.). Como você é `master_admin`, essa política te dá acesso a **todas as orgs** mesmo quando você está navegando pelas rotas normais de tenant — que dependem só do RLS para isolar (não filtram por `organization_id` no código).
+
+Resultado: no `/dashboard` você vê campanhas/leads/conversas de qualquer empresa. Foi exatamente o que aconteceu — colisão de nome ("teste" vs "teste 2") amplificou a confusão, mas o vazamento existiria mesmo sem nomes parecidos.
+
+O painel `/master/*` **não depende dessas policies** — `src/lib/master.functions.ts` usa `supabaseAdmin` (service role, bypassa RLS). Ou seja, remover as policies de master nas tabelas de tenant **não quebra** o painel master.
+
+## Decisão
+
+Sua regra: master_admin só vê dados de outras orgs **dentro de `/master/*`**. Nas rotas comuns (`/dashboard/*`) ele é tratado como membro normal — vê só as orgs em que é membro de fato (no seu caso, só S7).
 
 ## Mudanças
 
-### 1. Backend — `src/lib/campaigns.functions.ts`
+### 1. Migration — remover policies `Master admins manage all *` das tabelas de tenant
 
-Em `listEligibleLeadsPage`:
+`DROP POLICY` em todas as ~35 tabelas listadas acima. A política `"Org members ..."` (`is_org_member(auth.uid(), organization_id)`) continua sendo a única regra de leitura/escrita no contexto autenticado. Resultado prático:
 
-- Adicionar input `channel_filter: "all" | "whatsapp" | "email"` (default `"all"`).
-- `"all"` → não aplica `applyChannelFilter` nas queries de `rows` e `total`. Carrega todos os leads da org (não arquivados), paginados.
-- `"whatsapp"` → aplica filtro por telefone preenchido.
-- `"email"` → aplica filtro por email válido.
-- Manter os `counts` agregados como já estão (`org_total`, `eligible_total` calculado pelo canal **da campanha**, `already_enrolled`, `missing_channel`) — eles continuam servindo como contexto.
-- Adicionar no retorno `filtered_total` = total da query aplicada (com o `channel_filter` atual), para a paginação refletir o que o usuário está vendo.
-- Por linha, devolver também `eligible_for_campaign: boolean` (calculado com `isLeadEligibleForChannel(lead, campaign.channel)`) para o front poder marcar/desabilitar adequadamente.
+- `/dashboard/campaigns` → você vê apenas campanhas da S7.
+- `/dashboard/leads` → apenas leads da S7 (que continuam sendo os 5.013).
+- Inbox, pipeline, builder, integrações → idem.
+- `/master/organizations`, `/master/users`, `/master/logs`, etc. → continuam funcionando idênticos, porque usam `supabaseAdmin`.
 
-Nada muda em `listEligibleLeadsForCampaign` nem em `activateCampaign` — eles continuam sendo a fonte de verdade da ativação inicial e já filtram inelegíveis.
+**Tabelas que ficam fora do drop** (não são tenant data, master precisa mesmo via auth):
+- `platform_settings`, `ai_platform_settings`, `integration_providers`, `plans`, `subscriptions`, `audit_logs` — são globais/admin por natureza, mantêm a policy de master.
+- `organizations` e `organization_members` — mantêm a policy de master para o painel `/master/organizations` listar/editar.
 
-### 2. Frontend — `src/routes/_app.dashboard.campaigns.tsx` (`ManageEnrollmentsDialog`)
+### 2. Verificação rápida no código (sem mudanças, só confirmação)
 
-- Novo estado `channelFilter` (default `"all"`), incluído no `queryKey` e passado para a server fn.
-- Acima da lista, ao lado da busca, um `Select` compacto:
-  - Todos os leads
-  - Com WhatsApp
-  - Com email
-- A linha-resumo passa a mostrar: `5.013 leads na org · {filtered_total} no filtro atual · {eligible_total} elegíveis para {canal da campanha} · {already_enrolled} já inscritos`.
-- Paginação usa `filtered_total` em vez de `total`.
-- Em cada linha:
-  - Se `eligible_for_campaign === false`, mostrar badge cinza "Sem {canal}" e **desabilitar o checkbox** com tooltip "Lead não tem {email|WhatsApp} cadastrado — não pode ser adicionado a esta campanha". Isso evita o usuário inscrever leads que o `activateCampaign` ignoraria silenciosamente.
-- "Selecionar página" e "Selecionar todos os N" só consideram os elegíveis (`eligible_for_campaign === true`) presentes na página/total.
-- O contador da aba "Adicionar · N" continua usando `eligible_total - already_enrolled` (intenção: novos elegíveis), independente do filtro visual.
+- `src/lib/tenant.functions.ts`, `src/lib/campaigns.functions.ts`, `src/lib/inbox.functions.ts`, `src/lib/builder.functions.ts`: já usam `context.supabase` (cliente autenticado do usuário) + filtros por `organization_id` derivados do membership. Vão continuar funcionando — passam a retornar só a org do usuário automaticamente.
+- `src/lib/master.functions.ts`: usa `supabaseAdmin`. Não muda nada.
 
-### 3. Sem mudança de schema, sem mexer em ativação
+### 3. Nada de UI nesta rodada
 
-Não há migration. `activateCampaign`, `ActivateCampaignDialog`, Builder, Inbox, página de Leads e pg_cron permanecem intactos.
+Você mencionou uma futura "aba de suporte dentro do /dashboard para master ver dados de uma org específica". Isso fica para depois — não entra agora.
 
-## Gate de aceite
+## O que NÃO faço
 
-1. Abrir "Adicionar leads" numa campanha WhatsApp mostra por padrão **todos** os leads da org paginados, não só os com telefone.
-2. Trocar o filtro para "Com WhatsApp" reduz a lista para os elegíveis; "Com email" mostra os com email; "Todos os leads" volta a mostrar tudo.
-3. Leads sem o canal da campanha aparecem com badge "Sem WhatsApp/email" e checkbox desabilitado com tooltip explicativo.
-4. Busca e paginação funcionam dentro do filtro escolhido (contagem `X–Y de N` reflete o filtro).
-5. Linha-resumo informa quantos são elegíveis para o canal da campanha mesmo quando o filtro é "Todos".
-6. Ativação inicial (`ActivateCampaignDialog`) continua se comportando exatamente como hoje.
+- Não apago a campanha "teste 2", nem a org "Rafa Minoru INC", nem a conta do Rafael. Ele é um usuário legítimo da plataforma com a própria org.
+- Não toco em `/master/*`.
+- Não mexo nas rotas/queries do `/dashboard` (a correção é 100% no nível de RLS).
+
+## Critério de aceite
+
+1. Logado como `mariors07@gmail.com` em `/dashboard/campaigns` → "teste 2" **não aparece** (só campanhas da S7).
+2. `/dashboard/leads` continua mostrando os 5.013 leads da S7.
+3. `/master/organizations` continua listando todas as orgs (S7, Rafa Minoru INC, Demo teste).
+4. Logado como Rafael em `/dashboard/campaigns` → ele continua vendo "teste 2" (org dele).
