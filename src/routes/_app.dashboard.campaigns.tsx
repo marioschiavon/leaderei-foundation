@@ -807,10 +807,12 @@ function ManageLeadsDialog({
     email: string | null;
     phone: string | null;
     company_name: string | null;
+    eligible_for_campaign: boolean;
   }>;
   const counts = eligibleQ.data?.counts;
   const total = eligibleQ.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const filteredTotal = eligibleQ.data?.filtered_total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / pageSize));
   const channelLabel =
     channel === "whatsapp" || channel === "sms"
       ? "WhatsApp"
