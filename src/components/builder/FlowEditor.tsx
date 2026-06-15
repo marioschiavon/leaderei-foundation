@@ -1196,8 +1196,10 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
 
   function applyErrors(errs: Array<{ step_id: string | null; message: string }>) {
     const byId = new Map<string, string>();
+    const globals: string[] = [];
     for (const e of errs) {
       if (e.step_id) byId.set(e.step_id, e.message);
+      else globals.push(e.message);
     }
     setNodes((nds) =>
       nds.map((n) => ({
@@ -1205,7 +1207,9 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
         data: { ...n.data, errorMessage: byId.get(n.id) },
       })),
     );
+    for (const msg of globals) toast.error(msg);
   }
+
   function clearErrors() {
     setNodes((nds) =>
       nds.map((n) => ({ ...n, data: { ...n.data, errorMessage: undefined } })),

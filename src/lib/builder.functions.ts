@@ -278,11 +278,51 @@ function validateGraph(
     // Per-type config validation
     try {
       const cfg = validateConfigForType(s.type, s.config) as any;
+      // Always-on semantic checks (run regardless of strict)
+      if (s.type === "ai_generate_text") {
+        if (!cfg.output_label?.trim()) {
+          errors.push({
+            step_id: s.id,
+            message: "Gerar texto (IA): rótulo de saída é obrigatório.",
+          });
+        }
+        if (!cfg.channel_hint) {
+          errors.push({
+            step_id: s.id,
+            message: "Gerar texto (IA): canal de destino é obrigatório.",
+          });
+        }
+      }
+      if (s.type === "message_whatsapp") {
+        if (cfg.body_source === "ai") {
+          if (!cfg.ai_text_label?.trim()) {
+            errors.push({
+              step_id: s.id,
+              message: "WhatsApp: selecione qual texto de IA usar.",
+            });
+          }
+        } else if (opts.strict) {
+          if (!cfg.body?.trim()) {
+            errors.push({
+              step_id: s.id,
+              message: "WhatsApp: mensagem não pode estar vazia.",
+            });
+          }
+        }
+      }
+      if (s.type === "message_email" && cfg.body_source === "ai") {
+        if (!cfg.ai_text_label?.trim()) {
+          errors.push({
+            step_id: s.id,
+            message: "Email: selecione qual texto de IA usar.",
+          });
+        }
+      }
       if (opts.strict) {
         if (s.type === "message_email") {
           if (!cfg.subject?.trim())
             errors.push({ step_id: s.id, message: "Email: assunto vazio." });
-          if (!cfg.body_html?.trim())
+          if (cfg.body_source !== "ai" && !cfg.body_html?.trim())
             errors.push({ step_id: s.id, message: "Email: corpo vazio." });
         }
         if (s.type === "wait") {
@@ -300,6 +340,7 @@ function validateGraph(
         message: `Configuração inválida: ${(e as Error).message}`,
       });
     }
+
   }
   return errors;
 }
