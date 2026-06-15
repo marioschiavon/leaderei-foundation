@@ -1462,6 +1462,8 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
             <ConfigPanel
               node={selectedNode}
               onChange={updateSelectedConfig}
+              allNodes={nodes}
+              edges={edges}
             />
           </aside>
         )}
