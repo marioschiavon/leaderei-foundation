@@ -2334,3 +2334,169 @@ function AiMessagePanel({
     </div>
   );
 }
+
+function AiGenerateTextPanel({
+  node, onChange,
+}: { node: StepNode; onChange: (patch: Record<string, any>) => void }) {
+  const cfg = node.data.config as {
+    output_label?: string;
+    channel_hint?: "whatsapp" | "email";
+    task_instruction?: string;
+    mood_slug?: string | null;
+    approach_slug?: string | null;
+    length_slug?: string | null;
+    language_slug?: string | null;
+    extra_context?: string | null;
+    must_include?: string | null;
+  };
+  const fetchPresets = useServerFn(listAiTonePresets);
+  const previewFn = useServerFn(previewAiMessage);
+  const { data: presets } = useQuery({
+    queryKey: ["ai-tone-presets"],
+    queryFn: () => fetchPresets(),
+    staleTime: 5 * 60_000,
+  });
+  const [labelTouched, setLabelTouched] = useState(false);
+  const [preview, setPreview] = useState<{ text: string; tokens_in: number; tokens_out: number; cost_usd: number; model: string } | null>(null);
+  const previewMut = useMutation({
+    mutationFn: () => previewFn({
+      data: {
+        stepConfig: {
+          mood_slug: cfg.mood_slug ?? null,
+          approach_slug: cfg.approach_slug ?? null,
+          length_slug: cfg.length_slug ?? null,
+          language_slug: cfg.language_slug ?? null,
+          extra_context: cfg.extra_context ?? null,
+          must_include: cfg.must_include ?? null,
+        },
+        channel: cfg.channel_hint ?? "whatsapp",
+        task_instruction: cfg.task_instruction ?? null,
+      },
+    }),
+    onSuccess: (r: any) => setPreview(r),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const label = cfg.output_label ?? "";
+  const labelInvalid = labelTouched && !label.trim();
+  const slug = slugifyLabel(label);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border bg-surface-muted/30 p-3 space-y-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saída</div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-out-label">Rótulo de saída</Label>
+          <Input
+            id="ai-out-label"
+            value={label}
+            onChange={(e) => onChange({ output_label: e.target.value })}
+            onBlur={() => setLabelTouched(true)}
+            placeholder="ex: abertura, follow_up_1"
+            className={cn(labelInvalid && "border-destructive focus-visible:ring-destructive")}
+          />
+          {labelInvalid ? (
+            <p className="text-[11px] text-destructive">Rótulo obrigatório.</p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">Use este nome no step de envio para usar este texto.</p>
+          )}
+          {label && (
+            <p className="text-[11px] text-muted-foreground">
+              Slug: <code className="font-mono">{slug || "—"}</code>
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Canal de destino</Label>
+          <Select
+            value={cfg.channel_hint ?? "whatsapp"}
+            onValueChange={(v) => onChange({ channel_hint: v })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+              <SelectItem value="email">📧 Email</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            Define o formato da saída e quais steps de envio podem usar este texto.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conteúdo</div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-gt-task">Instrução específica</Label>
+          <Textarea
+            id="ai-gt-task"
+            rows={4}
+            maxLength={500}
+            value={cfg.task_instruction ?? ""}
+            onChange={(e) => onChange({ task_instruction: e.target.value })}
+            placeholder="Ex.: Escreva a primeira mensagem fria, mencionando o setor do lead."
+          />
+          <p className="text-[10px] text-muted-foreground text-right">{(cfg.task_instruction ?? "").length}/500</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <AiPresetSelect label="Humor" kind="mood" value={cfg.mood_slug} presets={presets ?? []} onChange={(v) => onChange({ mood_slug: v })} />
+          <AiPresetSelect label="Abordagem" kind="approach" value={cfg.approach_slug} presets={presets ?? []} onChange={(v) => onChange({ approach_slug: v })} />
+          <AiPresetSelect label="Tamanho" kind="length" value={cfg.length_slug} presets={presets ?? []} onChange={(v) => onChange({ length_slug: v })} />
+          <AiPresetSelect label="Idioma" kind="language" value={cfg.language_slug} presets={presets ?? []} onChange={(v) => onChange({ language_slug: v })} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-gt-extra">Contexto extra (opcional)</Label>
+          <Textarea
+            id="ai-gt-extra"
+            rows={2}
+            maxLength={280}
+            value={cfg.extra_context ?? ""}
+            onChange={(e) => onChange({ extra_context: e.target.value || null })}
+            placeholder="Ex.: o lead baixou o whitepaper na semana passada."
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-gt-include">Precisa mencionar (opcional)</Label>
+          <Input
+            id="ai-gt-include"
+            maxLength={280}
+            value={cfg.must_include ?? ""}
+            onChange={(e) => onChange({ must_include: e.target.value || null })}
+            placeholder="Ex.: desconto de lançamento até sexta."
+          />
+        </div>
+      </div>
+
+      <div className="rounded-md border bg-background p-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium">Pré-visualizar texto</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => previewMut.mutate()} disabled={previewMut.isPending}>
+            {previewMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            Gerar
+          </Button>
+        </div>
+        {preview && (
+          <div className="mt-2 space-y-1">
+            <div className="whitespace-pre-wrap rounded border bg-surface p-2 text-xs">{preview.text}</div>
+            <div className="text-[10px] text-muted-foreground">
+              {preview.model} · {preview.tokens_in}/{preview.tokens_out} tokens · ${preview.cost_usd.toFixed(5)}
+            </div>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-muted-foreground">
+          Este é um preview — o texto real será gerado quando o fluxo executar.
+        </p>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Este step apenas gera o texto e salva no contexto da execução. Use um step de envio (WhatsApp ou Email) à frente com a origem definida como "Gerado por IA" para enviar.
+      </p>
+    </div>
+  );
+}
