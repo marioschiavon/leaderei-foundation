@@ -678,10 +678,47 @@ function AiMessageNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function AiGenerateTextNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { output_label?: string; channel_hint?: string };
+  const hasLabel = !!cfg.output_label?.trim();
+  const channelIcon = cfg.channel_hint === "email" ? "📧" : "💬";
+  const channelName = cfg.channel_hint === "email" ? "Email" : "WhatsApp";
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Sparkles} label="Gerar texto (IA)" />
+      <div style={{ padding: "10px 12px", fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+        {hasLabel ? (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4, alignSelf: "flex-start",
+            fontSize: 11, padding: "2px 6px", borderRadius: 4,
+            background: "#ede9fe", color: "#6d28d9", fontWeight: 500,
+          }}>
+            💾 {cfg.output_label}
+          </span>
+        ) : (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4, alignSelf: "flex-start",
+            fontSize: 11, padding: "2px 6px", borderRadius: 4,
+            background: "#fef3c7", color: "#92400e", fontWeight: 500,
+          }}>
+            ⚠️ Sem rótulo
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: COLORS.muted }}>
+          {channelIcon} {channelName}
+        </span>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
   ai_message: AiMessageNode,
+  ai_generate_text: AiGenerateTextNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
   calcom_check_availability: CalCheckAvailabilityNode,
