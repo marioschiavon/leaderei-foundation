@@ -143,6 +143,7 @@ const PALETTE: Array<{
   { type: "condition_replied", label: "Condição: respondeu?", icon: GitBranch, enabled: true },
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
   { type: "ai_message", label: "Mensagem com IA", icon: Sparkles, enabled: true },
+  { type: "ai_generate_text", label: "Gerar texto (IA)", icon: Sparkles, enabled: true },
   { type: "calcom_check_availability", label: "Consultar agenda", icon: CalendarSearch, enabled: true },
   { type: "calcom_book_meeting", label: "Agendar reunião", icon: CalendarCheck, enabled: true },
   { type: "calcom_reschedule_booking", label: "Reagendar reunião", icon: CalendarClock, enabled: true },
