@@ -380,8 +380,9 @@ function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
 }
 
 function WhatsAppStepNode({ data, selected }: NodeProps<StepNode>) {
-  const cfg = data.config as { body?: string };
-  const isComplete = !!cfg.body?.trim();
+  const cfg = data.config as { body?: string; body_source?: string; ai_text_label?: string };
+  const isAi = cfg.body_source === "ai";
+  const isComplete = isAi ? !!cfg.ai_text_label : !!cfg.body?.trim();
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
