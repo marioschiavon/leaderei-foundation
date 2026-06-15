@@ -11,6 +11,7 @@ const STEP_TYPES = [
   "message_whatsapp",
   "message_linkedin",
   "ai_message",
+  "ai_generate_text",
   "wait",
   "condition_replied",
   "action",
