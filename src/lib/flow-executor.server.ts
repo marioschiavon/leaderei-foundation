@@ -826,6 +826,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         title: `Texto IA gerado: ${cfg.output_label}`,
         description: aiText.slice(0, 120) + (aiText.length > 120 ? "…" : ""),
         payload: {
+          kind: "ai_text_generated",
           enrollment_id: en.id,
           step_id: step.id,
           slug,
