@@ -101,6 +101,7 @@ type StepType =
   | "message_whatsapp"
   | "message_linkedin"
   | "ai_message"
+  | "ai_generate_text"
   | "wait"
   | "condition_replied"
   | "action"
@@ -142,6 +143,7 @@ const PALETTE: Array<{
   { type: "condition_replied", label: "Condição: respondeu?", icon: GitBranch, enabled: true },
   { type: "message_whatsapp", label: "WhatsApp", icon: MessageCircle, enabled: true },
   { type: "ai_message", label: "Mensagem com IA", icon: Sparkles, enabled: true },
+  { type: "ai_generate_text", label: "Gerar texto (IA)", icon: Sparkles, enabled: true },
   { type: "calcom_check_availability", label: "Consultar agenda", icon: CalendarSearch, enabled: true },
   { type: "calcom_book_meeting", label: "Agendar reunião", icon: CalendarCheck, enabled: true },
   { type: "calcom_reschedule_booking", label: "Reagendar reunião", icon: CalendarClock, enabled: true },
@@ -165,6 +167,17 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
     language_slug: null,
     extra_context: "",
     must_include: "",
+  },
+  ai_generate_text: {
+    output_label: "",
+    channel_hint: "whatsapp",
+    task_instruction: "",
+    mood_slug: null,
+    approach_slug: null,
+    length_slug: null,
+    language_slug: null,
+    extra_context: null,
+    must_include: null,
   },
   wait: { duration_value: 1, duration_unit: "days" },
   condition_replied: { scope: "any_channel", timeout_value: 3, timeout_unit: "days" },
@@ -204,6 +217,48 @@ function branchColor(b: string): string {
       return COLORS.no;
     default: return COLORS.edge;
   }
+}
+
+// Slugify a label exactly the same way the executor does (slugifyLabel).
+function slugifyLabel(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+// Reverse BFS over edges: find ai_generate_text ancestors of currentNodeId
+// whose channel_hint matches and whose output_label is set.
+function getUpstreamAiTexts(
+  currentNodeId: string,
+  allNodes: StepNode[],
+  edges: Edge[],
+  channelFilter: "email" | "whatsapp",
+): Array<{ nodeId: string; label: string; slug: string }> {
+  const ancestors = new Set<string>();
+  const queue: string[] = [currentNodeId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.target === id && !ancestors.has(edge.source)) {
+        ancestors.add(edge.source);
+        queue.push(edge.source);
+      }
+    }
+  }
+  return allNodes
+    .filter((n) => {
+      if (!ancestors.has(n.id)) return false;
+      if (n.type !== "ai_generate_text") return false;
+      const cfg = (n.data?.config ?? {}) as any;
+      return !!cfg.output_label && cfg.channel_hint === channelFilter;
+    })
+    .map((n) => {
+      const label: string = (n.data.config as any).output_label;
+      return { nodeId: n.id, label, slug: slugifyLabel(label) };
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -278,8 +333,9 @@ function NodeHeader({ icon: Icon, label }: { icon: any; label: string }) {
 }
 
 function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
-  const cfg = data.config as { subject?: string; body_html?: string };
-  const isComplete = !!cfg.subject?.trim() && !!cfg.body_html?.trim();
+  const cfg = data.config as { subject?: string; body_html?: string; body_source?: string; ai_text_label?: string };
+  const isAi = cfg.body_source === "ai";
+  const isComplete = !!cfg.subject?.trim() && (isAi ? !!cfg.ai_text_label : !!cfg.body_html?.trim());
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
@@ -296,6 +352,12 @@ function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
         >
           {cfg.subject || "Sem assunto"}
         </div>
+        {isAi && cfg.ai_text_label && (
+          <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#7c3aed" }}>
+            <Sparkles size={10} />
+            <span>IA: {cfg.ai_text_label}</span>
+          </div>
+        )}
         <div
           style={{
             marginTop: 8,
@@ -318,8 +380,9 @@ function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
 }
 
 function WhatsAppStepNode({ data, selected }: NodeProps<StepNode>) {
-  const cfg = data.config as { body?: string };
-  const isComplete = !!cfg.body?.trim();
+  const cfg = data.config as { body?: string; body_source?: string; ai_text_label?: string };
+  const isAi = cfg.body_source === "ai";
+  const isComplete = isAi ? !!cfg.ai_text_label : !!cfg.body?.trim();
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
@@ -339,8 +402,14 @@ function WhatsAppStepNode({ data, selected }: NodeProps<StepNode>) {
             minHeight: 32,
           }}
         >
-          {cfg.body || "Sem mensagem"}
+          {isAi ? (cfg.ai_text_label ? "Texto gerado por IA" : "Sem texto selecionado") : (cfg.body || "Sem mensagem")}
         </div>
+        {isAi && cfg.ai_text_label && (
+          <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#7c3aed" }}>
+            <Sparkles size={10} />
+            <span>IA: {cfg.ai_text_label}</span>
+          </div>
+        )}
         <div
           style={{
             marginTop: 8,
@@ -623,10 +692,47 @@ function AiMessageNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function AiGenerateTextNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { output_label?: string; channel_hint?: string };
+  const hasLabel = !!cfg.output_label?.trim();
+  const channelIcon = cfg.channel_hint === "email" ? "📧" : "💬";
+  const channelName = cfg.channel_hint === "email" ? "Email" : "WhatsApp";
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Sparkles} label="Gerar texto (IA)" />
+      <div style={{ padding: "10px 12px", fontSize: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+        {hasLabel ? (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4, alignSelf: "flex-start",
+            fontSize: 11, padding: "2px 6px", borderRadius: 4,
+            background: "#ede9fe", color: "#6d28d9", fontWeight: 500,
+          }}>
+            💾 {cfg.output_label}
+          </span>
+        ) : (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4, alignSelf: "flex-start",
+            fontSize: 11, padding: "2px 6px", borderRadius: 4,
+            background: "#fef3c7", color: "#92400e", fontWeight: 500,
+          }}>
+            ⚠️ Sem rótulo
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: COLORS.muted }}>
+          {channelIcon} {channelName}
+        </span>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
   ai_message: AiMessageNode,
+  ai_generate_text: AiGenerateTextNode,
   wait: WaitStepNode,
   condition_replied: ConditionRepliedNode,
   calcom_check_availability: CalCheckAvailabilityNode,
@@ -1370,6 +1476,8 @@ function BuilderEditorInner({ documentId }: { documentId: string }) {
             <ConfigPanel
               node={selectedNode}
               onChange={updateSelectedConfig}
+              allNodes={nodes}
+              edges={edges}
             />
           </aside>
         )}
@@ -1411,12 +1519,18 @@ const EMAIL_VARS = [
 function ConfigPanel({
   node,
   onChange,
+  allNodes,
+  edges,
 }: {
   node: StepNode;
   onChange: (patch: Record<string, any>) => void;
+  allNodes: StepNode[];
+  edges: Edge[];
 }) {
-  if (node.type === "message_email") return <EmailPanel node={node} onChange={onChange} />;
-  if (node.type === "message_whatsapp") return <WhatsAppPanel node={node} onChange={onChange} />;
+  if (node.type === "message_email")
+    return <EmailPanel node={node} onChange={onChange} allNodes={allNodes} edges={edges} />;
+  if (node.type === "message_whatsapp")
+    return <WhatsAppPanel node={node} onChange={onChange} allNodes={allNodes} edges={edges} />;
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
@@ -1430,6 +1544,8 @@ function ConfigPanel({
     return <CalEventTypePanel node={node} onChange={onChange} kind="reschedule" />;
   if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
   if (node.type === "ai_message") return <AiMessagePanel node={node} onChange={onChange} />;
+  if (node.type === "ai_generate_text")
+    return <AiGenerateTextPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
@@ -1683,11 +1799,20 @@ function EndPanel({
 function WhatsAppPanel({
   node,
   onChange,
+  allNodes,
+  edges,
 }: {
   node: StepNode;
   onChange: (patch: Record<string, any>) => void;
+  allNodes: StepNode[];
+  edges: Edge[];
 }) {
-  const cfg = node.data.config as { body?: string };
+  const cfg = node.data.config as { body?: string; body_source?: "fixed" | "ai"; ai_text_label?: string };
+  const bodySource = cfg.body_source ?? "fixed";
+  const aiTexts = useMemo(
+    () => getUpstreamAiTexts(node.id, allNodes, edges, "whatsapp"),
+    [node.id, allNodes, edges],
+  );
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   function insertVar(v: string) {
@@ -1709,31 +1834,71 @@ function WhatsAppPanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label htmlFor="wa-body">Mensagem</Label>
-        <Textarea
-          id="wa-body"
-          ref={bodyRef}
-          rows={8}
-          value={cfg.body ?? ""}
-          onChange={(e) => onChange({ body: e.target.value })}
-          placeholder="Oi {{ lead.first_name }}, tudo bem?"
-        />
+        <Label className="text-xs font-medium text-muted-foreground">Origem do texto</Label>
+        <Select value={bodySource} onValueChange={(v) => onChange({ body_source: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fixed">✏️ Texto fixo</SelectItem>
+            <SelectItem value="ai">✨ Gerado por IA</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Variáveis</Label>
-        <div className="flex flex-wrap gap-1">
-          {EMAIL_VARS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => insertVar(v)}
-              className="rounded-md border bg-surface px-1.5 py-0.5 text-[11px] font-mono hover:bg-surface-muted"
+
+      {bodySource === "ai" ? (
+        aiTexts.length === 0 ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+            <p className="font-medium">Nenhum gerador de IA disponível</p>
+            <p className="mt-0.5">Adicione um step "Gerar texto (IA)" com canal WhatsApp antes deste no fluxo.</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Texto gerado por IA</Label>
+            <Select
+              value={cfg.ai_text_label ?? ""}
+              onValueChange={(v) => onChange({ ai_text_label: v })}
             >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+              <SelectTrigger><SelectValue placeholder="Selecionar texto..." /></SelectTrigger>
+              <SelectContent>
+                {aiTexts.map((item) => (
+                  <SelectItem key={item.nodeId} value={item.label}>
+                    <span className="font-medium">{item.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">💬 slug: {item.slug}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-body">Mensagem</Label>
+            <Textarea
+              id="wa-body"
+              ref={bodyRef}
+              rows={8}
+              value={cfg.body ?? ""}
+              onChange={(e) => onChange({ body: e.target.value })}
+              placeholder="Oi {{ lead.first_name }}, tudo bem?"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Variáveis</Label>
+            <div className="flex flex-wrap gap-1">
+              {EMAIL_VARS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVar(v)}
+                  className="rounded-md border bg-surface px-1.5 py-0.5 text-[11px] font-mono hover:bg-surface-muted"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
       <p className="text-xs text-muted-foreground">
         Requer uma instância WhatsApp conectada em Integrações. Leads sem telefone são ignorados.
       </p>
@@ -1746,11 +1911,26 @@ function WhatsAppPanel({
 function EmailPanel({
   node,
   onChange,
+  allNodes,
+  edges,
 }: {
   node: StepNode;
   onChange: (patch: Record<string, any>) => void;
+  allNodes: StepNode[];
+  edges: Edge[];
 }) {
-  const cfg = node.data.config as { subject?: string; body_html?: string; from_alias?: string };
+  const cfg = node.data.config as {
+    subject?: string;
+    body_html?: string;
+    from_alias?: string;
+    body_source?: "fixed" | "ai";
+    ai_text_label?: string;
+  };
+  const bodySource = cfg.body_source ?? "fixed";
+  const aiTexts = useMemo(
+    () => getUpstreamAiTexts(node.id, allNodes, edges, "email"),
+    [node.id, allNodes, edges],
+  );
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1789,61 +1969,102 @@ function EmailPanel({
           placeholder="padrão da org"
         />
       </div>
+
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label>Corpo (HTML)</Label>
-          <div className="flex rounded-md border text-xs">
-            <button
-              onClick={() => setMode("edit")}
-              className={cn(
-                "px-2 py-0.5",
-                mode === "edit" && "bg-muted font-medium",
-              )}
-            >
-              Editar
-            </button>
-            <button
-              onClick={() => setMode("preview")}
-              className={cn(
-                "px-2 py-0.5",
-                mode === "preview" && "bg-muted font-medium",
-              )}
-            >
-              Preview
-            </button>
+        <Label className="text-xs font-medium text-muted-foreground">Origem do texto</Label>
+        <Select value={bodySource} onValueChange={(v) => onChange({ body_source: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fixed">✏️ Texto fixo</SelectItem>
+            <SelectItem value="ai">✨ Gerado por IA</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {bodySource === "ai" ? (
+        aiTexts.length === 0 ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+            <p className="font-medium">Nenhum gerador de IA disponível</p>
+            <p className="mt-0.5">Adicione um step "Gerar texto (IA)" com canal Email antes deste no fluxo.</p>
           </div>
-        </div>
-        {mode === "edit" ? (
-          <Textarea
-            ref={bodyRef}
-            rows={10}
-            value={cfg.body_html ?? ""}
-            onChange={(e) => onChange({ body_html: e.target.value })}
-            className="font-mono text-xs"
-          />
         ) : (
-          <iframe
-            sandbox=""
-            srcDoc={cfg.body_html ?? "<em>vazio</em>"}
-            className="h-56 w-full rounded-md border bg-white"
-          />
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Variáveis disponíveis</Label>
-        <div className="flex flex-wrap gap-1">
-          {EMAIL_VARS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => insertVar(v)}
-              className="rounded-md border bg-background px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Texto gerado por IA</Label>
+            <Select
+              value={cfg.ai_text_label ?? ""}
+              onValueChange={(v) => onChange({ ai_text_label: v })}
             >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+              <SelectTrigger><SelectValue placeholder="Selecionar texto de email..." /></SelectTrigger>
+              <SelectContent>
+                {aiTexts.map((item) => (
+                  <SelectItem key={item.nodeId} value={item.label}>
+                    <span className="font-medium">{item.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">📧 slug: {item.slug}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Corpo (HTML)</Label>
+              <div className="flex rounded-md border text-xs">
+                <button
+                  onClick={() => setMode("edit")}
+                  className={cn(
+                    "px-2 py-0.5",
+                    mode === "edit" && "bg-muted font-medium",
+                  )}
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => setMode("preview")}
+                  className={cn(
+                    "px-2 py-0.5",
+                    mode === "preview" && "bg-muted font-medium",
+                  )}
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
+            {mode === "edit" ? (
+              <Textarea
+                ref={bodyRef}
+                rows={10}
+                value={cfg.body_html ?? ""}
+                onChange={(e) => onChange({ body_html: e.target.value })}
+                className="font-mono text-xs"
+              />
+            ) : (
+              <iframe
+                sandbox=""
+                srcDoc={cfg.body_html ?? "<em>vazio</em>"}
+                className="h-56 w-full rounded-md border bg-white"
+              />
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Variáveis disponíveis</Label>
+            <div className="flex flex-wrap gap-1">
+              {EMAIL_VARS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVar(v)}
+                  className="rounded-md border bg-background px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -2109,6 +2330,172 @@ function AiMessagePanel({
 
       <p className="text-xs text-muted-foreground">
         A IA gera o texto a cada execução, combinando o prompt mestre da plataforma + voz da sua marca + ajustes deste passo. O lead recebe pelo canal escolhido.
+      </p>
+    </div>
+  );
+}
+
+function AiGenerateTextPanel({
+  node, onChange,
+}: { node: StepNode; onChange: (patch: Record<string, any>) => void }) {
+  const cfg = node.data.config as {
+    output_label?: string;
+    channel_hint?: "whatsapp" | "email";
+    task_instruction?: string;
+    mood_slug?: string | null;
+    approach_slug?: string | null;
+    length_slug?: string | null;
+    language_slug?: string | null;
+    extra_context?: string | null;
+    must_include?: string | null;
+  };
+  const fetchPresets = useServerFn(listAiTonePresets);
+  const previewFn = useServerFn(previewAiMessage);
+  const { data: presets } = useQuery({
+    queryKey: ["ai-tone-presets"],
+    queryFn: () => fetchPresets(),
+    staleTime: 5 * 60_000,
+  });
+  const [labelTouched, setLabelTouched] = useState(false);
+  const [preview, setPreview] = useState<{ text: string; tokens_in: number; tokens_out: number; cost_usd: number; model: string } | null>(null);
+  const previewMut = useMutation({
+    mutationFn: () => previewFn({
+      data: {
+        stepConfig: {
+          mood_slug: cfg.mood_slug ?? null,
+          approach_slug: cfg.approach_slug ?? null,
+          length_slug: cfg.length_slug ?? null,
+          language_slug: cfg.language_slug ?? null,
+          extra_context: cfg.extra_context ?? null,
+          must_include: cfg.must_include ?? null,
+        },
+        channel: cfg.channel_hint ?? "whatsapp",
+        task_instruction: cfg.task_instruction ?? null,
+      },
+    }),
+    onSuccess: (r: any) => setPreview(r),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const label = cfg.output_label ?? "";
+  const labelInvalid = labelTouched && !label.trim();
+  const slug = slugifyLabel(label);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border bg-surface-muted/30 p-3 space-y-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saída</div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-out-label">Rótulo de saída</Label>
+          <Input
+            id="ai-out-label"
+            value={label}
+            onChange={(e) => onChange({ output_label: e.target.value })}
+            onBlur={() => setLabelTouched(true)}
+            placeholder="ex: abertura, follow_up_1"
+            className={cn(labelInvalid && "border-destructive focus-visible:ring-destructive")}
+          />
+          {labelInvalid ? (
+            <p className="text-[11px] text-destructive">Rótulo obrigatório.</p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">Use este nome no step de envio para usar este texto.</p>
+          )}
+          {label && (
+            <p className="text-[11px] text-muted-foreground">
+              Slug: <code className="font-mono">{slug || "—"}</code>
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Canal de destino</Label>
+          <Select
+            value={cfg.channel_hint ?? "whatsapp"}
+            onValueChange={(v) => onChange({ channel_hint: v })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+              <SelectItem value="email">📧 Email</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            Define o formato da saída e quais steps de envio podem usar este texto.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conteúdo</div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-gt-task">Instrução específica</Label>
+          <Textarea
+            id="ai-gt-task"
+            rows={4}
+            maxLength={500}
+            value={cfg.task_instruction ?? ""}
+            onChange={(e) => onChange({ task_instruction: e.target.value })}
+            placeholder="Ex.: Escreva a primeira mensagem fria, mencionando o setor do lead."
+          />
+          <p className="text-[10px] text-muted-foreground text-right">{(cfg.task_instruction ?? "").length}/500</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <AiPresetSelect label="Humor" kind="mood" value={cfg.mood_slug} presets={presets ?? []} onChange={(v) => onChange({ mood_slug: v })} />
+          <AiPresetSelect label="Abordagem" kind="approach" value={cfg.approach_slug} presets={presets ?? []} onChange={(v) => onChange({ approach_slug: v })} />
+          <AiPresetSelect label="Tamanho" kind="length" value={cfg.length_slug} presets={presets ?? []} onChange={(v) => onChange({ length_slug: v })} />
+          <AiPresetSelect label="Idioma" kind="language" value={cfg.language_slug} presets={presets ?? []} onChange={(v) => onChange({ language_slug: v })} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-gt-extra">Contexto extra (opcional)</Label>
+          <Textarea
+            id="ai-gt-extra"
+            rows={2}
+            maxLength={280}
+            value={cfg.extra_context ?? ""}
+            onChange={(e) => onChange({ extra_context: e.target.value || null })}
+            placeholder="Ex.: o lead baixou o whitepaper na semana passada."
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ai-gt-include">Precisa mencionar (opcional)</Label>
+          <Input
+            id="ai-gt-include"
+            maxLength={280}
+            value={cfg.must_include ?? ""}
+            onChange={(e) => onChange({ must_include: e.target.value || null })}
+            placeholder="Ex.: desconto de lançamento até sexta."
+          />
+        </div>
+      </div>
+
+      <div className="rounded-md border bg-background p-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium">Pré-visualizar texto</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => previewMut.mutate()} disabled={previewMut.isPending}>
+            {previewMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            Gerar
+          </Button>
+        </div>
+        {preview && (
+          <div className="mt-2 space-y-1">
+            <div className="whitespace-pre-wrap rounded border bg-surface p-2 text-xs">{preview.text}</div>
+            <div className="text-[10px] text-muted-foreground">
+              {preview.model} · {preview.tokens_in}/{preview.tokens_out} tokens · ${preview.cost_usd.toFixed(5)}
+            </div>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-muted-foreground">
+          Este é um preview — o texto real será gerado quando o fluxo executar.
+        </p>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Este step apenas gera o texto e salva no contexto da execução. Use um step de envio (WhatsApp ou Email) à frente com a origem definida como "Gerado por IA" para enviar.
       </p>
     </div>
   );
