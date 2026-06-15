@@ -1505,12 +1505,18 @@ const EMAIL_VARS = [
 function ConfigPanel({
   node,
   onChange,
+  allNodes,
+  edges,
 }: {
   node: StepNode;
   onChange: (patch: Record<string, any>) => void;
+  allNodes: StepNode[];
+  edges: Edge[];
 }) {
-  if (node.type === "message_email") return <EmailPanel node={node} onChange={onChange} />;
-  if (node.type === "message_whatsapp") return <WhatsAppPanel node={node} onChange={onChange} />;
+  if (node.type === "message_email")
+    return <EmailPanel node={node} onChange={onChange} allNodes={allNodes} edges={edges} />;
+  if (node.type === "message_whatsapp")
+    return <WhatsAppPanel node={node} onChange={onChange} allNodes={allNodes} edges={edges} />;
   if (node.type === "wait") return <WaitPanel node={node} onChange={onChange} />;
   if (node.type === "condition_replied")
     return <ConditionPanel node={node} onChange={onChange} />;
@@ -1524,6 +1530,8 @@ function ConfigPanel({
     return <CalEventTypePanel node={node} onChange={onChange} kind="reschedule" />;
   if (node.type === "end") return <EndPanel node={node} onChange={onChange} />;
   if (node.type === "ai_message") return <AiMessagePanel node={node} onChange={onChange} />;
+  if (node.type === "ai_generate_text")
+    return <AiGenerateTextPanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
