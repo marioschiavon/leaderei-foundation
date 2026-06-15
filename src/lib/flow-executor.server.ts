@@ -729,6 +729,118 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
     }
 
     // -----------------------------------------------------------------------
+    case "ai_generate_text": {
+      const cfg = step.config as {
+        output_label: string;
+        channel_hint?: "whatsapp" | "email" | null;
+        task_instruction?: string | null;
+        mood_slug?: string | null;
+        approach_slug?: string | null;
+        length_slug?: string | null;
+        language_slug?: string | null;
+        extra_context?: string | null;
+        must_include?: string | null;
+      };
+      if (!cfg.output_label || !cfg.output_label.trim()) {
+        return { kind: "fail", error: "Step 'Gerar texto com IA' requer um rótulo (output_label)." };
+      }
+
+      const [settingsRes, presetsRes, profileRes, leadFullRes] = await Promise.all([
+        supabaseAdmin.from("ai_platform_settings").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle(),
+        supabaseAdmin.from("ai_tone_presets").select("kind,slug,prompt_fragment").eq("is_active", true),
+        supabaseAdmin.from("ai_org_profile").select("*").eq("organization_id", en.organization_id).maybeSingle(),
+        supabaseAdmin.from("leads")
+          .select("full_name,job_title,company_name,industry,city,country,linkedin_url,website_url,custom_fields")
+          .eq("id", lead.id).maybeSingle(),
+      ]);
+      const settings = settingsRes.data;
+      if (!settings || !settings.is_enabled) {
+        return { kind: "fail", error: "IA da plataforma desabilitada." };
+      }
+      const { hasOpenAIKey, callOpenAI } = await import("@/lib/openai.server");
+      if (!hasOpenAIKey()) return { kind: "fail", error: "OPENAI_API_KEY ausente." };
+
+      const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
+      const { system, user } = buildPrompt({
+        masterSystemPrompt: settings.master_system_prompt ?? "",
+        orgProfile: profileRes.data ?? null,
+        stepConfig: {
+          mood_slug: cfg.mood_slug ?? null,
+          approach_slug: cfg.approach_slug ?? null,
+          length_slug: cfg.length_slug ?? null,
+          language_slug: cfg.language_slug ?? null,
+          extra_context: cfg.extra_context ?? null,
+          must_include: cfg.must_include ?? null,
+        },
+        presets: (presetsRes.data ?? []) as any,
+        lead: (leadFullRes.data ?? lead) as any,
+        channelHint: cfg.channel_hint ?? null,
+        taskInstruction: cfg.task_instruction ?? null,
+      });
+
+      let aiText = "";
+      try {
+        const r = await callOpenAI({
+          systemPrompt: system,
+          userPrompt: user,
+          model: settings.default_model,
+          temperature: Number(settings.default_temperature),
+          maxTokens: settings.max_tokens_per_call,
+          organizationId: en.organization_id,
+          leadId: lead.id,
+          kind: "reply_draft",
+          triggeredBy: null,
+        });
+        aiText = (r.text ?? "").trim();
+      } catch (e: any) {
+        return { kind: "fail", error: `IA: ${String(e?.message ?? e).slice(0, 200)}` };
+      }
+      if (!aiText) return { kind: "fail", error: "IA retornou texto vazio." };
+
+      const slug = slugifyLabel(cfg.output_label);
+      if (!slug) return { kind: "fail", error: `Rótulo inválido: "${cfg.output_label}".` };
+
+      const currentContext = (en.context ?? {}) as any;
+      const aiTexts = (currentContext.ai_texts ?? {}) as Record<string, unknown>;
+      aiTexts[slug] = {
+        text: aiText,
+        generated_at: new Date().toISOString(),
+        step_id: step.id,
+        channel_hint: cfg.channel_hint ?? null,
+        chars: aiText.length,
+      };
+      const newContext = { ...currentContext, ai_texts: aiTexts };
+
+      await supabaseAdmin
+        .from("campaign_enrollments")
+        .update({ context: newContext })
+        .eq("id", en.id);
+
+      // Keep in-memory enrollment in sync so subsequent reads in the same tick see the value
+      en.context = newContext;
+
+      await supabaseAdmin.from("lead_activities").insert({
+        organization_id: en.organization_id,
+        lead_id: lead.id,
+        type: "ai_text_generated",
+        title: `Texto IA gerado: ${cfg.output_label}`,
+        description: aiText.slice(0, 120) + (aiText.length > 120 ? "…" : ""),
+        payload: {
+          enrollment_id: en.id,
+          step_id: step.id,
+          slug,
+          chars: aiText.length,
+          channel_hint: cfg.channel_hint ?? null,
+        },
+      });
+
+      const next = await findNextStep(step.document_id, step.id, "next");
+      return { kind: "advance", next_step_id: next, delay_until: now, output: { slug, chars: aiText.length } };
+    }
+
+
+
+    // -----------------------------------------------------------------------
     case "end": {
       const cfg = step.config as { reason?: string };
       return { kind: "complete", output: { reason: cfg.reason ?? null, ended_at: now.toISOString() } };
