@@ -74,6 +74,24 @@ function renderTemplate(tpl: string, vars: Record<string, unknown>): string {
   });
 }
 
+function slugifyLabel(label: string): string {
+  return (label ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+function getStoredAiText(en: Enrollment, label: string): string | null {
+  const slug = slugifyLabel(label);
+  const ctx = (en.context ?? {}) as any;
+  const entry = ctx?.ai_texts?.[slug];
+  const text = entry?.text;
+  return typeof text === "string" && text.length > 0 ? text : null;
+}
+
+
 async function loadLead(lead_id: string) {
   const { data, error } = await supabaseAdmin
     .from("leads")
