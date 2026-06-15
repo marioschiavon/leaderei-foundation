@@ -1785,11 +1785,20 @@ function EndPanel({
 function WhatsAppPanel({
   node,
   onChange,
+  allNodes,
+  edges,
 }: {
   node: StepNode;
   onChange: (patch: Record<string, any>) => void;
+  allNodes: StepNode[];
+  edges: Edge[];
 }) {
-  const cfg = node.data.config as { body?: string };
+  const cfg = node.data.config as { body?: string; body_source?: "fixed" | "ai"; ai_text_label?: string };
+  const bodySource = cfg.body_source ?? "fixed";
+  const aiTexts = useMemo(
+    () => getUpstreamAiTexts(node.id, allNodes, edges, "whatsapp"),
+    [node.id, allNodes, edges],
+  );
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   function insertVar(v: string) {
@@ -1811,31 +1820,71 @@ function WhatsAppPanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label htmlFor="wa-body">Mensagem</Label>
-        <Textarea
-          id="wa-body"
-          ref={bodyRef}
-          rows={8}
-          value={cfg.body ?? ""}
-          onChange={(e) => onChange({ body: e.target.value })}
-          placeholder="Oi {{ lead.first_name }}, tudo bem?"
-        />
+        <Label className="text-xs font-medium text-muted-foreground">Origem do texto</Label>
+        <Select value={bodySource} onValueChange={(v) => onChange({ body_source: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fixed">✏️ Texto fixo</SelectItem>
+            <SelectItem value="ai">✨ Gerado por IA</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Variáveis</Label>
-        <div className="flex flex-wrap gap-1">
-          {EMAIL_VARS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => insertVar(v)}
-              className="rounded-md border bg-surface px-1.5 py-0.5 text-[11px] font-mono hover:bg-surface-muted"
+
+      {bodySource === "ai" ? (
+        aiTexts.length === 0 ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+            <p className="font-medium">Nenhum gerador de IA disponível</p>
+            <p className="mt-0.5">Adicione um step "Gerar texto (IA)" com canal WhatsApp antes deste no fluxo.</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Texto gerado por IA</Label>
+            <Select
+              value={cfg.ai_text_label ?? ""}
+              onValueChange={(v) => onChange({ ai_text_label: v })}
             >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+              <SelectTrigger><SelectValue placeholder="Selecionar texto..." /></SelectTrigger>
+              <SelectContent>
+                {aiTexts.map((item) => (
+                  <SelectItem key={item.nodeId} value={item.label}>
+                    <span className="font-medium">{item.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">💬 slug: {item.slug}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-body">Mensagem</Label>
+            <Textarea
+              id="wa-body"
+              ref={bodyRef}
+              rows={8}
+              value={cfg.body ?? ""}
+              onChange={(e) => onChange({ body: e.target.value })}
+              placeholder="Oi {{ lead.first_name }}, tudo bem?"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Variáveis</Label>
+            <div className="flex flex-wrap gap-1">
+              {EMAIL_VARS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVar(v)}
+                  className="rounded-md border bg-surface px-1.5 py-0.5 text-[11px] font-mono hover:bg-surface-muted"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
       <p className="text-xs text-muted-foreground">
         Requer uma instância WhatsApp conectada em Integrações. Leads sem telefone são ignorados.
       </p>
