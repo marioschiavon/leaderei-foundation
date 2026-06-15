@@ -76,6 +76,18 @@ const AiMessageConfig = z.object({
   must_include: z.string().max(280).default("").optional(),
 });
 
+const AiGenerateTextConfig = z.object({
+  output_label: z.string().max(120).default(""),
+  channel_hint: z.enum(["whatsapp", "email"]).default("whatsapp"),
+  task_instruction: z.string().max(500).default("").optional(),
+  mood_slug: z.string().max(48).nullable().optional(),
+  approach_slug: z.string().max(48).nullable().optional(),
+  length_slug: z.string().max(48).nullable().optional(),
+  language_slug: z.string().max(48).nullable().optional(),
+  extra_context: z.string().max(280).default("").optional(),
+  must_include: z.string().max(280).default("").optional(),
+});
+
 const CalCheckAvailabilityConfig = z.object({
   event_type_id: z.number().int().positive(),
   window_days: z.number().int().min(1).max(60).default(7),
