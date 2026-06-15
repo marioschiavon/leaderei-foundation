@@ -1,63 +1,76 @@
-## Diagnóstico (causa raiz, confirmada no banco)
 
-Você **não renomeou** "teste" para "teste 2". São duas campanhas distintas, em organizações distintas:
+# Plano — Builder UI para `ai_generate_text` + modo IA nos envios
 
-| Campanha | Org | Criada por | Quando |
-|---|---|---|---|
-| `teste` | **S7** (sua) | Mario | 07/06 |
-| `teste 2` | **Rafa Minoru INC** (não é sua) | Rafael Hirata | 11/06 |
+Escopo 100% frontend, apenas `src/components/builder/FlowEditor.tsx`.
 
-Você não conhece o Rafael — ele criou conta separada, com a própria organização. Até aí, tudo certo: contas e orgs estão de fato separadas no banco.
+## 1. Registrar `ai_generate_text` no Builder
 
-**O bug real:** a "teste 2" aparece na sua tela `/dashboard/campaigns` porque toda tabela de tenant tem uma política RLS extra do tipo:
+- Adicionar `"ai_generate_text"` à union `StepType` (linha ~103).
+- Inserir na paleta `STEP_TYPES` após `ai_message`: `{ type: "ai_generate_text", label: "Gerar texto (IA)", icon: Sparkles, enabled: true }`.
+- Em `DEFAULT_CONFIG` (linha 154), adicionar:
+  ```ts
+  ai_generate_text: {
+    output_label: "",
+    channel_hint: "whatsapp",
+    task_instruction: "",
+    mood_slug: null, approach_slug: null, length_slug: null, language_slug: null,
+    extra_context: null, must_include: null,
+  }
+  ```
+- Criar `AiGenerateTextNode` (baseado em `AiMessageNode`, ícone Sparkles em violeta): linha 1 "Gerar texto (IA)"; badge `💾 {output_label}` ou amarelo "⚠️ Sem rótulo"; ícone do canal (`💬`/`📧`).
+- Registrar no map de `nodeTypes` (linha ~629): `ai_generate_text: AiGenerateTextNode`.
 
+## 2. Helper `slugifyLabel` + BFS reverso
+
+Adicionar no topo do arquivo (escopo de módulo, fora dos componentes):
+- `slugifyLabel(s)` — NFD + remove diacríticos + `\s→_` + lower + strip non `[a-z0-9_]`.
+- `getUpstreamAiTexts(currentId, allNodes, edges, channelFilter)` — BFS reverso por `edge.target===id`, filtra ancestrais `type==="ai_generate_text"` com `output_label` e `channel_hint===channelFilter`, retorna `{nodeId, label, slug}`.
+
+## 3. Propagar `allNodes`/`edges` ao `ConfigPanel`
+
+- Linha ~1370: passar `allNodes={nodes}` e `edges={edges}` ao `<ConfigPanel/>`.
+- Linha 1411: estender assinatura de `ConfigPanel` com `allNodes`, `edges`.
+- Repassar para `EmailPanel`, `WhatsAppPanel`, e novo `AiGenerateTextPanel`.
+
+## 4. Novo `AiGenerateTextPanel`
+
+Componente baseado em `AiMessagePanel`. Seções:
+- **Saída**: input `output_label` (required, borda vermelha onBlur vazio, helper + preview `Slug: {slugifyLabel(output_label)}`); Select `channel_hint` (`whatsapp`/`email`) com helper.
+- **Conteúdo**: `task_instruction` (textarea); `mood_slug`/`approach_slug`/`length_slug`/`language_slug` via `listAiTonePresets` (mesma fetch e padrão de `AiMessagePanel`); `extra_context` e `must_include` (textareas opcionais).
+- **Prévia**: botão "Pré-visualizar texto" → `previewAiMessage` passando `channel_hint`; abre dialog com aviso "preview — texto real gerado em execução".
+
+Adicionar branch em `ConfigPanel`:
+```tsx
+if (node.type === "ai_generate_text")
+  return <AiGenerateTextPanel node={node} onChange={onChange} allNodes={allNodes} edges={edges} />;
 ```
-"Master admins manage all <tabela>"  USING (has_role(auth.uid(), 'master_admin'))
+
+## 5. `WhatsAppPanel` e `EmailPanel` — toggle fixo/IA
+
+Ambos passam a receber `allNodes`/`edges`. No topo do form:
+- Calcular `aiTexts = getUpstreamAiTexts(node.id, allNodes, edges, "whatsapp"|"email")`.
+- `bodySource = config.body_source ?? "fixed"`.
+- Select **Origem do texto**: `fixed` (✏️ Texto fixo) / `ai` (✨ Gerado por IA).
+- Se `ai`:
+  - `aiTexts.length===0` → banner amarelo ("Adicione um step 'Gerar texto (IA)' com canal {WhatsApp|Email} antes deste no fluxo.").
+  - Senão → Select `ai_text_label` com `value=item.label` mostrando label + `slug: {item.slug}`.
+- Se `fixed` → manter campos atuais (`body` para WhatsApp; `subject`+`body_html` para Email). Comportamento default inalterado.
+
+Nos nós visuais `WhatsAppStepNode` e `EmailStepNode`, quando `cfg.body_source==="ai" && cfg.ai_text_label`:
+```tsx
+<div className="mt-1 flex items-center gap-1 text-[10px] text-violet-600">
+  <Sparkles className="h-2.5 w-2.5" /><span>IA: {cfg.ai_text_label}</span>
+</div>
 ```
 
-Existe em ~35 tabelas (campaigns, leads, conversations, messages, deals, lead_activities, builder_documents, flow_*, hook7_instances, etc.). Como você é `master_admin`, essa política te dá acesso a **todas as orgs** mesmo quando você está navegando pelas rotas normais de tenant — que dependem só do RLS para isolar (não filtram por `organization_id` no código).
+## Restrições respeitadas
 
-Resultado: no `/dashboard` você vê campanhas/leads/conversas de qualquer empresa. Foi exatamente o que aconteceu — colisão de nome ("teste" vs "teste 2") amplificou a confusão, mas o vazamento existiria mesmo sem nomes parecidos.
+- Apenas `FlowEditor.tsx`.
+- Não tocar `AiMessagePanel`/`AiMessageNode` nem executor/server/banco.
+- `body_source` ausente = `"fixed"` (back-compat total).
+- BFS inline (sem libs de grafo) garante que steps em branches paralelos não aparecem no dropdown.
+- `previewAiMessage` reaproveitado sem alteração.
 
-O painel `/master/*` **não depende dessas policies** — `src/lib/master.functions.ts` usa `supabaseAdmin` (service role, bypassa RLS). Ou seja, remover as policies de master nas tabelas de tenant **não quebra** o painel master.
+## Saída final
 
-## Decisão
-
-Sua regra: master_admin só vê dados de outras orgs **dentro de `/master/*`**. Nas rotas comuns (`/dashboard/*`) ele é tratado como membro normal — vê só as orgs em que é membro de fato (no seu caso, só S7).
-
-## Mudanças
-
-### 1. Migration — remover policies `Master admins manage all *` das tabelas de tenant
-
-`DROP POLICY` em todas as ~35 tabelas listadas acima. A política `"Org members ..."` (`is_org_member(auth.uid(), organization_id)`) continua sendo a única regra de leitura/escrita no contexto autenticado. Resultado prático:
-
-- `/dashboard/campaigns` → você vê apenas campanhas da S7.
-- `/dashboard/leads` → apenas leads da S7 (que continuam sendo os 5.013).
-- Inbox, pipeline, builder, integrações → idem.
-- `/master/organizations`, `/master/users`, `/master/logs`, etc. → continuam funcionando idênticos, porque usam `supabaseAdmin`.
-
-**Tabelas que ficam fora do drop** (não são tenant data, master precisa mesmo via auth):
-- `platform_settings`, `ai_platform_settings`, `integration_providers`, `plans`, `subscriptions`, `audit_logs` — são globais/admin por natureza, mantêm a policy de master.
-- `organizations` e `organization_members` — mantêm a policy de master para o painel `/master/organizations` listar/editar.
-
-### 2. Verificação rápida no código (sem mudanças, só confirmação)
-
-- `src/lib/tenant.functions.ts`, `src/lib/campaigns.functions.ts`, `src/lib/inbox.functions.ts`, `src/lib/builder.functions.ts`: já usam `context.supabase` (cliente autenticado do usuário) + filtros por `organization_id` derivados do membership. Vão continuar funcionando — passam a retornar só a org do usuário automaticamente.
-- `src/lib/master.functions.ts`: usa `supabaseAdmin`. Não muda nada.
-
-### 3. Nada de UI nesta rodada
-
-Você mencionou uma futura "aba de suporte dentro do /dashboard para master ver dados de uma org específica". Isso fica para depois — não entra agora.
-
-## O que NÃO faço
-
-- Não apago a campanha "teste 2", nem a org "Rafa Minoru INC", nem a conta do Rafael. Ele é um usuário legítimo da plataforma com a própria org.
-- Não toco em `/master/*`.
-- Não mexo nas rotas/queries do `/dashboard` (a correção é 100% no nível de RLS).
-
-## Critério de aceite
-
-1. Logado como `mariors07@gmail.com` em `/dashboard/campaigns` → "teste 2" **não aparece** (só campanhas da S7).
-2. `/dashboard/leads` continua mostrando os 5.013 leads da S7.
-3. `/master/organizations` continua listando todas as orgs (S7, Rafa Minoru INC, Demo teste).
-4. Logado como Rafael em `/dashboard/campaigns` → ele continua vendo "teste 2" (org dele).
+Após implementação: lista dos 12 critérios com ✅/❌, confirmação da regra de filtro por canal + BFS, arquivos modificados (`FlowEditor.tsx`), seção "O que toquei fora do escopo: nada".
