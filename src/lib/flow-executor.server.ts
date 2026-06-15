@@ -138,13 +138,33 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
   switch (step.type) {
     // -----------------------------------------------------------------------
     case "message_email": {
-      const cfg = step.config as { subject?: string; body_html?: string; body_text?: string };
+      const cfg = step.config as {
+        subject?: string;
+        body_html?: string;
+        body_text?: string;
+        body_source?: "fixed" | "ai";
+        ai_text_label?: string | null;
+      };
       if (!lead.email) {
         return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_email" } };
       }
       const subject = renderTemplate(cfg.subject ?? "", vars);
-      const html = renderTemplate(cfg.body_html ?? "", vars);
-      const text = cfg.body_text ? renderTemplate(cfg.body_text, vars) : undefined;
+      let html: string;
+      let text: string | undefined;
+      if (cfg.body_source === "ai" && cfg.ai_text_label) {
+        const stored = getStoredAiText(en, cfg.ai_text_label);
+        if (!stored) {
+          return {
+            kind: "fail",
+            error: `Texto de IA "${cfg.ai_text_label}" não encontrado no contexto. Verifique se o step "Gerar texto com IA" (rótulo: "${cfg.ai_text_label}", canal: email) está antes deste step no fluxo.`,
+          };
+        }
+        html = stored.trim().startsWith("<") ? stored : `<p>${stored}</p>`;
+        text = undefined;
+      } else {
+        html = renderTemplate(cfg.body_html ?? "", vars);
+        text = cfg.body_text ? renderTemplate(cfg.body_text, vars) : undefined;
+      }
       const res = await sendEmailInternal({
         to: lead.email,
         subject,
@@ -167,6 +187,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       const next = await findNextStep(step.document_id, step.id, "next");
       return { kind: "advance", next_step_id: next, delay_until: now, output: { send_log_id: res.id } };
     }
+
 
     // -----------------------------------------------------------------------
     case "message_whatsapp": {
