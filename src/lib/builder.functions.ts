@@ -28,10 +28,14 @@ const EmailConfig = z.object({
   body_html: z.string().max(50000).default(""),
   body_text: z.string().max(50000).optional(),
   from_alias: z.string().max(120).optional(),
+  body_source: z.enum(["fixed", "ai"]).default("fixed").optional(),
+  ai_text_label: z.string().max(120).optional(),
 });
 const WhatsappConfig = z.object({
   body: z.string().max(4000).default(""),
   media_url: z.string().url().optional(),
+  body_source: z.enum(["fixed", "ai"]).default("fixed").optional(),
+  ai_text_label: z.string().max(120).optional(),
 });
 const LinkedinConfig = z.object({
   message_type: z.enum(["connection_request", "inmail", "message"]).default("message"),
