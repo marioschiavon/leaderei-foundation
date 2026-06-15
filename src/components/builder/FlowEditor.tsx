@@ -219,6 +219,48 @@ function branchColor(b: string): string {
   }
 }
 
+// Slugify a label exactly the same way the executor does (slugifyLabel).
+function slugifyLabel(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+// Reverse BFS over edges: find ai_generate_text ancestors of currentNodeId
+// whose channel_hint matches and whose output_label is set.
+function getUpstreamAiTexts(
+  currentNodeId: string,
+  allNodes: StepNode[],
+  edges: Edge[],
+  channelFilter: "email" | "whatsapp",
+): Array<{ nodeId: string; label: string; slug: string }> {
+  const ancestors = new Set<string>();
+  const queue: string[] = [currentNodeId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.target === id && !ancestors.has(edge.source)) {
+        ancestors.add(edge.source);
+        queue.push(edge.source);
+      }
+    }
+  }
+  return allNodes
+    .filter((n) => {
+      if (!ancestors.has(n.id)) return false;
+      if (n.type !== "ai_generate_text") return false;
+      const cfg = (n.data?.config ?? {}) as any;
+      return !!cfg.output_label && cfg.channel_hint === channelFilter;
+    })
+    .map((n) => {
+      const label: string = (n.data.config as any).output_label;
+      return { nodeId: n.id, label, slug: slugifyLabel(label) };
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Node Components
 // ---------------------------------------------------------------------------
