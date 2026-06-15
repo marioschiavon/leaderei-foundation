@@ -72,8 +72,8 @@ const AiMessageConfig = z.object({
   approach_slug: z.string().max(48).nullable().optional(),
   length_slug: z.string().max(48).nullable().optional(),
   language_slug: z.string().max(48).nullable().optional(),
-  extra_context: z.string().max(280).default("").optional(),
-  must_include: z.string().max(280).default("").optional(),
+  extra_context: z.string().max(280).nullable().default("").optional(),
+  must_include: z.string().max(280).nullable().default("").optional(),
 });
 
 const AiGenerateTextConfig = z.object({
@@ -84,8 +84,8 @@ const AiGenerateTextConfig = z.object({
   approach_slug: z.string().max(48).nullable().optional(),
   length_slug: z.string().max(48).nullable().optional(),
   language_slug: z.string().max(48).nullable().optional(),
-  extra_context: z.string().max(280).default("").optional(),
-  must_include: z.string().max(280).default("").optional(),
+  extra_context: z.string().max(280).nullable().default("").optional(),
+  must_include: z.string().max(280).nullable().default("").optional(),
 });
 
 const CalCheckAvailabilityConfig = z.object({
