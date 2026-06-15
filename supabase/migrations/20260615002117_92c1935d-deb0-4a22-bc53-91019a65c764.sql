@@ -1,0 +1,1 @@
+CREATE POLICY "No direct client access webhook_events" ON public.webhook_events FOR ALL TO authenticated USING (false) WITH CHECK (false);
