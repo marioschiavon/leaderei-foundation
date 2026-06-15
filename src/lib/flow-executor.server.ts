@@ -730,6 +730,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
 
     // -----------------------------------------------------------------------
     case "ai_generate_text": {
+      console.log("[executor] processando ai_generate_text", { stepId: step.id });
       const cfg = step.config as {
         output_label: string;
         channel_hint?: "whatsapp" | "email" | null;
