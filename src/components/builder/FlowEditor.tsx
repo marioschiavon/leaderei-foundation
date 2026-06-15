@@ -352,6 +352,12 @@ function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
         >
           {cfg.subject || "Sem assunto"}
         </div>
+        {isAi && cfg.ai_text_label && (
+          <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#7c3aed" }}>
+            <Sparkles size={10} />
+            <span>IA: {cfg.ai_text_label}</span>
+          </div>
+        )}
         <div
           style={{
             marginTop: 8,
