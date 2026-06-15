@@ -133,6 +133,8 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return EndConfig.parse(config ?? {});
     case "ai_message":
       return AiMessageConfig.parse(config ?? {});
+    case "ai_generate_text":
+      return AiGenerateTextConfig.parse(config ?? {});
   }
 }
 
