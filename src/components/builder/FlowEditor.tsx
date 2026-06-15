@@ -333,8 +333,9 @@ function NodeHeader({ icon: Icon, label }: { icon: any; label: string }) {
 }
 
 function EmailStepNode({ data, selected }: NodeProps<StepNode>) {
-  const cfg = data.config as { subject?: string; body_html?: string };
-  const isComplete = !!cfg.subject?.trim() && !!cfg.body_html?.trim();
+  const cfg = data.config as { subject?: string; body_html?: string; body_source?: string; ai_text_label?: string };
+  const isAi = cfg.body_source === "ai";
+  const isComplete = !!cfg.subject?.trim() && (isAi ? !!cfg.ai_text_label : !!cfg.body_html?.trim());
   return (
     <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
       <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
