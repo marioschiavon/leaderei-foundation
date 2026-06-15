@@ -1897,11 +1897,26 @@ function WhatsAppPanel({
 function EmailPanel({
   node,
   onChange,
+  allNodes,
+  edges,
 }: {
   node: StepNode;
   onChange: (patch: Record<string, any>) => void;
+  allNodes: StepNode[];
+  edges: Edge[];
 }) {
-  const cfg = node.data.config as { subject?: string; body_html?: string; from_alias?: string };
+  const cfg = node.data.config as {
+    subject?: string;
+    body_html?: string;
+    from_alias?: string;
+    body_source?: "fixed" | "ai";
+    ai_text_label?: string;
+  };
+  const bodySource = cfg.body_source ?? "fixed";
+  const aiTexts = useMemo(
+    () => getUpstreamAiTexts(node.id, allNodes, edges, "email"),
+    [node.id, allNodes, edges],
+  );
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1940,61 +1955,102 @@ function EmailPanel({
           placeholder="padrão da org"
         />
       </div>
+
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label>Corpo (HTML)</Label>
-          <div className="flex rounded-md border text-xs">
-            <button
-              onClick={() => setMode("edit")}
-              className={cn(
-                "px-2 py-0.5",
-                mode === "edit" && "bg-muted font-medium",
-              )}
-            >
-              Editar
-            </button>
-            <button
-              onClick={() => setMode("preview")}
-              className={cn(
-                "px-2 py-0.5",
-                mode === "preview" && "bg-muted font-medium",
-              )}
-            >
-              Preview
-            </button>
+        <Label className="text-xs font-medium text-muted-foreground">Origem do texto</Label>
+        <Select value={bodySource} onValueChange={(v) => onChange({ body_source: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fixed">✏️ Texto fixo</SelectItem>
+            <SelectItem value="ai">✨ Gerado por IA</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {bodySource === "ai" ? (
+        aiTexts.length === 0 ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+            <p className="font-medium">Nenhum gerador de IA disponível</p>
+            <p className="mt-0.5">Adicione um step "Gerar texto (IA)" com canal Email antes deste no fluxo.</p>
           </div>
-        </div>
-        {mode === "edit" ? (
-          <Textarea
-            ref={bodyRef}
-            rows={10}
-            value={cfg.body_html ?? ""}
-            onChange={(e) => onChange({ body_html: e.target.value })}
-            className="font-mono text-xs"
-          />
         ) : (
-          <iframe
-            sandbox=""
-            srcDoc={cfg.body_html ?? "<em>vazio</em>"}
-            className="h-56 w-full rounded-md border bg-white"
-          />
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Variáveis disponíveis</Label>
-        <div className="flex flex-wrap gap-1">
-          {EMAIL_VARS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => insertVar(v)}
-              className="rounded-md border bg-background px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Texto gerado por IA</Label>
+            <Select
+              value={cfg.ai_text_label ?? ""}
+              onValueChange={(v) => onChange({ ai_text_label: v })}
             >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+              <SelectTrigger><SelectValue placeholder="Selecionar texto de email..." /></SelectTrigger>
+              <SelectContent>
+                {aiTexts.map((item) => (
+                  <SelectItem key={item.nodeId} value={item.label}>
+                    <span className="font-medium">{item.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">📧 slug: {item.slug}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Corpo (HTML)</Label>
+              <div className="flex rounded-md border text-xs">
+                <button
+                  onClick={() => setMode("edit")}
+                  className={cn(
+                    "px-2 py-0.5",
+                    mode === "edit" && "bg-muted font-medium",
+                  )}
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => setMode("preview")}
+                  className={cn(
+                    "px-2 py-0.5",
+                    mode === "preview" && "bg-muted font-medium",
+                  )}
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
+            {mode === "edit" ? (
+              <Textarea
+                ref={bodyRef}
+                rows={10}
+                value={cfg.body_html ?? ""}
+                onChange={(e) => onChange({ body_html: e.target.value })}
+                className="font-mono text-xs"
+              />
+            ) : (
+              <iframe
+                sandbox=""
+                srcDoc={cfg.body_html ?? "<em>vazio</em>"}
+                className="h-56 w-full rounded-md border bg-white"
+              />
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Variáveis disponíveis</Label>
+            <div className="flex flex-wrap gap-1">
+              {EMAIL_VARS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVar(v)}
+                  className="rounded-md border bg-background px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
