@@ -849,6 +849,12 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
     }
 
     default:
+      console.error("[executor] tipo de passo desconhecido", {
+        type: (step as any).type,
+        stepId: step.id,
+        typeofType: typeof (step as any).type,
+        typeJson: JSON.stringify((step as any).type),
+      });
       return { kind: "fail", error: `tipo de passo desconhecido: ${step.type}` };
   }
 }
