@@ -11,6 +11,7 @@ const STEP_TYPES = [
   "message_whatsapp",
   "message_linkedin",
   "ai_message",
+  "ai_generate_text",
   "wait",
   "condition_replied",
   "action",
@@ -27,10 +28,14 @@ const EmailConfig = z.object({
   body_html: z.string().max(50000).default(""),
   body_text: z.string().max(50000).optional(),
   from_alias: z.string().max(120).optional(),
+  body_source: z.enum(["fixed", "ai"]).default("fixed").optional(),
+  ai_text_label: z.string().max(120).optional(),
 });
 const WhatsappConfig = z.object({
   body: z.string().max(4000).default(""),
   media_url: z.string().url().optional(),
+  body_source: z.enum(["fixed", "ai"]).default("fixed").optional(),
+  ai_text_label: z.string().max(120).optional(),
 });
 const LinkedinConfig = z.object({
   message_type: z.enum(["connection_request", "inmail", "message"]).default("message"),
@@ -63,6 +68,18 @@ const AiMessageConfig = z.object({
   channel: z.enum(["whatsapp", "email"]).default("whatsapp"),
   task_instruction: z.string().max(500).default(""),
   email_subject_template: z.string().max(200).default("").optional(),
+  mood_slug: z.string().max(48).nullable().optional(),
+  approach_slug: z.string().max(48).nullable().optional(),
+  length_slug: z.string().max(48).nullable().optional(),
+  language_slug: z.string().max(48).nullable().optional(),
+  extra_context: z.string().max(280).default("").optional(),
+  must_include: z.string().max(280).default("").optional(),
+});
+
+const AiGenerateTextConfig = z.object({
+  output_label: z.string().max(120).default(""),
+  channel_hint: z.enum(["whatsapp", "email"]).default("whatsapp"),
+  task_instruction: z.string().max(500).default("").optional(),
   mood_slug: z.string().max(48).nullable().optional(),
   approach_slug: z.string().max(48).nullable().optional(),
   length_slug: z.string().max(48).nullable().optional(),
@@ -116,6 +133,8 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return EndConfig.parse(config ?? {});
     case "ai_message":
       return AiMessageConfig.parse(config ?? {});
+    case "ai_generate_text":
+      return AiGenerateTextConfig.parse(config ?? {});
   }
 }
 
