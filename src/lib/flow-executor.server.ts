@@ -191,8 +191,24 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
 
     // -----------------------------------------------------------------------
     case "message_whatsapp": {
-      const cfg = step.config as { body?: string };
-      const body = renderTemplate(cfg.body ?? "", vars);
+      const cfg = step.config as {
+        body?: string;
+        body_source?: "fixed" | "ai";
+        ai_text_label?: string | null;
+      };
+      let body: string;
+      if (cfg.body_source === "ai" && cfg.ai_text_label) {
+        const stored = getStoredAiText(en, cfg.ai_text_label);
+        if (!stored) {
+          return {
+            kind: "fail",
+            error: `Texto de IA "${cfg.ai_text_label}" não encontrado no contexto. Verifique se o step "Gerar texto com IA" (rótulo: "${cfg.ai_text_label}", canal: whatsapp) está antes deste step no fluxo.`,
+          };
+        }
+        body = stored;
+      } else {
+        body = renderTemplate(cfg.body ?? "", vars);
+      }
       const phone = (lead.phone ?? "").replace(/\D+/g, "");
       if (phone.length < 10 || phone.length > 15) {
         return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "invalid_phone", phone } };
