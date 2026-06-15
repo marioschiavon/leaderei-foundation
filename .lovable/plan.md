@@ -1,76 +1,28 @@
+## Causa raiz
 
-# Plano — Builder UI para `ai_generate_text` + modo IA nos envios
+O código fonte **já tem** o `case "ai_generate_text"` no executor (`src/lib/flow-executor.server.ts`, linha 732) e está correto. Mas os erros continuam aparecendo a cada minuto no banco (último: 15:13:02) porque o cron `pg_cron` chama duas URLs:
 
-Escopo 100% frontend, apenas `src/components/builder/FlowEditor.tsx`.
+- `https://project--ab6c70f9-…lovable.app/api/public/hooks/run-flow-tick`
+- `https://leaderei.lovable.app/api/public/hooks/run-flow-tick`
 
-## 1. Registrar `ai_generate_text` no Builder
+Ambas servem o **deployment publicado**, não o sandbox de dev nem o build de preview mais recente. Como o `case "ai_generate_text"` foi adicionado depois do último publish, o Worker em produção ainda cai no `default` e grava `tipo de passo desconhecido: ai_generate_text` em `flow_step_runs`.
 
-- Adicionar `"ai_generate_text"` à union `StepType` (linha ~103).
-- Inserir na paleta `STEP_TYPES` após `ai_message`: `{ type: "ai_generate_text", label: "Gerar texto (IA)", icon: Sparkles, enabled: true }`.
-- Em `DEFAULT_CONFIG` (linha 154), adicionar:
-  ```ts
-  ai_generate_text: {
-    output_label: "",
-    channel_hint: "whatsapp",
-    task_instruction: "",
-    mood_slug: null, approach_slug: null, length_slug: null, language_slug: null,
-    extra_context: null, must_include: null,
-  }
-  ```
-- Criar `AiGenerateTextNode` (baseado em `AiMessageNode`, ícone Sparkles em violeta): linha 1 "Gerar texto (IA)"; badge `💾 {output_label}` ou amarelo "⚠️ Sem rótulo"; ícone do canal (`💬`/`📧`).
-- Registrar no map de `nodeTypes` (linha ~629): `ai_generate_text: AiGenerateTextNode`.
+Nenhuma alteração de código resolve isso — é uma questão de **republicar** o app para o novo executor entrar no ar.
 
-## 2. Helper `slugifyLabel` + BFS reverso
+## Plano
 
-Adicionar no topo do arquivo (escopo de módulo, fora dos componentes):
-- `slugifyLabel(s)` — NFD + remove diacríticos + `\s→_` + lower + strip non `[a-z0-9_]`.
-- `getUpstreamAiTexts(currentId, allNodes, edges, channelFilter)` — BFS reverso por `edge.target===id`, filtra ancestrais `type==="ai_generate_text"` com `output_label` e `channel_hint===channelFilter`, retorna `{nodeId, label, slug}`.
+1. **Republicar o app** (botão Publish). Isso reconstrói o Worker e o cron passa a executar o `case "ai_generate_text"` na próxima execução (até 60s depois).
 
-## 3. Propagar `allNodes`/`edges` ao `ConfigPanel`
+2. **Verificar** após o publish: rodar `select status, error, created_at from flow_step_runs where step_id = '8d21af0a-9f81-4571-b900-b12dfa3d2dc7' order by created_at desc limit 3;` — o próximo run deve sair como `succeeded` (e nos logs do servidor deve aparecer `[executor] processando ai_generate_text`).
 
-- Linha ~1370: passar `allNodes={nodes}` e `edges={edges}` ao `<ConfigPanel/>`.
-- Linha 1411: estender assinatura de `ConfigPanel` com `allNodes`, `edges`.
-- Repassar para `EmailPanel`, `WhatsAppPanel`, e novo `AiGenerateTextPanel`.
+3. **Opcional — limpar enrollments travados** que já falharam várias vezes nesse step. Se o `runFlowTick` desabilita enrollments após N falhas (precisa confirmar olhando `flow-executor.server.ts`), reativá-los manualmente com `update campaign_enrollments set status='active', next_run_at=now() where id in (...)`.
 
-## 4. Novo `AiGenerateTextPanel`
+## Detalhe técnico
 
-Componente baseado em `AiMessagePanel`. Seções:
-- **Saída**: input `output_label` (required, borda vermelha onBlur vazio, helper + preview `Slug: {slugifyLabel(output_label)}`); Select `channel_hint` (`whatsapp`/`email`) com helper.
-- **Conteúdo**: `task_instruction` (textarea); `mood_slug`/`approach_slug`/`length_slug`/`language_slug` via `listAiTonePresets` (mesma fetch e padrão de `AiMessagePanel`); `extra_context` e `must_include` (textareas opcionais).
-- **Prévia**: botão "Pré-visualizar texto" → `previewAiMessage` passando `channel_hint`; abre dialog com aviso "preview — texto real gerado em execução".
+- O `case` está bem formado, retorna `advance`, e o switch não tem fall-through.
+- Não há cache adicional do Worker além do próprio deployment publicado.
+- O sandbox de dev (Vite) já tem o código novo, mas o cron **não** o atinge — ele só fala com as URLs `*.lovable.app`.
 
-Adicionar branch em `ConfigPanel`:
-```tsx
-if (node.type === "ai_generate_text")
-  return <AiGenerateTextPanel node={node} onChange={onChange} allNodes={allNodes} edges={edges} />;
-```
+## Próximo passo
 
-## 5. `WhatsAppPanel` e `EmailPanel` — toggle fixo/IA
-
-Ambos passam a receber `allNodes`/`edges`. No topo do form:
-- Calcular `aiTexts = getUpstreamAiTexts(node.id, allNodes, edges, "whatsapp"|"email")`.
-- `bodySource = config.body_source ?? "fixed"`.
-- Select **Origem do texto**: `fixed` (✏️ Texto fixo) / `ai` (✨ Gerado por IA).
-- Se `ai`:
-  - `aiTexts.length===0` → banner amarelo ("Adicione um step 'Gerar texto (IA)' com canal {WhatsApp|Email} antes deste no fluxo.").
-  - Senão → Select `ai_text_label` com `value=item.label` mostrando label + `slug: {item.slug}`.
-- Se `fixed` → manter campos atuais (`body` para WhatsApp; `subject`+`body_html` para Email). Comportamento default inalterado.
-
-Nos nós visuais `WhatsAppStepNode` e `EmailStepNode`, quando `cfg.body_source==="ai" && cfg.ai_text_label`:
-```tsx
-<div className="mt-1 flex items-center gap-1 text-[10px] text-violet-600">
-  <Sparkles className="h-2.5 w-2.5" /><span>IA: {cfg.ai_text_label}</span>
-</div>
-```
-
-## Restrições respeitadas
-
-- Apenas `FlowEditor.tsx`.
-- Não tocar `AiMessagePanel`/`AiMessageNode` nem executor/server/banco.
-- `body_source` ausente = `"fixed"` (back-compat total).
-- BFS inline (sem libs de grafo) garante que steps em branches paralelos não aparecem no dropdown.
-- `previewAiMessage` reaproveitado sem alteração.
-
-## Saída final
-
-Após implementação: lista dos 12 critérios com ✅/❌, confirmação da regra de filtro por canal + BFS, arquivos modificados (`FlowEditor.tsx`), seção "O que toquei fora do escopo: nada".
+Clicar em **Publish** abaixo e aguardar ~1 minuto. Se após o publish o erro persistir, aí sim investigamos mais (provavelmente seria uma chave de IA ausente ou validação interna do `ai_generate_text`, não mais "tipo desconhecido").
