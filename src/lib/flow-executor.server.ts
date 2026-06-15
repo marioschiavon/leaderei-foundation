@@ -822,7 +822,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       await supabaseAdmin.from("lead_activities").insert({
         organization_id: en.organization_id,
         lead_id: lead.id,
-        type: "ai_text_generated",
+        type: "system",
         title: `Texto IA gerado: ${cfg.output_label}`,
         description: aiText.slice(0, 120) + (aiText.length > 120 ? "…" : ""),
         payload: {
