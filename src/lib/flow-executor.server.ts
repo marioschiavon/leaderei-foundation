@@ -648,7 +648,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       // Dispatch by channel
       if (channel === "email") {
         if (!lead.email) {
-          return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_email" } };
+          return { kind: "permanent_fail", error: "Lead não tem email cadastrado." };
         }
         const subject = renderTemplate(cfg.email_subject_template ?? "", vars) || "Mensagem";
         const html = aiText.split("\n").map((l) => `<p>${l.replace(/</g, "&lt;")}</p>`).join("");
