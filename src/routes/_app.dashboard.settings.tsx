@@ -30,7 +30,7 @@ import { getMyContext } from "@/lib/tenant.functions";
 import {
   getMyOrganization, updateMyOrganization,
   listOrgMembers, listOrgInvitations,
-  inviteMember, sendInvitationEmail, updateMemberRole, removeMember, revokeInvitation,
+  inviteMember, sendInvitationEmail, getInvitationLink, updateMemberRole, removeMember, revokeInvitation,
   listApiKeys, createApiKey, revokeApiKey,
 } from "@/lib/settings.functions";
 import { getWhatsAppMode, updateWhatsAppMode } from "@/lib/hook7.functions";
