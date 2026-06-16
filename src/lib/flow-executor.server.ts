@@ -1053,7 +1053,77 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
 // Tick: drain up to N pending jobs
 // ---------------------------------------------------------------------------
 
-export async function runFlowTick(maxJobs = 25): Promise<{ processed: number; failed: number }> {
+export async function reclaimStuckJobs(olderThanSeconds = 180, max = 50): Promise<{ reclaimed: number; failed_permanently: number }> {
+  const cutoff = new Date(Date.now() - olderThanSeconds * 1000).toISOString();
+  const { data: stuck } = await supabaseAdmin
+    .from("scheduled_jobs")
+    .select("id, attempts, max_attempts, enrollment_id")
+    .eq("status", "running")
+    .lt("locked_at", cutoff)
+    .limit(max);
+  const rows = stuck ?? [];
+  if (!rows.length) return { reclaimed: 0, failed_permanently: 0 };
+
+  const nowIso = new Date().toISOString();
+  const msg = `lock expirado após ${olderThanSeconds}s, reagendado`;
+  let reclaimed = 0;
+  let permanent = 0;
+
+  for (const j of rows) {
+    const nextAttempts = (j.attempts ?? 0) + 1;
+    const exceeded = nextAttempts >= (j.max_attempts ?? 5);
+    if (exceeded) {
+      await supabaseAdmin.from("scheduled_jobs").update({
+        status: "failed",
+        last_error: `[STUCK] ${msg} — max_attempts atingido`,
+        attempts: nextAttempts,
+        locked_at: null,
+        locked_by: null,
+      }).eq("id", j.id);
+      if (j.enrollment_id) {
+        await supabaseAdmin.from("campaign_enrollments").update({
+          status: "failed",
+          last_error: `[STUCK] ${msg}`,
+        }).eq("id", j.enrollment_id);
+      }
+      permanent += 1;
+    } else {
+      await supabaseAdmin.from("scheduled_jobs").update({
+        status: "pending",
+        run_at: nowIso,
+        locked_at: null,
+        locked_by: null,
+        attempts: nextAttempts,
+        last_error: msg,
+      }).eq("id", j.id);
+      reclaimed += 1;
+    }
+
+    if (j.enrollment_id) {
+      const { data: runs } = await supabaseAdmin
+        .from("flow_step_runs")
+        .select("id")
+        .eq("enrollment_id", j.enrollment_id)
+        .eq("status", "running")
+        .order("started_at", { ascending: false })
+        .limit(5);
+      for (const r of runs ?? []) {
+        await supabaseAdmin.from("flow_step_runs").update({
+          status: "failed",
+          finished_at: nowIso,
+          error: msg,
+        }).eq("id", r.id);
+      }
+    }
+  }
+
+  return { reclaimed, failed_permanently: permanent };
+}
+
+export async function runFlowTick(maxJobs = 25): Promise<{ processed: number; failed: number; reclaimed?: number }> {
+  // 0) Watchdog: free jobs whose worker died with the lock held (>3min).
+  await reclaimStuckJobs(180, 50);
+
   // Lock a batch via raw SQL (SKIP LOCKED) using a custom RPC isn't available;
   // emulate by selecting + conditional update. Postgrest can't SKIP LOCKED, so
   // we use a soft-lock with locked_by + a random worker id.
