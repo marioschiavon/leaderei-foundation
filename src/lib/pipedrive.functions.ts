@@ -63,7 +63,8 @@ export const getPipedriveConnection = createServerFn({ method: "GET" })
       };
     }
 
-    const { data: creds } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: creds } = await supabaseAdmin
       .from("integration_credentials")
       .select("key, value_encrypted")
       .eq("organization_id", organization_id)
@@ -249,13 +250,15 @@ export const syncPipedriveNow = createServerFn({ method: "POST" })
       throw new Error("Pipedrive não está conectado.");
     }
 
-    const { data: creds } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: creds } = await supabaseAdmin
       .from("integration_credentials")
       .select("key, value_encrypted")
+      .eq("organization_id", organization_id)
       .eq("integration_id", conn.id)
       .eq("key", "api_token")
       .maybeSingle();
-    const api_token = creds?.value_encrypted ?? null;
+    const api_token = (creds as any)?.value_encrypted ?? null;
     if (!api_token) throw new Error("Token Pipedrive ausente. Reconecte a integração.");
 
     const cfg = (conn.config ?? {}) as { company_domain?: string; pipedrive_cursors?: SyncCursors };

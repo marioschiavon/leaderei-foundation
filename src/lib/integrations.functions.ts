@@ -34,12 +34,13 @@ export const getOrgResendConnection = createServerFn({ method: "GET" })
       .eq("provider_id", provider.id)
       .maybeSingle();
     if (!conn) return { provider_id: provider.id, connection: null, from_email: null, from_name: null, has_key: false };
-    const { data: creds } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: creds } = await supabaseAdmin
       .from("integration_credentials")
       .select("key, value_encrypted")
       .eq("organization_id", organization_id)
       .eq("integration_id", conn.id);
-    const hasKey = (creds ?? []).some((c) => c.key === "api_key" && !!c.value_encrypted);
+    const hasKey = (creds ?? []).some((c: any) => c.key === "api_key" && !!c.value_encrypted);
     const cfg = (conn.config ?? {}) as { from_email?: string; from_name?: string };
     return {
       provider_id: provider.id,

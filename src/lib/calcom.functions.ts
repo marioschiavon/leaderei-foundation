@@ -62,15 +62,16 @@ export const getCalcomConnection = createServerFn({ method: "GET" })
       };
     }
 
-    const { data: creds } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: creds } = await supabaseAdmin
       .from("integration_credentials")
       .select("key, value_encrypted")
       .eq("organization_id", organization_id)
       .eq("integration_id", conn.id);
 
-    const hasKey = (creds ?? []).some((c) => c.key === "api_key" && !!c.value_encrypted);
-    const secretRow = (creds ?? []).find((c) => c.key === "webhook_secret");
-    const webhookSecret = (secretRow?.value_encrypted as string | null) ?? null;
+    const hasKey = (creds ?? []).some((c: any) => c.key === "api_key" && !!c.value_encrypted);
+    const secretRow = (creds ?? []).find((c: any) => c.key === "webhook_secret");
+    const webhookSecret = ((secretRow as any)?.value_encrypted as string | null) ?? null;
 
     const { count } = await supabase
       .from("cal_event_types_cache")
