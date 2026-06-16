@@ -9,7 +9,22 @@ export type StepOutcome =
   | { kind: "advance"; next_step_id: string | null; delay_until: Date; branch?: string; output?: Json }
   | { kind: "wait"; resume_at: Date; output?: Json }
   | { kind: "complete"; output?: Json }
-  | { kind: "fail"; error: string; output?: Json };
+  | { kind: "fail"; error: string; output?: Json }
+  | { kind: "permanent_fail"; error: string; output?: Json };
+
+// Detect config/data errors that won't resolve via retry (e.g. Resend not
+// connected, missing OPENAI key). Used to upgrade thrown exceptions caught
+// by the outer try/catch into permanent_fail.
+const PERMANENT_ERROR_PATTERNS: RegExp[] = [
+  /n[ãa]o conectou o Resend/i,
+  /Conecte em Integra[çc][õo]es/i,
+  /Resend.*n[ãa]o.*configurad/i,
+  /OPENAI_API_KEY/i,
+  /IA da plataforma desabilitada/i,
+];
+function isPermanentErrorMessage(msg: string): boolean {
+  return PERMANENT_ERROR_PATTERNS.some((re) => re.test(msg));
+}
 
 interface Enrollment {
   id: string;
@@ -146,7 +161,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         ai_text_label?: string | null;
       };
       if (!lead.email) {
-        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_email" } };
+        return { kind: "permanent_fail", error: "Lead não tem email cadastrado." };
       }
       const subject = renderTemplate(cfg.subject ?? "", vars);
       let html: string;
@@ -155,7 +170,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         const stored = getStoredAiText(en, cfg.ai_text_label);
         if (!stored) {
           return {
-            kind: "fail",
+            kind: "permanent_fail",
             error: `Texto de IA "${cfg.ai_text_label}" não encontrado no contexto. Verifique se o step "Gerar texto com IA" (rótulo: "${cfg.ai_text_label}", canal: email) está antes deste step no fluxo.`,
           };
         }
@@ -201,7 +216,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         const stored = getStoredAiText(en, cfg.ai_text_label);
         if (!stored) {
           return {
-            kind: "fail",
+            kind: "permanent_fail",
             error: `Texto de IA "${cfg.ai_text_label}" não encontrado no contexto. Verifique se o step "Gerar texto com IA" (rótulo: "${cfg.ai_text_label}", canal: whatsapp) está antes deste step no fluxo.`,
           };
         }
@@ -211,7 +226,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       }
       const phone = (lead.phone ?? "").replace(/\D+/g, "");
       if (phone.length < 10 || phone.length > 15) {
-        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "invalid_phone", phone } };
+        return { kind: "permanent_fail", error: "Lead não tem telefone/WhatsApp válido cadastrado.", output: { phone } };
       }
       // Pick a connected instance for the org
       const { data: instances } = await supabaseAdmin
@@ -223,7 +238,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         .order("last_connected_at", { ascending: false })
         .limit(1);
       const inst = instances?.[0];
-      if (!inst) return { kind: "fail", error: "Nenhuma instância WhatsApp conectada." };
+      if (!inst) return { kind: "permanent_fail", error: "Nenhuma instância WhatsApp conectada. Conecte uma em Integrações." };
 
       const { data: token } = await supabaseAdmin.rpc("get_hook7_instance_token", { _instance_id: inst.id });
       if (!token) return { kind: "fail", error: "Token Hook7 indisponível." };
@@ -588,10 +603,10 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       ]);
       const settings = settingsRes.data;
       if (!settings || !settings.is_enabled) {
-        return { kind: "fail", error: "IA da plataforma desabilitada." };
+        return { kind: "permanent_fail", error: "IA da plataforma desabilitada." };
       }
       const { hasOpenAIKey, callOpenAI } = await import("@/lib/openai.server");
-      if (!hasOpenAIKey()) return { kind: "fail", error: "OPENAI_API_KEY ausente." };
+      if (!hasOpenAIKey()) return { kind: "permanent_fail", error: "OPENAI_API_KEY ausente." };
 
       const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
       const { system, user } = buildPrompt({
@@ -633,7 +648,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       // Dispatch by channel
       if (channel === "email") {
         if (!lead.email) {
-          return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_email" } };
+          return { kind: "permanent_fail", error: "Lead não tem email cadastrado." };
         }
         const subject = renderTemplate(cfg.email_subject_template ?? "", vars) || "Mensagem";
         const html = aiText.split("\n").map((l) => `<p>${l.replace(/</g, "&lt;")}</p>`).join("");
@@ -662,7 +677,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       // WhatsApp
       const phone = (lead.phone ?? "").replace(/\D+/g, "");
       if (phone.length < 10 || phone.length > 15) {
-        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "invalid_phone", phone } };
+        return { kind: "permanent_fail", error: "Lead não tem telefone/WhatsApp válido cadastrado.", output: { phone } };
       }
       const { data: instances } = await supabaseAdmin
         .from("hook7_instances")
@@ -673,7 +688,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         .order("last_connected_at", { ascending: false })
         .limit(1);
       const inst = instances?.[0];
-      if (!inst) return { kind: "fail", error: "Nenhuma instância WhatsApp conectada." };
+      if (!inst) return { kind: "permanent_fail", error: "Nenhuma instância WhatsApp conectada. Conecte uma em Integrações." };
       const { data: token } = await supabaseAdmin.rpc("get_hook7_instance_token", { _instance_id: inst.id });
       if (!token) return { kind: "fail", error: "Token Hook7 indisponível." };
       const { data: baseUrlData } = await supabaseAdmin.rpc("get_platform_plain", { _key: "hook7_base_url" });
@@ -743,7 +758,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         must_include?: string | null;
       };
       if (!cfg.output_label || !cfg.output_label.trim()) {
-        return { kind: "fail", error: "Step 'Gerar texto com IA' requer um rótulo (output_label)." };
+        return { kind: "permanent_fail", error: "Step 'Gerar texto com IA' requer um rótulo (output_label)." };
       }
 
       const [settingsRes, presetsRes, profileRes, leadFullRes] = await Promise.all([
@@ -756,10 +771,10 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       ]);
       const settings = settingsRes.data;
       if (!settings || !settings.is_enabled) {
-        return { kind: "fail", error: "IA da plataforma desabilitada." };
+        return { kind: "permanent_fail", error: "IA da plataforma desabilitada." };
       }
       const { hasOpenAIKey, callOpenAI } = await import("@/lib/openai.server");
-      if (!hasOpenAIKey()) return { kind: "fail", error: "OPENAI_API_KEY ausente." };
+      if (!hasOpenAIKey()) return { kind: "permanent_fail", error: "OPENAI_API_KEY ausente." };
 
       const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
       const { system, user } = buildPrompt({
@@ -799,7 +814,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       if (!aiText) return { kind: "fail", error: "IA retornou texto vazio." };
 
       const slug = slugifyLabel(cfg.output_label);
-      if (!slug) return { kind: "fail", error: `Rótulo inválido: "${cfg.output_label}".` };
+      if (!slug) return { kind: "permanent_fail", error: `Rótulo inválido: "${cfg.output_label}".` };
 
       const currentContext = (en.context ?? {}) as any;
       const aiTexts = (currentContext.ai_texts ?? {}) as Record<string, unknown>;
@@ -931,7 +946,29 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
   try {
     outcome = await executeStep(en as Enrollment, step as Step);
   } catch (e: any) {
-    outcome = { kind: "fail", error: String(e?.message ?? e).slice(0, 500) };
+    const msg = String(e?.message ?? e).slice(0, 500);
+    // Upgrade well-known config errors thrown from helpers (e.g. sendEmailInternal
+    // when Resend is not connected) into permanent_fail so we don't retry.
+    outcome = isPermanentErrorMessage(msg)
+      ? { kind: "permanent_fail", error: msg }
+      : { kind: "fail", error: msg };
+  }
+
+  if (outcome.kind === "permanent_fail") {
+    // Stop immediately — no retry. Mark enrollment as errored so the user can act.
+    await supabaseAdmin.from("flow_step_runs").update({
+      status: "failed",
+      error: `[PERMANENTE] ${outcome.error}`,
+      finished_at: new Date().toISOString(),
+      output: (outcome.output ?? {}) as any,
+    }).eq("id", runId);
+    await supabaseAdmin.from("scheduled_jobs").update({
+      status: "failed", last_error: `[PERMANENTE] ${outcome.error}`,
+    }).eq("id", job.id);
+    await supabaseAdmin.from("campaign_enrollments").update({
+      status: "failed", last_error: `[PERMANENTE] ${outcome.error}`,
+    }).eq("id", en.id);
+    return { ok: false, error: outcome.error, enrollment_id: en.id };
   }
 
   if (outcome.kind === "fail") {
