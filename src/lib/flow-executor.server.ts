@@ -966,7 +966,7 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
       status: "failed", last_error: `[PERMANENTE] ${outcome.error}`,
     }).eq("id", job.id);
     await supabaseAdmin.from("campaign_enrollments").update({
-      status: "errored", last_error: `[PERMANENTE] ${outcome.error}`,
+      status: "failed", last_error: `[PERMANENTE] ${outcome.error}`,
     }).eq("id", en.id);
     return { ok: false, error: outcome.error, enrollment_id: en.id };
   }
