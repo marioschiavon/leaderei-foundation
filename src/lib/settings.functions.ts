@@ -193,7 +193,7 @@ export const inviteMember = createServerFn({ method: "POST" })
 
     const base = process.env.VITE_PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
     const invite_url = `${base}/invite/${row.token}`;
-    return { invitation_id: row.id, token: row.token, invite_url };
+    return { invitation_id: row.id, invite_url };
   });
 
 export const sendInvitationEmail = createServerFn({ method: "POST" })
