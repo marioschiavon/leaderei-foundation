@@ -161,7 +161,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         ai_text_label?: string | null;
       };
       if (!lead.email) {
-        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "no_email" } };
+        return { kind: "permanent_fail", error: "Lead não tem email cadastrado." };
       }
       const subject = renderTemplate(cfg.subject ?? "", vars);
       let html: string;
@@ -170,7 +170,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         const stored = getStoredAiText(en, cfg.ai_text_label);
         if (!stored) {
           return {
-            kind: "fail",
+            kind: "permanent_fail",
             error: `Texto de IA "${cfg.ai_text_label}" não encontrado no contexto. Verifique se o step "Gerar texto com IA" (rótulo: "${cfg.ai_text_label}", canal: email) está antes deste step no fluxo.`,
           };
         }
