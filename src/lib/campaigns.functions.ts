@@ -574,10 +574,29 @@ export const resumeEnrollment = createServerFn({ method: "POST" })
     const { supabase } = context;
     const now = new Date().toISOString();
     const { data: en } = await supabase
-      .from("campaign_enrollments").select("id, organization_id, current_step_id").eq("id", data.enrollment_id).maybeSingle();
+      .from("campaign_enrollments")
+      .select("id, organization_id, current_step_id, document_id")
+      .eq("id", data.enrollment_id)
+      .maybeSingle();
     if (!en) throw new Error("Enrollment não encontrado.");
-    if (!en.current_step_id) throw new Error("Sem passo atual para retomar.");
-    await supabase.from("campaign_enrollments").update({ status: "active", next_run_at: now, last_error: null }).eq("id", en.id);
+
+    let stepId = en.current_step_id as string | null;
+    if (!stepId) {
+      if (!en.document_id) throw new Error("Enrollment sem fluxo associado.");
+      const { data: entry } = await supabase
+        .from("flow_steps")
+        .select("id")
+        .eq("document_id", en.document_id)
+        .eq("is_entry", true)
+        .maybeSingle();
+      if (!entry) throw new Error("Fluxo sem passo inicial — republique o fluxo no Builder.");
+      stepId = entry.id as string;
+    }
+
+    await supabase
+      .from("campaign_enrollments")
+      .update({ status: "active", next_run_at: now, last_error: null, current_step_id: stepId })
+      .eq("id", en.id);
     await supabase.from("scheduled_jobs").insert({
       organization_id: en.organization_id,
       kind: "flow_step",
