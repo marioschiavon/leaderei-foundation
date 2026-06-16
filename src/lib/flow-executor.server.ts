@@ -814,7 +814,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       if (!aiText) return { kind: "fail", error: "IA retornou texto vazio." };
 
       const slug = slugifyLabel(cfg.output_label);
-      if (!slug) return { kind: "fail", error: `Rótulo inválido: "${cfg.output_label}".` };
+      if (!slug) return { kind: "permanent_fail", error: `Rótulo inválido: "${cfg.output_label}".` };
 
       const currentContext = (en.context ?? {}) as any;
       const aiTexts = (currentContext.ai_texts ?? {}) as Record<string, unknown>;
