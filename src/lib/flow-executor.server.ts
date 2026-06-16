@@ -758,7 +758,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         must_include?: string | null;
       };
       if (!cfg.output_label || !cfg.output_label.trim()) {
-        return { kind: "fail", error: "Step 'Gerar texto com IA' requer um rótulo (output_label)." };
+        return { kind: "permanent_fail", error: "Step 'Gerar texto com IA' requer um rótulo (output_label)." };
       }
 
       const [settingsRes, presetsRes, profileRes, leadFullRes] = await Promise.all([
@@ -771,10 +771,10 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       ]);
       const settings = settingsRes.data;
       if (!settings || !settings.is_enabled) {
-        return { kind: "fail", error: "IA da plataforma desabilitada." };
+        return { kind: "permanent_fail", error: "IA da plataforma desabilitada." };
       }
       const { hasOpenAIKey, callOpenAI } = await import("@/lib/openai.server");
-      if (!hasOpenAIKey()) return { kind: "fail", error: "OPENAI_API_KEY ausente." };
+      if (!hasOpenAIKey()) return { kind: "permanent_fail", error: "OPENAI_API_KEY ausente." };
 
       const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
       const { system, user } = buildPrompt({
