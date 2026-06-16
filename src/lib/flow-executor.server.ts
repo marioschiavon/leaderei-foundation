@@ -946,7 +946,29 @@ export async function processJob(jobId: string): Promise<{ ok: boolean; error?: 
   try {
     outcome = await executeStep(en as Enrollment, step as Step);
   } catch (e: any) {
-    outcome = { kind: "fail", error: String(e?.message ?? e).slice(0, 500) };
+    const msg = String(e?.message ?? e).slice(0, 500);
+    // Upgrade well-known config errors thrown from helpers (e.g. sendEmailInternal
+    // when Resend is not connected) into permanent_fail so we don't retry.
+    outcome = isPermanentErrorMessage(msg)
+      ? { kind: "permanent_fail", error: msg }
+      : { kind: "fail", error: msg };
+  }
+
+  if (outcome.kind === "permanent_fail") {
+    // Stop immediately — no retry. Mark enrollment as errored so the user can act.
+    await supabaseAdmin.from("flow_step_runs").update({
+      status: "failed",
+      error: `[PERMANENTE] ${outcome.error}`,
+      finished_at: new Date().toISOString(),
+      output: (outcome.output ?? {}) as any,
+    }).eq("id", runId);
+    await supabaseAdmin.from("scheduled_jobs").update({
+      status: "failed", last_error: `[PERMANENTE] ${outcome.error}`,
+    }).eq("id", job.id);
+    await supabaseAdmin.from("campaign_enrollments").update({
+      status: "errored", last_error: `[PERMANENTE] ${outcome.error}`,
+    }).eq("id", en.id);
+    return { ok: false, error: outcome.error, enrollment_id: en.id };
   }
 
   if (outcome.kind === "fail") {
