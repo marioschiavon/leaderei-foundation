@@ -56,14 +56,15 @@ async function getConnectionRow(supabase: any, organization_id: string) {
   return { provider_id, conn };
 }
 
-async function loadApiKey(supabase: any, integration_id: string): Promise<string | null> {
-  const { data } = await supabase
+async function loadApiKey(_supabase: any, integration_id: string): Promise<string | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
     .from("integration_credentials")
     .select("value_encrypted")
     .eq("integration_id", integration_id)
     .eq("key", "api_key")
     .maybeSingle();
-  return data?.value_encrypted ?? null;
+  return (data as any)?.value_encrypted ?? null;
 }
 
 // ---------------------------------------------------------------------------
