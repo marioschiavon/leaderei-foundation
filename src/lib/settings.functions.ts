@@ -114,7 +114,7 @@ export const listOrgInvitations = createServerFn({ method: "GET" })
     const m = await getActiveOrg(supabase, userId);
     const { data, error } = await supabase
       .from("organization_invitations")
-      .select("id, email, role, token, expires_at, created_at, accepted_at, revoked_at")
+      .select("id, email, role, expires_at, created_at, accepted_at, revoked_at, last_sent_at")
       .eq("organization_id", m.organization_id)
       .is("accepted_at", null)
       .is("revoked_at", null)
@@ -122,6 +122,29 @@ export const listOrgInvitations = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const getInvitationLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ invitation_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context;
+    const m = await requireAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: inv, error } = await supabaseAdmin
+      .from("organization_invitations")
+      .select("token, organization_id, accepted_at, revoked_at, expires_at")
+      .eq("id", data.invitation_id)
+      .single();
+    if (error || !inv) throw new Error("Convite não encontrado.");
+    if (inv.organization_id !== m.organization_id) throw new Error("Convite não encontrado.");
+    if (inv.accepted_at || inv.revoked_at || new Date(inv.expires_at) <= new Date()) {
+      throw new Error("Convite não está mais ativo.");
+    }
+    const base = process.env.VITE_PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
+    return { invite_url: `${base}/invite/${inv.token}` };
   });
 
 const InviteSchema = z.object({
@@ -170,7 +193,7 @@ export const inviteMember = createServerFn({ method: "POST" })
 
     const base = process.env.VITE_PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
     const invite_url = `${base}/invite/${row.token}`;
-    return { invitation_id: row.id, token: row.token, invite_url };
+    return { invitation_id: row.id, invite_url };
   });
 
 export const sendInvitationEmail = createServerFn({ method: "POST" })
