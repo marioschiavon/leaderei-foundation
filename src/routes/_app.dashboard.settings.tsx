@@ -359,7 +359,7 @@ function MemberMenu({ member, onChanged }: { member: any; onChanged: () => void 
 function InviteMenu({ invite, onChanged }: { invite: any; onChanged: () => void }) {
   const revoke = useServerFn(revokeInvitation);
   const sendEmail = useServerFn(sendInvitationEmail);
-  const link = `${window.location.origin}/invite/${invite.token ?? ""}`;
+  const getLink = useServerFn(getInvitationLink);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -371,8 +371,11 @@ function InviteMenu({ invite, onChanged }: { invite: any; onChanged: () => void 
           catch (e: any) { toast.error(e.message); }
         }}>Reenviar por email</DropdownMenuItem>
         <DropdownMenuItem onClick={async () => {
-          if (invite.token) { await navigator.clipboard.writeText(link); toast.success("Link copiado."); }
-          else toast.info("Link não disponível para este convite.");
+          try {
+            const r = await getLink({ data: { invitation_id: invite.id } });
+            await navigator.clipboard.writeText(r.invite_url);
+            toast.success("Link copiado.");
+          } catch (e: any) { toast.error(e.message); }
         }}>Copiar link</DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onClick={async () => {
           try { await revoke({ data: { invitation_id: invite.id } }); toast.success("Convite revogado."); onChanged(); }
