@@ -603,10 +603,10 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       ]);
       const settings = settingsRes.data;
       if (!settings || !settings.is_enabled) {
-        return { kind: "fail", error: "IA da plataforma desabilitada." };
+        return { kind: "permanent_fail", error: "IA da plataforma desabilitada." };
       }
       const { hasOpenAIKey, callOpenAI } = await import("@/lib/openai.server");
-      if (!hasOpenAIKey()) return { kind: "fail", error: "OPENAI_API_KEY ausente." };
+      if (!hasOpenAIKey()) return { kind: "permanent_fail", error: "OPENAI_API_KEY ausente." };
 
       const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
       const { system, user } = buildPrompt({
