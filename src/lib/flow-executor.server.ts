@@ -9,7 +9,22 @@ export type StepOutcome =
   | { kind: "advance"; next_step_id: string | null; delay_until: Date; branch?: string; output?: Json }
   | { kind: "wait"; resume_at: Date; output?: Json }
   | { kind: "complete"; output?: Json }
-  | { kind: "fail"; error: string; output?: Json };
+  | { kind: "fail"; error: string; output?: Json }
+  | { kind: "permanent_fail"; error: string; output?: Json };
+
+// Detect config/data errors that won't resolve via retry (e.g. Resend not
+// connected, missing OPENAI key). Used to upgrade thrown exceptions caught
+// by the outer try/catch into permanent_fail.
+const PERMANENT_ERROR_PATTERNS: RegExp[] = [
+  /n[ãa]o conectou o Resend/i,
+  /Conecte em Integra[çc][õo]es/i,
+  /Resend.*n[ãa]o.*configurad/i,
+  /OPENAI_API_KEY/i,
+  /IA da plataforma desabilitada/i,
+];
+function isPermanentErrorMessage(msg: string): boolean {
+  return PERMANENT_ERROR_PATTERNS.some((re) => re.test(msg));
+}
 
 interface Enrollment {
   id: string;
