@@ -216,7 +216,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         const stored = getStoredAiText(en, cfg.ai_text_label);
         if (!stored) {
           return {
-            kind: "fail",
+            kind: "permanent_fail",
             error: `Texto de IA "${cfg.ai_text_label}" não encontrado no contexto. Verifique se o step "Gerar texto com IA" (rótulo: "${cfg.ai_text_label}", canal: whatsapp) está antes deste step no fluxo.`,
           };
         }
@@ -226,7 +226,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       }
       const phone = (lead.phone ?? "").replace(/\D+/g, "");
       if (phone.length < 10 || phone.length > 15) {
-        return { kind: "advance", next_step_id: await findNextStep(step.document_id, step.id, "next"), delay_until: now, output: { skipped: "invalid_phone", phone } };
+        return { kind: "permanent_fail", error: "Lead não tem telefone/WhatsApp válido cadastrado.", output: { phone } };
       }
       // Pick a connected instance for the org
       const { data: instances } = await supabaseAdmin
@@ -238,7 +238,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         .order("last_connected_at", { ascending: false })
         .limit(1);
       const inst = instances?.[0];
-      if (!inst) return { kind: "fail", error: "Nenhuma instância WhatsApp conectada." };
+      if (!inst) return { kind: "permanent_fail", error: "Nenhuma instância WhatsApp conectada. Conecte uma em Integrações." };
 
       const { data: token } = await supabaseAdmin.rpc("get_hook7_instance_token", { _instance_id: inst.id });
       if (!token) return { kind: "fail", error: "Token Hook7 indisponível." };
