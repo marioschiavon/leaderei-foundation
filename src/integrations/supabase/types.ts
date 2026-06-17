@@ -2708,6 +2708,7 @@ export type Database = {
         | "paused"
         | "completed"
         | "archived"
+        | "stopped"
       conversation_status: "open" | "pending" | "snoozed" | "closed"
       deal_stage:
         | "lead"
@@ -2937,6 +2938,7 @@ export const Constants = {
         "paused",
         "completed",
         "archived",
+        "stopped",
       ],
       conversation_status: ["open", "pending", "snoozed", "closed"],
       deal_stage: [

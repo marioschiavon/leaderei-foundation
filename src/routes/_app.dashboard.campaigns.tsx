@@ -18,6 +18,7 @@ import {
   MoreVertical,
   Play,
   Pause,
+  Square,
   Copy,
   Archive,
   Pencil,
@@ -59,6 +60,9 @@ import {
   forceFlowTick,
   getEnrollmentRuns,
   cancelEnrollment,
+  stopCampaign,
+  restartStoppedCampaign,
+  previewCampaignRestart,
 } from "@/lib/campaigns.functions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -123,6 +127,7 @@ const STATUS_META: Record<string, { label: string; chip: string; dot: string }> 
   scheduled: { label: "Agendada", chip: "bg-sky-500/10 text-sky-700 dark:text-sky-300", dot: "bg-sky-500" },
   running: { label: "Em execução", chip: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
   paused: { label: "Pausada", chip: "bg-amber-500/10 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  stopped: { label: "Parada", chip: "bg-rose-500/10 text-rose-700 dark:text-rose-300", dot: "bg-rose-500" },
   completed: { label: "Concluída", chip: "bg-foreground/5 text-foreground/70", dot: "bg-foreground/60" },
   archived: { label: "Arquivada", chip: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/60" },
 };
@@ -373,6 +378,9 @@ function CampaignCard({
   const archiveFn = useServerFn(archiveCampaign);
   const restoreFn = useServerFn(restoreCampaign);
   const deleteFn = useServerFn(deleteCampaign);
+  const stopFn = useServerFn(stopCampaign);
+  const restartFn = useServerFn(restartStoppedCampaign);
+  const previewRestartFn = useServerFn(previewCampaignRestart);
 
   const meta = STATUS_META[c.status] ?? STATUS_META.draft;
   const Icon = CHANNEL_ICON[c.channel] ?? Megaphone;
@@ -430,14 +438,65 @@ function CampaignCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const stopMutation = useMutation({
+    mutationFn: () => stopFn({ data: { campaign_id: c.id } }),
+    onSuccess: (r: any) => {
+      toast.success(
+        `Campanha parada. ${r?.cancelled_enrollments ?? 0} lead(s) removidos da fila.`,
+      );
+      invalidate();
+      setStopOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const restartMutation = useMutation({
+    mutationFn: (re_enroll: boolean) =>
+      restartFn({ data: { campaign_id: c.id, re_enroll } }),
+    onSuccess: (r: any) => {
+      toast.success(
+        r?.re_enrolled
+          ? `Campanha reiniciada. ${r.re_enrolled} lead(s) re-enrolados.`
+          : "Campanha reiniciada.",
+      );
+      invalidate();
+      setRestartOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [execOpen, setExecOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
   const [leadsOpen, setLeadsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [stopOpen, setStopOpen] = useState(false);
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartPreview, setRestartPreview] = useState<number | null>(null);
   const isArchived = scope === "archived";
-  const canStart = !isArchived && (c.status === "draft" || c.status === "paused");
+  const canStart = !isArchived && (c.status === "draft" || c.status === "paused" || c.status === "stopped");
   const canPause = !isArchived && c.status === "running";
+  const canStop = !isArchived && (c.status === "running" || c.status === "paused");
   const isLive = c.status === "running" || c.status === "paused";
+
+  const openRestart = async () => {
+    setRestartPreview(null);
+    setRestartOpen(true);
+    try {
+      const r: any = await previewRestartFn({ data: { campaign_id: c.id } });
+      setRestartPreview(r?.reenrollable ?? 0);
+    } catch {
+      setRestartPreview(0);
+    }
+  };
+
+  const startLabel =
+    c.status === "draft" ? "Ativar" : c.status === "stopped" ? "Reiniciar" : "Retomar";
+
+  const handleStartClick = () => {
+    if (c.status === "draft") setActivateOpen(true);
+    else if (c.status === "stopped") openRestart();
+    else statusMutation.mutate("running");
+  };
 
   return (
     <div className="flex flex-col rounded-xl border bg-surface">
@@ -544,15 +603,18 @@ function CampaignCard({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
+                  onClick={handleStartClick}
+                  disabled={statusMutation.isPending || restartMutation.isPending}
+                  title={
                     c.status === "draft"
-                      ? setActivateOpen(true)
-                      : statusMutation.mutate("running")
+                      ? "Ativar campanha e enrolar leads."
+                      : c.status === "stopped"
+                      ? "Reativar a campanha e re-enrolar os leads parados."
+                      : "Retomar a partir do passo atual."
                   }
-                  disabled={statusMutation.isPending}
                 >
                   <Play className="h-3.5 w-3.5" />
-                  {c.status === "draft" ? "Ativar" : "Retomar"}
+                  {startLabel}
                 </Button>
               )}
               {canPause && (
@@ -561,8 +623,20 @@ function CampaignCard({
                   variant="ghost"
                   onClick={() => statusMutation.mutate("paused")}
                   disabled={statusMutation.isPending}
+                  title="Pausa temporária — pode ser retomada do ponto atual."
                 >
                   <Pause className="h-3.5 w-3.5" /> Pausar
+                </Button>
+              )}
+              {canStop && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setStopOpen(true)}
+                  disabled={stopMutation.isPending}
+                  title="Encerra a execução: cancela leads em fila. Pode ser reiniciada depois."
+                >
+                  <Square className="h-3.5 w-3.5" /> Parar
                 </Button>
               )}
               <DropdownMenu>
@@ -620,6 +694,53 @@ function CampaignCard({
         onConfirm={() => deleteMutation.mutate()}
         isPending={deleteMutation.isPending}
       />
+      <AlertDialog open={stopOpen} onOpenChange={setStopOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parar campanha "{c.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os leads em fila serão cancelados e a campanha deixa de processar novos passos.
+              Passos que já estavam em execução terminam normalmente.
+              Você pode reiniciar depois — os leads parados serão re-enrolados desde o início (com confirmação).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stopMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); stopMutation.mutate(); }}
+              disabled={stopMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {stopMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+              Parar campanha
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={restartOpen} onOpenChange={setRestartOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar campanha "{c.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restartPreview === null
+                ? "Calculando leads para re-enrolar..."
+                : restartPreview === 0
+                ? "Não há leads parados para re-enrolar. A campanha voltará a ficar ativa, mas você precisará adicionar leads manualmente."
+                : `${restartPreview} lead(s) que estavam ativos no momento do Parar serão re-enrolados desde o passo inicial do fluxo.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restartMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); restartMutation.mutate((restartPreview ?? 0) > 0); }}
+              disabled={restartMutation.isPending || restartPreview === null}
+            >
+              {restartMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              {restartPreview && restartPreview > 0 ? "Reiniciar e re-enrolar" : "Reiniciar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

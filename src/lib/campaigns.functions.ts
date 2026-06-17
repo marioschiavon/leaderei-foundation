@@ -743,3 +743,120 @@ export const forceFlowTick = createServerFn({ method: "POST" })
     const out = await runFlowTick(25);
     return { ok: true, ...out };
   });
+
+// ---------------------------------------------------------------------------
+// Stop / Restart — stronger than pause. Stop cancels pending jobs and active
+// enrollments (running step_runs finish naturally). Restart from stopped
+// optionally re-enrolls leads that were active/paused at the time of stop.
+// ---------------------------------------------------------------------------
+
+export const previewCampaignRestart = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ campaign_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { count } = await supabase
+      .from("campaign_enrollments")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", data.campaign_id)
+      .eq("status", "cancelled");
+    return { reenrollable: count ?? 0 };
+  });
+
+export const stopCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ campaign_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const nowIso = new Date().toISOString();
+
+    // Cancel pending jobs for this campaign's enrollments.
+    const { data: enrolls } = await supabase
+      .from("campaign_enrollments")
+      .select("id, status")
+      .eq("campaign_id", data.campaign_id)
+      .in("status", ["active", "paused"]);
+    const enrollmentIds = (enrolls ?? []).map((e: any) => e.id as string);
+
+    let cancelledJobs = 0;
+    let cancelledEnrollments = 0;
+    if (enrollmentIds.length > 0) {
+      const { count: jc } = await supabase
+        .from("scheduled_jobs")
+        .update({ status: "cancelled" }, { count: "exact" })
+        .in("enrollment_id", enrollmentIds)
+        .eq("status", "pending");
+      cancelledJobs = jc ?? 0;
+
+      const { count: ec } = await supabase
+        .from("campaign_enrollments")
+        .update({ status: "cancelled", next_run_at: null, updated_at: nowIso }, { count: "exact" })
+        .in("id", enrollmentIds);
+      cancelledEnrollments = ec ?? 0;
+    }
+
+    // Mark campaign as stopped. Running step_runs finish naturally.
+    const { error } = await supabase
+      .from("campaigns")
+      .update({ status: "stopped" as any, updated_at: nowIso })
+      .eq("id", data.campaign_id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true, cancelled_jobs: cancelledJobs, cancelled_enrollments: cancelledEnrollments };
+  });
+
+export const restartStoppedCampaign = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      campaign_id: z.string().uuid(),
+      re_enroll: z.boolean().default(true),
+    }).parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const nowIso = new Date().toISOString();
+
+    let reEnrolled = 0;
+    if (data.re_enroll) {
+      const { document_id, entry_step_id } = await resolveDocumentAndEntry(supabase, data.campaign_id);
+      const { data: cancelled } = await supabase
+        .from("campaign_enrollments")
+        .select("id, organization_id")
+        .eq("campaign_id", data.campaign_id)
+        .eq("status", "cancelled")
+        .limit(2000);
+      for (const en of (cancelled ?? []) as Array<{ id: string; organization_id: string }>) {
+        await supabase
+          .from("campaign_enrollments")
+          .update({
+            status: "active",
+            current_step_id: entry_step_id,
+            document_id,
+            next_run_at: nowIso,
+            last_error: null,
+            completed_at: null,
+            context: {},
+            updated_at: nowIso,
+          })
+          .eq("id", en.id);
+        await supabase.from("scheduled_jobs").insert({
+          organization_id: en.organization_id,
+          kind: "flow_step",
+          payload: { enrollment_id: en.id },
+          enrollment_id: en.id,
+          run_at: nowIso,
+          scope: "org",
+        });
+        reEnrolled += 1;
+      }
+    }
+
+    const { error } = await supabase
+      .from("campaigns")
+      .update({ status: "running", started_at: nowIso, updated_at: nowIso })
+      .eq("id", data.campaign_id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true, re_enrolled: reEnrolled };
+  });

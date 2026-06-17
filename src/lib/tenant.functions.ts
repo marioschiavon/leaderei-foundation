@@ -771,6 +771,7 @@ const CAMPAIGN_STATUSES = [
   "scheduled",
   "running",
   "paused",
+  "stopped",
   "completed",
   "archived",
 ] as const;
