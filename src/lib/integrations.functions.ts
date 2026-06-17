@@ -91,8 +91,15 @@ export const saveOrgResendConnection = createServerFn({ method: "POST" })
     if (pErr) throw new Error(pErr.message);
     if (!provider) throw new Error("Provider 'resend' não cadastrado.");
 
+    // After validating org membership via getActiveOrgId, use admin client
+    // for writes so the integration policy (which requires global
+    // has_role(uid, 'company_admin')) doesn't block legitimate org members
+    // (e.g. master_admin who is company_admin of their own org via
+    // organization_members, but not in user_roles globally).
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     // Upsert connection
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from("organization_integrations")
       .select("id")
       .eq("organization_id", organization_id)
@@ -101,7 +108,7 @@ export const saveOrgResendConnection = createServerFn({ method: "POST" })
 
     let integration_id: string;
     if (existing) {
-      const { data: updated, error } = await supabase
+      const { data: updated, error } = await supabaseAdmin
         .from("organization_integrations")
         .update({
           status: "connected",
@@ -119,7 +126,7 @@ export const saveOrgResendConnection = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       integration_id = updated.id;
     } else {
-      const { data: inserted, error } = await supabase
+      const { data: inserted, error } = await supabaseAdmin
         .from("organization_integrations")
         .insert({
           organization_id,
@@ -138,7 +145,7 @@ export const saveOrgResendConnection = createServerFn({ method: "POST" })
     }
 
     // Upsert api_key credential
-    const { error: credErr } = await supabase
+    const { error: credErr } = await supabaseAdmin
       .from("integration_credentials")
       .upsert(
         {
@@ -174,8 +181,9 @@ export const disconnectOrgResend = createServerFn({ method: "POST" })
       .eq("provider_id", provider.id)
       .maybeSingle();
     if (!conn) return { ok: true };
-    await supabase.from("integration_credentials").delete().eq("integration_id", conn.id);
-    await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("integration_credentials").delete().eq("integration_id", conn.id);
+    await supabaseAdmin
       .from("organization_integrations")
       .update({ status: "disconnected", updated_at: new Date().toISOString() })
       .eq("id", conn.id);
