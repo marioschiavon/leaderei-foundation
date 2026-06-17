@@ -127,6 +127,7 @@ const STATUS_META: Record<string, { label: string; chip: string; dot: string }> 
   scheduled: { label: "Agendada", chip: "bg-sky-500/10 text-sky-700 dark:text-sky-300", dot: "bg-sky-500" },
   running: { label: "Em execução", chip: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
   paused: { label: "Pausada", chip: "bg-amber-500/10 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  stopped: { label: "Parada", chip: "bg-rose-500/10 text-rose-700 dark:text-rose-300", dot: "bg-rose-500" },
   completed: { label: "Concluída", chip: "bg-foreground/5 text-foreground/70", dot: "bg-foreground/60" },
   archived: { label: "Arquivada", chip: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/60" },
 };
