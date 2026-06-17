@@ -603,15 +603,18 @@ function CampaignCard({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
+                  onClick={handleStartClick}
+                  disabled={statusMutation.isPending || restartMutation.isPending}
+                  title={
                     c.status === "draft"
-                      ? setActivateOpen(true)
-                      : statusMutation.mutate("running")
+                      ? "Ativar campanha e enrolar leads."
+                      : c.status === "stopped"
+                      ? "Reativar a campanha e re-enrolar os leads parados."
+                      : "Retomar a partir do passo atual."
                   }
-                  disabled={statusMutation.isPending}
                 >
                   <Play className="h-3.5 w-3.5" />
-                  {c.status === "draft" ? "Ativar" : "Retomar"}
+                  {startLabel}
                 </Button>
               )}
               {canPause && (
@@ -620,8 +623,20 @@ function CampaignCard({
                   variant="ghost"
                   onClick={() => statusMutation.mutate("paused")}
                   disabled={statusMutation.isPending}
+                  title="Pausa temporária — pode ser retomada do ponto atual."
                 >
                   <Pause className="h-3.5 w-3.5" /> Pausar
+                </Button>
+              )}
+              {canStop && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setStopOpen(true)}
+                  disabled={stopMutation.isPending}
+                  title="Encerra a execução: cancela leads em fila. Pode ser reiniciada depois."
+                >
+                  <Square className="h-3.5 w-3.5" /> Parar
                 </Button>
               )}
               <DropdownMenu>
