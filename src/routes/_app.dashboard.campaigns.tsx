@@ -1504,7 +1504,7 @@ function ExecutionsDialog({
                 Lista de leads enrolados no fluxo. Atualiza a cada 5s.
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pr-10">
               {((stats as any)?.completed ?? 0) > 0 && (
                 <Button
                   size="sm"
@@ -1530,14 +1530,14 @@ function ExecutionsDialog({
                 variant="outline"
                 onClick={() => tickMut.mutate()}
                 disabled={tickMut.isPending}
-                title="Roda o worker manualmente — útil para testar sem esperar o cron."
+                title="Executa o worker imediatamente, sem esperar o próximo ciclo automático (1 min)."
               >
                 {tickMut.isPending ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                Forçar tick
+                Executar agora
               </Button>
             </div>
           </div>
