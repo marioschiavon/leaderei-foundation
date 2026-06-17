@@ -378,6 +378,9 @@ function CampaignCard({
   const archiveFn = useServerFn(archiveCampaign);
   const restoreFn = useServerFn(restoreCampaign);
   const deleteFn = useServerFn(deleteCampaign);
+  const stopFn = useServerFn(stopCampaign);
+  const restartFn = useServerFn(restartStoppedCampaign);
+  const previewRestartFn = useServerFn(previewCampaignRestart);
 
   const meta = STATUS_META[c.status] ?? STATUS_META.draft;
   const Icon = CHANNEL_ICON[c.channel] ?? Megaphone;
@@ -435,14 +438,65 @@ function CampaignCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const stopMutation = useMutation({
+    mutationFn: () => stopFn({ data: { campaign_id: c.id } }),
+    onSuccess: (r: any) => {
+      toast.success(
+        `Campanha parada. ${r?.cancelled_enrollments ?? 0} lead(s) removidos da fila.`,
+      );
+      invalidate();
+      setStopOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const restartMutation = useMutation({
+    mutationFn: (re_enroll: boolean) =>
+      restartFn({ data: { campaign_id: c.id, re_enroll } }),
+    onSuccess: (r: any) => {
+      toast.success(
+        r?.re_enrolled
+          ? `Campanha reiniciada. ${r.re_enrolled} lead(s) re-enrolados.`
+          : "Campanha reiniciada.",
+      );
+      invalidate();
+      setRestartOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [execOpen, setExecOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
   const [leadsOpen, setLeadsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [stopOpen, setStopOpen] = useState(false);
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartPreview, setRestartPreview] = useState<number | null>(null);
   const isArchived = scope === "archived";
-  const canStart = !isArchived && (c.status === "draft" || c.status === "paused");
+  const canStart = !isArchived && (c.status === "draft" || c.status === "paused" || c.status === "stopped");
   const canPause = !isArchived && c.status === "running";
+  const canStop = !isArchived && (c.status === "running" || c.status === "paused");
   const isLive = c.status === "running" || c.status === "paused";
+
+  const openRestart = async () => {
+    setRestartPreview(null);
+    setRestartOpen(true);
+    try {
+      const r: any = await previewRestartFn({ data: { campaign_id: c.id } });
+      setRestartPreview(r?.reenrollable ?? 0);
+    } catch {
+      setRestartPreview(0);
+    }
+  };
+
+  const startLabel =
+    c.status === "draft" ? "Ativar" : c.status === "stopped" ? "Reiniciar" : "Retomar";
+
+  const handleStartClick = () => {
+    if (c.status === "draft") setActivateOpen(true);
+    else if (c.status === "stopped") openRestart();
+    else statusMutation.mutate("running");
+  };
 
   return (
     <div className="flex flex-col rounded-xl border bg-surface">
