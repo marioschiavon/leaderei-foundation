@@ -1,42 +1,34 @@
-## Diagnóstico
+## Entendimento
 
-Enrollment `9abbdb4f...` da campanha Teste 03 está preso no passo de entrada `ai_generate_text` (label "abertura"). O fluxo atual é só: **AI → WhatsApp → End** (sem Resend).
+- O menu **Master** é o único espaço de configurações globais — só master_admin acessa.
+- O menu **Integrações** (em `/dashboard/integrations`) é sempre da empresa do usuário atual, independente do papel global. Master_admin nessa tela age como qualquer membro da própria org.
+- O bloqueio atual acontece porque a policy de `integration_credentials` exige `has_role(uid, 'company_admin')` (papel global em `user_roles`), e o master_admin não tem esse papel global — embora seja `company_admin` da sua org via `organization_members`.
 
-Linha do tempo:
-- 16/jun 22:14 — job falhou em **permanente** com a mensagem antiga "Resend não conectou". Veio de uma versão anterior do fluxo (você removeu o passo de e-mail depois). Esse erro ficou gravado mas não é o problema atual.
-- 16/jun 22:19 — você retomou; novo job criado.
-- 16/jun 22:20:02 — worker pegou o job, abriu `flow_step_runs` com `status='running'`, travou (`locked_at` setado) e **nunca finalizou**. Já passaram >5 min.
+Não vamos misturar master com company: nada de dar acesso global a integrações da empresa via policy de master. A correção fica restrita ao caminho da própria org.
 
-Resultado: `scheduled_jobs.status='running'`, `locked_at` antigo, `flow_step_runs.status='running'`, `finished_at` null. Como o executor não tem watchdog para locks vencidos, ninguém vai pegar de novo — fica preso para sempre.
+## Correção (mínima e cirúrgica)
 
-A causa raiz do hang no passo AI (timeout silencioso da chamada, worker reciclado no meio, etc.) é uma segunda investigação. O imediato é destravar e impedir reincidência.
+### Server functions de integração — usar `supabaseAdmin` após validar membership da org
 
-## O que vou fazer
+Em `src/lib/integrations.functions.ts`:
 
-### 1. Destravar a Teste 03 (dados, sem código)
-- `flow_step_runs` `d4b6ae4b...` → `status='failed'`, `finished_at=now()`, `error='lock expirado — reagendado'`.
-- `scheduled_jobs` `80bb43d7...` → `status='pending'`, `locked_at=null`, `locked_by=null`, `run_at=now()`, `last_error='lock expirado'`. Assim o próximo tick reprocessa o passo AI.
+- `saveOrgResendConnection` e `disconnectOrgResend` hoje escrevem com o cliente autenticado (sujeito ao RLS que falha).
+- O `getActiveOrgId` (já chamado nessas funções) garante que o usuário é **membro ativo** da org atual — essa é a autorização de negócio que importa nessa tela.
+- Após essa validação, trocar a escrita para `supabaseAdmin` (`await import('@/integrations/supabase/client.server')` dentro do handler), aplicada aos upserts em `organization_integrations` e `integration_credentials` (save) e ao delete/update correspondentes (disconnect).
+- A leitura (`getOrgResendConnection`) já usa `supabaseAdmin` — só está sendo alinhado o caminho de escrita.
 
-### 2. Watchdog em `src/lib/flow-executor.server.ts`
-No início de cada tick (antes de selecionar jobs pendentes), liberar jobs órfãos:
+Resultado:
+- Master_admin que é membro da sua própria org salva integrações sem fricção.
+- Company_admin comum continua funcionando exatamente igual.
+- Usuário que não é membro ativo da org → `getActiveOrgId` falha antes de qualquer escrita.
+- As policies de `integration_credentials` e `organization_integrations` permanecem **inalteradas** — master continua sem acesso global a integrações de outras empresas a partir do menu da company.
 
-- Buscar `scheduled_jobs` com `status='running'` E `locked_at < now() - interval '3 minutes'`.
-- Para cada um: setar `status='pending'`, `locked_at=null`, `locked_by=null`, `run_at=now()`, incrementar `attempts` e gravar `last_error='lock expirado após 3min, reagendado'`. Se já passou de `max_attempts`, marcar `failed` em vez de `pending`.
-- Também fechar o `flow_step_runs` correspondente (mais recente, `status='running'`) com `status='failed'`, `finished_at=now()`, mesma mensagem.
+## Auditoria
 
-Limite: até 50 jobs por tick para não estourar a janela.
+O `audit_logs` continua registrando `actor_user_id` = `context.userId`, então a autoria do master fica preservada mesmo com a escrita por `supabaseAdmin`. Nenhuma mudança extra de logging nesta rodada.
 
-### 3. Não mexer
-- Lógica do `executeStep`, dos handlers de cada tipo de passo (ai_generate_text, whatsapp, email, condition, cal.com).
-- Número de tentativas (5).
-- Lógica de `permanent_fail` (continua imediata, sem retry).
-- Nada de UI.
+## Fora do escopo
 
-## Como verificar depois
-1. Confirmar via SQL que o enrollment voltou a `next_run_at` próximo de agora e job `pending`.
-2. Aguardar o próximo tick (`/api/public/hooks/run-flow-tick`) e checar `flow_step_runs` — deve aparecer novo run com status `done` ou erro real (não "running" eterno).
-3. Se a chamada AI travar de novo, o watchdog libera em 3min e o retry de 5 tentativas eventualmente marca falha real com mensagem útil.
-
-## Escopo
-- Edição apenas em `src/lib/flow-executor.server.ts`.
-- Uma operação manual no banco para destravar a Teste 03 (via insert tool).
+- Sem mudança em RLS.
+- Sem mudança em UI.
+- Pipedrive/Apollo/Hook7 só serão revistos se exibirem o mesmo sintoma — varredura separada depois.
