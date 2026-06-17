@@ -694,6 +694,53 @@ function CampaignCard({
         onConfirm={() => deleteMutation.mutate()}
         isPending={deleteMutation.isPending}
       />
+      <AlertDialog open={stopOpen} onOpenChange={setStopOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parar campanha "{c.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os leads em fila serão cancelados e a campanha deixa de processar novos passos.
+              Passos que já estavam em execução terminam normalmente.
+              Você pode reiniciar depois — os leads parados serão re-enrolados desde o início (com confirmação).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stopMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); stopMutation.mutate(); }}
+              disabled={stopMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {stopMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+              Parar campanha
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={restartOpen} onOpenChange={setRestartOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar campanha "{c.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restartPreview === null
+                ? "Calculando leads para re-enrolar..."
+                : restartPreview === 0
+                ? "Não há leads parados para re-enrolar. A campanha voltará a ficar ativa, mas você precisará adicionar leads manualmente."
+                : `${restartPreview} lead(s) que estavam ativos no momento do Parar serão re-enrolados desde o passo inicial do fluxo.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restartMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); restartMutation.mutate((restartPreview ?? 0) > 0); }}
+              disabled={restartMutation.isPending || restartPreview === null}
+            >
+              {restartMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              {restartPreview && restartPreview > 0 ? "Reiniciar e re-enrolar" : "Reiniciar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
