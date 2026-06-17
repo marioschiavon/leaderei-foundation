@@ -181,8 +181,9 @@ export const disconnectOrgResend = createServerFn({ method: "POST" })
       .eq("provider_id", provider.id)
       .maybeSingle();
     if (!conn) return { ok: true };
-    await supabase.from("integration_credentials").delete().eq("integration_id", conn.id);
-    await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("integration_credentials").delete().eq("integration_id", conn.id);
+    await supabaseAdmin
       .from("organization_integrations")
       .update({ status: "disconnected", updated_at: new Date().toISOString() })
       .eq("id", conn.id);
