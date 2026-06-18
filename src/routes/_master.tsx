@@ -15,6 +15,7 @@ const NAV = [
   { label: "Planos", to: "/master/plans" },
   { label: "Plataforma", to: "/master/platform" },
   { label: "IA", to: "/master/ai" },
+  { label: "Fila do Agente", to: "/master/agent-queue" },
   { label: "Logs", to: "/master/logs" },
 ];
 
