@@ -409,6 +409,10 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
   const agentCtx = (conv.agent_context ?? {}) as any;
   const offeredSlots: string[] = Array.isArray(agentCtx.offered_slots) ? agentCtx.offered_slots : [];
 
+  const memoryLines = (memory ?? [])
+    .map((m) => `- [${m.category}] ${m.key}: ${m.value}`)
+    .join("\n");
+
   const systemPrompt = [
     settings.master_system_prompt?.trim() ?? "",
     "",
@@ -420,6 +424,7 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     `[Canal]\nA conversa está acontecendo via ${conv.channel === "whatsapp" ? "WhatsApp (mensagens curtas, informais)" : "e-mail"}.`,
     offeredSlots.length ? `[Horários já oferecidos anteriormente]\n${offeredSlots.map(formatSlotPt).join("\n")}\nUse 'confirmar_agendamento' apenas com um destes ISOs: ${offeredSlots.join(", ")}` : "",
     `[Lead]\nNome: ${lead.full_name ?? "—"} | Empresa: ${lead.company_name ?? "—"} | Cargo: ${lead.job_title ?? "—"}`,
+    memoryLines ? `[O que a IA já sabe sobre este lead]\n${memoryLines}` : "",
     "",
     "[Instruções do menu]",
     "Você DEVE chamar a função decide_action com exatamente uma ação. Não escreva texto livre fora da function call.",
