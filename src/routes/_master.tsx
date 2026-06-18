@@ -80,13 +80,14 @@ function MasterLayout() {
                   key={n.to}
                   to={n.to}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors inline-flex items-center gap-1.5",
                     active
                       ? "bg-white/10 text-white"
                       : "text-white/70 hover:bg-white/5 hover:text-white",
                   )}
                 >
                   {n.label}
+                  {n.to === "/master/agent-queue" ? <AgentQueueBadge /> : null}
                 </Link>
               );
             })}
