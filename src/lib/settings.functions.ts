@@ -178,7 +178,8 @@ export const inviteMember = createServerFn({ method: "POST" })
     if (pending) throw new Error("Convite já enviado. Reenvie ou revogue o existente.");
 
     const token = crypto.randomBytes(24).toString("base64url");
-    const { data: row, error } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
       .from("organization_invitations")
       .insert({
         organization_id: m.organization_id,
