@@ -486,14 +486,22 @@ export const enrichLeadWithApollo = createServerFn({ method: "POST" })
     if (lead.linkedin_url) matchBody.linkedin_url = lead.linkedin_url;
     if (lead.full_name) {
       const parts = String(lead.full_name).trim().split(/\s+/);
-      matchBody.first_name = parts.slice(0, -1).join(" ") || parts[0];
-      matchBody.last_name = parts.length > 1 ? parts.at(-1) : undefined;
+      if (parts.length > 1) {
+        matchBody.first_name = parts.slice(0, -1).join(" ");
+        matchBody.last_name = parts.at(-1);
+      } else if (parts[0]) {
+        matchBody.name = parts[0];
+      }
     }
     if (lead.website_url) matchBody.domain = String(lead.website_url).replace(/^https?:\/\//, "").split("/")[0];
     if (lead.company_name) matchBody.organization_name = lead.company_name;
 
-    if (!matchBody.email && !matchBody.linkedin_url && !(matchBody.first_name && matchBody.last_name && (matchBody.domain || matchBody.organization_name))) {
-      throw new Error("Lead não tem dados suficientes (email, LinkedIn ou nome + empresa).");
+    const hasName = !!(matchBody.first_name && matchBody.last_name) || !!matchBody.name;
+    const hasCompany = !!(matchBody.domain || matchBody.organization_name);
+    if (!matchBody.email && !matchBody.linkedin_url && !(hasName && hasCompany)) {
+      throw new Error(
+        "Lead sem dados suficientes para o Apollo. Adicione email, LinkedIn, ou nome completo + empresa/site.",
+      );
     }
 
     const result = await callApollo<{ person?: any }>({
