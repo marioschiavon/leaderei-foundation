@@ -206,7 +206,8 @@ export const sendInvitationEmail = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const m = await requireAdmin(supabase, userId);
 
-    const { data: inv, error } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: inv, error } = await supabaseAdmin
       .from("organization_invitations")
       .select("id, email, organization_id, role, token, expires_at")
       .eq("id", data.invitation_id)
@@ -216,7 +217,6 @@ export const sendInvitationEmail = createServerFn({ method: "POST" })
 
     const { sendEmailInternal } = await import("./email.functions");
     const { renderInvitationEmail } = await import("./email-templates/invitation");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const [{ data: org }, { data: inviterProfile }, { data: appUrlRow }, { data: logoRow }] = await Promise.all([
       supabaseAdmin.from("organizations").select("name").eq("id", m.organization_id).single(),
