@@ -363,13 +363,14 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     .eq("lead_id", lead_id)
     .eq("status", "active");
 
-  // 3. Load lead + history + AI settings
-  const [{ data: lead }, { data: msgs }, { data: settings }, { data: profile }, { data: presets }] = await Promise.all([
+  // 3. Load lead + history + AI settings + memory
+  const [{ data: lead }, { data: msgs }, { data: settings }, { data: profile }, { data: presets }, { data: memory }] = await Promise.all([
     supabaseAdmin.from("leads").select("id, full_name, email, phone, company_name, job_title, industry, city, country, custom_fields").eq("id", lead_id).maybeSingle(),
     supabaseAdmin.from("messages").select("direction, body, created_at, sent_by_ai").eq("conversation_id", conversation_id).order("created_at", { ascending: true }).limit(20),
     supabaseAdmin.from("ai_platform_settings").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle(),
     supabaseAdmin.from("ai_org_profile").select("*").eq("organization_id", organization_id).maybeSingle(),
     supabaseAdmin.from("ai_tone_presets").select("kind,slug,prompt_fragment").eq("is_active", true),
+    supabaseAdmin.from("lead_memory_items").select("category, key, value").eq("lead_id", lead_id).is("archived_at", null).order("category").limit(20),
   ]);
 
   if (!lead) {
