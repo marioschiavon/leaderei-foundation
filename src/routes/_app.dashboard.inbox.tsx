@@ -94,6 +94,7 @@ function InboxPage() {
         if (payload.new?.conversation_id) {
           queryClient.invalidateQueries({ queryKey: ["conv-messages", payload.new.conversation_id] });
         }
+        queryClient.invalidateQueries({ queryKey: ["lead-memory-summary"] });
       })
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "messages",
