@@ -107,3 +107,19 @@ function MasterLayout() {
     </div>
   );
 }
+
+function AgentQueueBadge() {
+  const fn = useServerFn(getAgentQueuePendingCount);
+  const { data } = useQuery({
+    queryKey: ["agent-queue-pending-count"],
+    queryFn: () => fn(),
+    refetchInterval: 30_000,
+  });
+  const count = data?.count ?? 0;
+  if (!count) return null;
+  return (
+    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[0.65rem] font-semibold text-white">
+      {count}
+    </span>
+  );
+}
