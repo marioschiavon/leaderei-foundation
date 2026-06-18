@@ -289,6 +289,18 @@ export async function searchPeopleWithCache(args: {
 // Apollo person → lead mapping
 // ---------------------------------------------------------------------------
 
+function isUsableEmail(email: unknown, status?: unknown): boolean {
+  if (!email || typeof email !== "string") return false;
+  const lower = email.toLowerCase();
+  if (lower.includes("email_not_unlocked")) return false;
+  if (lower.includes("domain.com") && lower.startsWith("email_")) return false;
+  if (typeof status === "string") {
+    const s = status.toLowerCase();
+    if (s === "unavailable" || s === "bounced" || s === "locked") return false;
+  }
+  return true;
+}
+
 export function mapPersonToLeadPayload(
   p: ApolloPerson,
   organization_id: string,
@@ -296,15 +308,16 @@ export function mapPersonToLeadPayload(
   const fullName =
     (p.name && p.name.trim()) ||
     [p.first_name, p.last_name].filter(Boolean).join(" ").trim() ||
-    p.email ||
+    (isUsableEmail(p.email, (p as any).email_status) ? (p.email as string) : null) ||
     `Apollo #${p.id}`;
   const primaryPhone = p.phone_numbers?.[0]?.sanitized_number ?? p.phone_numbers?.[0]?.raw_number ?? null;
   const org = p.organization ?? null;
+  const usableEmail = isUsableEmail(p.email, (p as any).email_status) ? p.email : null;
 
   return {
     organization_id,
     full_name: fullName,
-    email: p.email ?? null,
+    email: usableEmail,
     job_title: p.title ?? null,
     company_name: org?.name ?? null,
     website_url: org?.website_url ?? null,
@@ -321,6 +334,7 @@ export function mapPersonToLeadPayload(
     enrichment_data: { apollo: p },
   };
 }
+
 
 // Only fills missing fields; never overwrites existing values.
 export function mergeLeadPatch(
