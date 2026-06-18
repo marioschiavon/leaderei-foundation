@@ -479,6 +479,10 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     await supabaseAdmin.from("scheduled_jobs")
       .update({ status: "completed", last_error: "ação enfileirada para aprovação" })
       .eq("id", job.id);
+    await extractAndSaveMemory({
+      organization_id, lead_id, conversation_id,
+      messages: (msgs ?? []) as any, latestDecision: decision,
+    });
     return { ok: true };
   }
 
@@ -499,6 +503,10 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
       agent_context: agentCtx,
     });
     await supabaseAdmin.from("scheduled_jobs").update({ status: "completed" }).eq("id", job.id);
+    await extractAndSaveMemory({
+      organization_id, lead_id, conversation_id,
+      messages: (msgs ?? []) as any, latestDecision: decision,
+    });
     return { ok: true };
   } catch (e: any) {
     const attempts = (job.attempts ?? 0) + 1;
