@@ -451,6 +451,31 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     return { ok: false, error: String(e?.message ?? e) };
   }
 
+  // 3.5 Verifica fila de aprovação (regra da org → global → safe default = auto)
+  const shouldQueue = await shouldEnqueueAction(decision.action, organization_id);
+  if (shouldQueue) {
+    await supabaseAdmin.from("agent_action_queue").insert({
+      organization_id,
+      conversation_id,
+      lead_id,
+      action_type: decision.action,
+      action_params: decision as any,
+      status: "pending",
+    });
+    await supabaseAdmin.from("lead_activities").insert({
+      organization_id,
+      lead_id,
+      type: "system" as any,
+      title: `Agente aguardando aprovação: ${decision.action}`,
+      description: `Ação "${decision.action}" enfileirada para aprovação do master.`,
+      payload: { agent: true, action: decision.action, queued: true, conversation_id },
+    });
+    await supabaseAdmin.from("scheduled_jobs")
+      .update({ status: "completed", last_error: "ação enfileirada para aprovação" })
+      .eq("id", job.id);
+    return { ok: true };
+  }
+
   // 4. Execute action
   try {
     await executeAction(decision, {
@@ -481,6 +506,65 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     }).eq("id", job.id);
     return { ok: false, error: String(e?.message ?? e) };
   }
+}
+
+async function shouldEnqueueAction(actionType: string, organizationId: string): Promise<boolean> {
+  const { data: orgRule } = await supabaseAdmin
+    .from("agent_action_rules")
+    .select("auto_execute, enabled")
+    .eq("organization_id", organizationId)
+    .eq("action_type", actionType)
+    .maybeSingle();
+  if (orgRule) {
+    if (!orgRule.enabled) return false;
+    return !orgRule.auto_execute;
+  }
+  const { data: globalRule } = await supabaseAdmin
+    .from("agent_action_rules")
+    .select("auto_execute, enabled")
+    .is("organization_id", null)
+    .eq("action_type", actionType)
+    .maybeSingle();
+  if (globalRule) {
+    if (!globalRule.enabled) return false;
+    return !globalRule.auto_execute;
+  }
+  return false;
+}
+
+/** Reaproveita executeAction para um item da fila aprovado pelo master. */
+export async function executeAgentActionFromQueue(queueId: string): Promise<void> {
+  const { data: row, error } = await supabaseAdmin
+    .from("agent_action_queue")
+    .select("organization_id, conversation_id, lead_id, action_params")
+    .eq("id", queueId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Item da fila não encontrado.");
+
+  const [{ data: conv }, { data: lead }] = await Promise.all([
+    supabaseAdmin.from("conversations")
+      .select("id, channel, subject, agent_context")
+      .eq("id", row.conversation_id).maybeSingle(),
+    supabaseAdmin.from("leads")
+      .select("id, full_name, email, phone")
+      .eq("id", row.lead_id).maybeSingle(),
+  ]);
+  if (!conv) throw new Error("Conversa ausente.");
+  if (!lead) throw new Error("Lead ausente.");
+
+  const agentCtx = (conv.agent_context ?? {}) as any;
+  const offeredSlots: string[] = Array.isArray(agentCtx.offered_slots) ? agentCtx.offered_slots : [];
+
+  await executeAction(row.action_params as AgentAction, {
+    organization_id: row.organization_id,
+    conversation_id: row.conversation_id,
+    conversation_channel: conv.channel,
+    conversation_subject: conv.subject ?? null,
+    lead: { id: lead.id, full_name: lead.full_name, email: lead.email, phone: lead.phone },
+    offered_slots: offeredSlots,
+    agent_context: agentCtx,
+  });
 }
 
 async function executeAction(

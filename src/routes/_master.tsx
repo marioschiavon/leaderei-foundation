@@ -1,8 +1,11 @@
 import { createFileRoute, Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Shield, ArrowLeft, Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { useAuthSession, useIsMaster } from "@/lib/auth";
+import { getAgentQueuePendingCount } from "@/lib/master.functions";
 
 export const Route = createFileRoute("/_master")({
   component: MasterLayout,
@@ -15,6 +18,7 @@ const NAV = [
   { label: "Planos", to: "/master/plans" },
   { label: "Plataforma", to: "/master/platform" },
   { label: "IA", to: "/master/ai" },
+  { label: "Fila do Agente", to: "/master/agent-queue" },
   { label: "Logs", to: "/master/logs" },
 ];
 
@@ -76,13 +80,14 @@ function MasterLayout() {
                   key={n.to}
                   to={n.to}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors inline-flex items-center gap-1.5",
                     active
                       ? "bg-white/10 text-white"
                       : "text-white/70 hover:bg-white/5 hover:text-white",
                   )}
                 >
                   {n.label}
+                  {n.to === "/master/agent-queue" ? <AgentQueueBadge /> : null}
                 </Link>
               );
             })}
@@ -100,5 +105,21 @@ function MasterLayout() {
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function AgentQueueBadge() {
+  const fn = useServerFn(getAgentQueuePendingCount);
+  const { data } = useQuery({
+    queryKey: ["agent-queue-pending-count"],
+    queryFn: () => fn(),
+    refetchInterval: 30_000,
+  });
+  const count = data?.count ?? 0;
+  if (!count) return null;
+  return (
+    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[0.65rem] font-semibold text-white">
+      {count}
+    </span>
   );
 }
