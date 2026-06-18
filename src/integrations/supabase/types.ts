@@ -1768,6 +1768,63 @@ export type Database = {
           },
         ]
       }
+      lead_memory_items: {
+        Row: {
+          archived_at: string | null
+          category: string
+          confidence: number | null
+          created_at: string
+          id: string
+          key: string
+          lead_id: string
+          organization_id: string
+          source: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          archived_at?: string | null
+          category: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          key: string
+          lead_id: string
+          organization_id: string
+          source?: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          archived_at?: string | null
+          category?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          key?: string
+          lead_id?: string
+          organization_id?: string
+          source?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_memory_items_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_memory_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_sources: {
         Row: {
           color: string | null
