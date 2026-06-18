@@ -456,4 +456,194 @@ export const listAuditLogsForMaster = createServerFn({ method: "POST" })
     };
   });
 
+// ---------------------------------------------------------------------------
+// Agent action rules + queue
+// ---------------------------------------------------------------------------
+
+const ACTION_TYPES = [
+  "responder",
+  "oferecer_horarios",
+  "confirmar_agendamento",
+  "marcar_quente_humano",
+  "encerrar_cadencia",
+  "ignorar",
+] as const;
+const actionTypeSchema = z.enum(ACTION_TYPES);
+
+export const listAgentActionRules = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertMaster(context.userId);
+    const { data: rules, error } = await supabaseAdmin
+      .from("agent_action_rules")
+      .select("id, organization_id, action_type, auto_execute, enabled, updated_at");
+    if (error) throw new Error(error.message);
+
+    const orgIds = Array.from(new Set((rules ?? []).map((r) => r.organization_id).filter(Boolean))) as string[];
+    let orgsMap = new Map<string, string>();
+    if (orgIds.length) {
+      const { data: orgs } = await supabaseAdmin
+        .from("organizations").select("id, name").in("id", orgIds);
+      orgsMap = new Map((orgs ?? []).map((o) => [o.id, o.name]));
+    }
+
+    const global = (rules ?? []).filter((r) => r.organization_id === null);
+    const byOrgMap = new Map<string, { org_id: string; org_name: string; rules: any[] }>();
+    for (const r of rules ?? []) {
+      if (!r.organization_id) continue;
+      const entry = byOrgMap.get(r.organization_id) ?? {
+        org_id: r.organization_id,
+        org_name: orgsMap.get(r.organization_id) ?? "—",
+        rules: [],
+      };
+      entry.rules.push(r);
+      byOrgMap.set(r.organization_id, entry);
+    }
+    return { global, by_org: Array.from(byOrgMap.values()), action_types: ACTION_TYPES as readonly string[] };
+  });
+
+export const listAllOrganizationsForRules = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertMaster(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("organizations").select("id, name").order("name", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const upsertAgentActionRule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organization_id: z.string().uuid().nullable(),
+    action_type: actionTypeSchema,
+    auto_execute: z.boolean(),
+    enabled: z.boolean().default(true),
+  }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const base = supabaseAdmin.from("agent_action_rules")
+      .select("id").eq("action_type", data.action_type);
+    const existingQuery = data.organization_id === null
+      ? base.is("organization_id", null)
+      : base.eq("organization_id", data.organization_id);
+    const { data: existing } = await existingQuery.maybeSingle();
+
+    if (existing) {
+      const { error } = await supabaseAdmin.from("agent_action_rules")
+        .update({ auto_execute: data.auto_execute, enabled: data.enabled, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin.from("agent_action_rules")
+        .insert({
+          organization_id: data.organization_id,
+          action_type: data.action_type,
+          auto_execute: data.auto_execute,
+          enabled: data.enabled,
+        });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const listAgentActionQueue = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    organization_id: z.string().uuid().nullable().optional(),
+    status: z.enum(["pending","approved","cancelled","executed","failed","all"]).default("pending"),
+    limit: z.number().int().min(1).max(200).default(50),
+  }).parse(i ?? {}))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    let q = supabaseAdmin.from("agent_action_queue")
+      .select("id, organization_id, conversation_id, lead_id, action_type, action_params, status, error, created_at, reviewed_at, executed_at")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.status !== "all") q = q.eq("status", data.status);
+    if (data.organization_id) q = q.eq("organization_id", data.organization_id);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const leadIds = Array.from(new Set((rows ?? []).map((r) => r.lead_id)));
+    const convIds = Array.from(new Set((rows ?? []).map((r) => r.conversation_id)));
+    const orgIds = Array.from(new Set((rows ?? []).map((r) => r.organization_id)));
+    const [{ data: leads }, { data: convs }, { data: orgs }] = await Promise.all([
+      leadIds.length ? supabaseAdmin.from("leads").select("id, full_name, company_name").in("id", leadIds) : Promise.resolve({ data: [] as any[] }),
+      convIds.length ? supabaseAdmin.from("conversations").select("id, channel").in("id", convIds) : Promise.resolve({ data: [] as any[] }),
+      orgIds.length ? supabaseAdmin.from("organizations").select("id, name").in("id", orgIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const leadMap = new Map((leads ?? []).map((l: any) => [l.id, l]));
+    const convMap = new Map((convs ?? []).map((c: any) => [c.id, c]));
+    const orgMap = new Map((orgs ?? []).map((o: any) => [o.id, o]));
+
+    const { count: pendingCount } = await supabaseAdmin
+      .from("agent_action_queue").select("id", { count: "exact", head: true }).eq("status", "pending");
+
+    return {
+      pending_count: pendingCount ?? 0,
+      items: (rows ?? []).map((r) => ({
+        ...r,
+        org_name: orgMap.get(r.organization_id)?.name ?? "—",
+        lead_name: leadMap.get(r.lead_id)?.full_name ?? "—",
+        lead_company: leadMap.get(r.lead_id)?.company_name ?? null,
+        channel: convMap.get(r.conversation_id)?.channel ?? null,
+      })),
+    };
+  });
+
+export const getAgentQueuePendingCount = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertMaster(context.userId);
+    const { count } = await supabaseAdmin
+      .from("agent_action_queue").select("id", { count: "exact", head: true }).eq("status", "pending");
+    return { count: count ?? 0 };
+  });
+
+export const reviewAgentAction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    queue_id: z.string().uuid(),
+    approve: z.boolean(),
+  }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { data: row, error } = await supabaseAdmin
+      .from("agent_action_queue").select("id, status").eq("id", data.queue_id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Item não encontrado.");
+    if (row.status !== "pending") throw new Error(`Item não está pendente (status: ${row.status}).`);
+
+    const nowIso = new Date().toISOString();
+
+    if (!data.approve) {
+      const { error: uErr } = await supabaseAdmin.from("agent_action_queue")
+        .update({ status: "cancelled", reviewed_at: nowIso, reviewed_by: context.userId })
+        .eq("id", data.queue_id);
+      if (uErr) throw new Error(uErr.message);
+      return { ok: true, status: "cancelled" as const };
+    }
+
+    await supabaseAdmin.from("agent_action_queue")
+      .update({ status: "approved", reviewed_at: nowIso, reviewed_by: context.userId })
+      .eq("id", data.queue_id);
+
+    try {
+      const { executeAgentActionFromQueue } = await import("@/lib/conversation-agent.server");
+      await executeAgentActionFromQueue(data.queue_id);
+      await supabaseAdmin.from("agent_action_queue")
+        .update({ status: "executed", executed_at: new Date().toISOString() })
+        .eq("id", data.queue_id);
+      return { ok: true, status: "executed" as const };
+    } catch (e: any) {
+      const msg = String(e?.message ?? e).slice(0, 500);
+      await supabaseAdmin.from("agent_action_queue")
+        .update({ status: "failed", error: msg })
+        .eq("id", data.queue_id);
+      throw new Error(msg);
+    }
+  });
+
+
 
