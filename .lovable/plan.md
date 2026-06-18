@@ -1,34 +1,38 @@
-## Entendimento
+# Apollo: consertar o botão "Enriquecer com Apollo"
 
-- O menu **Master** é o único espaço de configurações globais — só master_admin acessa.
-- O menu **Integrações** (em `/dashboard/integrations`) é sempre da empresa do usuário atual, independente do papel global. Master_admin nessa tela age como qualquer membro da própria org.
-- O bloqueio atual acontece porque a policy de `integration_credentials` exige `has_role(uid, 'company_admin')` (papel global em `user_roles`), e o master_admin não tem esse papel global — embora seja `company_admin` da sua org via `organization_members`.
+## Diagnóstico
 
-Não vamos misturar master com company: nada de dar acesso global a integrações da empresa via policy de master. A correção fica restrita ao caminho da própria org.
+O botão "Enriquecer com Apollo" no detalhe do lead chama `enrichLeadWithApollo`, mas hoje falha por três motivos:
 
-## Correção (mínima e cirúrgica)
+1. **RLS bloqueia telemetria/cache silenciosamente.** As tabelas `apollo_api_calls` e `apollo_search_cache` só têm policy de SELECT — nenhum INSERT/UPDATE. Toda chamada Apollo tenta logar e cachear, falha sem erro (engolido por try/catch). Resultado: zero registro de chamadas (tabela vazia mesmo com Apollo conectado), cache de 24h inútil, e nenhuma forma de auditar.
 
-### Server functions de integração — usar `supabaseAdmin` após validar membership da org
+2. **Email "bloqueado" do Apollo é tratado como email válido.** Quando Apollo devolve `email: "email_not_unlocked@domain.com"`, `mapPersonToLeadPayload` grava no lead, sujando o campo email com lixo.
 
-Em `src/lib/integrations.functions.ts`:
+3. **Sinal fraco para o usuário.** Hoje o handler retorna `{ ok, matched, fields_updated }` mas a UI só mostra um toast. Se o Apollo não encontrou match (`matched=false`), o usuário não tem ideia do porquê (faltou email/LinkedIn? Apollo não conhece a pessoa?).
 
-- `saveOrgResendConnection` e `disconnectOrgResend` hoje escrevem com o cliente autenticado (sujeito ao RLS que falha).
-- O `getActiveOrgId` (já chamado nessas funções) garante que o usuário é **membro ativo** da org atual — essa é a autorização de negócio que importa nessa tela.
-- Após essa validação, trocar a escrita para `supabaseAdmin` (`await import('@/integrations/supabase/client.server')` dentro do handler), aplicada aos upserts em `organization_integrations` e `integration_credentials` (save) e ao delete/update correspondentes (disconnect).
-- A leitura (`getOrgResendConnection`) já usa `supabaseAdmin` — só está sendo alinhado o caminho de escrita.
+## Mudanças
 
-Resultado:
-- Master_admin que é membro da sua própria org salva integrações sem fricção.
-- Company_admin comum continua funcionando exatamente igual.
-- Usuário que não é membro ativo da org → `getActiveOrgId` falha antes de qualquer escrita.
-- As policies de `integration_credentials` e `organization_integrations` permanecem **inalteradas** — master continua sem acesso global a integrações de outras empresas a partir do menu da company.
+### 1. Migration: completar RLS das tabelas Apollo
+- `apollo_api_calls`: adicionar policy INSERT (`is_org_member` + service_role).
+- `apollo_search_cache`: adicionar policies INSERT/UPDATE/DELETE (`is_org_member` + service_role).
 
-## Auditoria
+### 2. `src/lib/apollo.server.ts`
+- Em `mapPersonToLeadPayload`: descartar email se contém `email_not_unlocked` ou se `email_status` for `unavailable`/`bounced` — preserva o resto do payload, só não escreve no campo `email` do lead.
 
-O `audit_logs` continua registrando `actor_user_id` = `context.userId`, então a autoria do master fica preservada mesmo com a escrita por `supabaseAdmin`. Nenhuma mudança extra de logging nesta rodada.
+### 3. `src/lib/apollo.functions.ts` (`enrichLeadWithApollo`)
+- Após o match, classificar o resultado em três estados claros:
+  - `not_found` — Apollo não retornou pessoa.
+  - `locked` — retornou pessoa mas email/telefone bloqueados (sem créditos para revelar).
+  - `success` — algo foi atualizado.
+- Retornar `{ matched, locked, fields_updated, message }` para a UI mostrar mensagem precisa.
+- Continuar gravando em `lead_enrichment` (já existe).
+
+### 4. `src/routes/_app.dashboard.leads.$leadId.tsx`
+- Trocar o toast genérico atual por mensagem que reflete o estado (`success` mostra quais campos atualizou; `locked` avisa "Apollo encontrou mas email/telefone bloqueados — verifique créditos"; `not_found` mantém o toast atual).
+- Sem mudanças de layout.
 
 ## Fora do escopo
-
-- Sem mudança em RLS.
-- Sem mudança em UI.
-- Pipedrive/Apollo/Hook7 só serão revistos se exibirem o mesmo sintoma — varredura separada depois.
+- Sem auto-enriquecimento em background (confirmado pelo usuário).
+- Sem mudanças na busca Apollo (`/dashboard/leads/apollo`).
+- Sem mudanças em Pipedrive/Hook7/Resend.
+- Sem enriquecimento em massa.

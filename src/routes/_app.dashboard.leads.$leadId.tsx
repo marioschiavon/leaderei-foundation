@@ -222,16 +222,21 @@ function LeadDetailPage() {
   const enrichMut = useMutation({
     mutationFn: () => enrichFn({ data: { lead_id: leadId } }),
     onSuccess: (r: any) => {
-      if (r.matched) {
-        const n = r.fields_updated?.length ?? 0;
-        toast.success(n ? `Enriquecido: ${n} campos atualizados.` : "Enriquecido. Nenhum campo novo.");
+      const msg = r?.message as string | undefined;
+      if (!r?.matched) {
+        toast.warning(msg ?? "Apollo não encontrou correspondência.");
+      } else if (r?.locked) {
+        toast.warning(msg ?? "Apollo encontrou a pessoa, mas contatos estão bloqueados.");
+      } else if ((r?.fields_updated?.length ?? 0) > 0) {
+        toast.success(msg ?? `Enriquecido: ${r.fields_updated.length} campos atualizados.`);
       } else {
-        toast.warning("Apollo não encontrou correspondência.");
+        toast.info(msg ?? "Enriquecido. Nenhum campo novo.");
       }
       queryClient.invalidateQueries({ queryKey: ["leads", "detail", leadId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (isLoading) {
     return (
