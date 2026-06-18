@@ -26,6 +26,7 @@ import { Route as MasterMasterPlansRouteImport } from './routes/_master.master.p
 import { Route as MasterMasterOrganizationsRouteImport } from './routes/_master.master.organizations'
 import { Route as MasterMasterLogsRouteImport } from './routes/_master.master.logs'
 import { Route as MasterMasterAiRouteImport } from './routes/_master.master.ai'
+import { Route as MasterMasterAgentQueueRouteImport } from './routes/_master.master.agent-queue'
 import { Route as AppDashboardSettingsRouteImport } from './routes/_app.dashboard.settings'
 import { Route as AppDashboardPipelineRouteImport } from './routes/_app.dashboard.pipeline'
 import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.leads'
@@ -125,6 +126,11 @@ const MasterMasterAiRoute = MasterMasterAiRouteImport.update({
   path: '/master/ai',
   getParentRoute: () => MasterRoute,
 } as any)
+const MasterMasterAgentQueueRoute = MasterMasterAgentQueueRouteImport.update({
+  id: '/master/agent-queue',
+  path: '/master/agent-queue',
+  getParentRoute: () => MasterRoute,
+} as any)
 const AppDashboardSettingsRoute = AppDashboardSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -214,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
+  '/master/agent-queue': typeof MasterMasterAgentQueueRoute
   '/master/ai': typeof MasterMasterAiRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByTo {
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
+  '/master/agent-queue': typeof MasterMasterAgentQueueRoute
   '/master/ai': typeof MasterMasterAiRoute
   '/master/logs': typeof MasterMasterLogsRoute
   '/master/organizations': typeof MasterMasterOrganizationsRoute
@@ -277,6 +285,7 @@ export interface FileRoutesById {
   '/_app/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/_app/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
+  '/_master/master/agent-queue': typeof MasterMasterAgentQueueRoute
   '/_master/master/ai': typeof MasterMasterAiRoute
   '/_master/master/logs': typeof MasterMasterLogsRoute
   '/_master/master/organizations': typeof MasterMasterOrganizationsRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
+    | '/master/agent-queue'
     | '/master/ai'
     | '/master/logs'
     | '/master/organizations'
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/dashboard/integrations'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
+    | '/master/agent-queue'
     | '/master/ai'
     | '/master/logs'
     | '/master/organizations'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/leads'
     | '/_app/dashboard/pipeline'
     | '/_app/dashboard/settings'
+    | '/_master/master/agent-queue'
     | '/_master/master/ai'
     | '/_master/master/logs'
     | '/_master/master/organizations'
@@ -523,6 +535,13 @@ declare module '@tanstack/react-router' {
       path: '/master/ai'
       fullPath: '/master/ai'
       preLoaderRoute: typeof MasterMasterAiRouteImport
+      parentRoute: typeof MasterRoute
+    }
+    '/_master/master/agent-queue': {
+      id: '/_master/master/agent-queue'
+      path: '/master/agent-queue'
+      fullPath: '/master/agent-queue'
+      preLoaderRoute: typeof MasterMasterAgentQueueRouteImport
       parentRoute: typeof MasterRoute
     }
     '/_app/dashboard/settings': {
@@ -680,6 +699,7 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface MasterRouteChildren {
+  MasterMasterAgentQueueRoute: typeof MasterMasterAgentQueueRoute
   MasterMasterAiRoute: typeof MasterMasterAiRoute
   MasterMasterLogsRoute: typeof MasterMasterLogsRoute
   MasterMasterOrganizationsRoute: typeof MasterMasterOrganizationsRoute
@@ -690,6 +710,7 @@ interface MasterRouteChildren {
 }
 
 const MasterRouteChildren: MasterRouteChildren = {
+  MasterMasterAgentQueueRoute: MasterMasterAgentQueueRoute,
   MasterMasterAiRoute: MasterMasterAiRoute,
   MasterMasterLogsRoute: MasterMasterLogsRoute,
   MasterMasterOrganizationsRoute: MasterMasterOrganizationsRoute,
