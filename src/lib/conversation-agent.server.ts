@@ -836,3 +836,99 @@ export async function runAgentTick(maxJobs = 10): Promise<{ processed: number; s
   }
   return { processed: lockedIds.length, succeeded, failed };
 }
+
+// ---------------------------------------------------------------------------
+// Memory extraction (fire-and-forget; never throws to caller)
+// ---------------------------------------------------------------------------
+
+async function extractAndSaveMemory(params: {
+  organization_id: string;
+  lead_id: string;
+  conversation_id: string;
+  messages: Array<{ direction: string; body: string | null; created_at: string }>;
+  latestDecision: AgentAction;
+}): Promise<void> {
+  try {
+    const { organization_id, lead_id, messages, latestDecision } = params;
+    if (latestDecision.action === "ignorar") return;
+    if (!messages?.length) return;
+    if (!hasOpenAIKey()) return;
+
+    const dialogue = messages
+      .filter((m) => m.body)
+      .slice(-20)
+      .map((m) => `${m.direction === "inbound" ? "Lead" : "Você"}: ${m.body}`)
+      .join("\n");
+
+    const userPrompt = `
+Analise a conversa abaixo e extraia insights estruturados sobre o lead e sua empresa.
+Retorne APENAS um JSON válido, sem texto adicional, com este formato:
+{ "insights": [ { "category": "contato|empresa|intencao", "key": "chave_curta", "value": "valor", "confidence": 0.0 } ] }
+
+Regras:
+- Extraia APENAS o que está explicitamente na conversa. Não invente.
+- "contato": decisor, canal_preferido, horario_preferido, tom, cargo_real
+- "empresa": usa_crm, setor, tamanho, dor_principal, stack_tecnologico, momento
+- "intencao": tipo detectado nesta mensagem (interesse/objecao/redirecionamento/agendamento/recusa)
+- confidence: 0.9+ explícito, 0.7-0.89 implícito claro, 0.5-0.69 deduzido
+- Máximo 5 insights. Se nada novo, retorne { "insights": [] }.
+
+Conversa:
+${dialogue}
+`.trim();
+
+    const resp = await callOpenAI({
+      organizationId: organization_id,
+      leadId: lead_id,
+      conversationId: params.conversation_id,
+      kind: "extract",
+      model: "gpt-4o-mini",
+      systemPrompt: "Você é um extrator de informações. Retorne apenas JSON válido.",
+      userPrompt,
+      maxTokens: 500,
+      temperature: 0.2,
+    });
+
+    const text = resp.text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+    const parsed = JSON.parse(text);
+    const insights: Array<{ category: string; key: string; value: string; confidence?: number }> =
+      Array.isArray(parsed?.insights) ? parsed.insights.slice(0, 5) : [];
+    if (!insights.length) return;
+
+    for (const insight of insights) {
+      if (!insight?.category || !insight?.key || !insight?.value) continue;
+      if (!["contato", "empresa", "intencao"].includes(insight.category)) continue;
+      const key = String(insight.key).slice(0, 80);
+      const value = String(insight.value).slice(0, 500);
+      const confidence = typeof insight.confidence === "number"
+        ? Math.max(0, Math.min(1, insight.confidence)) : null;
+
+      const { data: existing } = await supabaseAdmin
+        .from("lead_memory_items")
+        .select("id")
+        .eq("lead_id", params.lead_id)
+        .eq("category", insight.category)
+        .eq("key", key)
+        .is("archived_at", null)
+        .maybeSingle();
+
+      if (existing) {
+        await supabaseAdmin.from("lead_memory_items")
+          .update({ value, confidence, source: "agente", updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabaseAdmin.from("lead_memory_items").insert({
+          organization_id: params.organization_id,
+          lead_id: params.lead_id,
+          category: insight.category,
+          key,
+          value,
+          source: "agente",
+          confidence,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[memory] extração falhou, ignorando:", (e as any)?.message ?? e);
+  }
+}
