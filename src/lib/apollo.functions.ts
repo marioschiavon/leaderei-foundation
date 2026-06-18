@@ -516,28 +516,63 @@ export const enrichLeadWithApollo = createServerFn({ method: "POST" })
           payload: { status: "not_found", match_body: matchBody, triggered_by: userId },
         } as any);
       } catch { /* best-effort */ }
-      return { ok: true, matched: false };
+      return {
+        ok: true,
+        matched: false,
+        locked: false,
+        fields_updated: [] as string[],
+        message: "Apollo não encontrou correspondência para este lead.",
+      };
     }
 
     const incoming = mapPersonToLeadPayload(result.person, organization_id);
     const patch = mergeLeadPatch(lead, incoming);
+    const updatedFields = Object.keys(patch).filter((k) => k !== "enrichment_data");
 
     if (Object.keys(patch).length) {
       await supabase.from("leads").update(patch as any).eq("id", data.lead_id);
     }
+
+    // Detecta se o Apollo achou a pessoa mas não revelou contatos (email/telefone bloqueados)
+    const rawEmail: string | undefined = result.person?.email;
+    const emailLocked =
+      !!rawEmail && typeof rawEmail === "string" && rawEmail.toLowerCase().includes("email_not_unlocked");
+    const hasAnyPhone = Array.isArray(result.person?.phone_numbers) && result.person.phone_numbers.length > 0;
+    const locked = updatedFields.length === 0 && (emailLocked || !hasAnyPhone);
 
     try {
       await supabase.from("lead_enrichment").insert({
         organization_id,
         lead_id: data.lead_id,
         provider: "apollo",
-        payload: { status: "success", apollo: result.person, triggered_by: userId },
+        payload: {
+          status: locked ? "locked" : updatedFields.length ? "success" : "no_new_fields",
+          apollo: result.person,
+          triggered_by: userId,
+          updated_fields: updatedFields,
+        },
       } as any);
     } catch { /* best-effort */ }
 
+    let message: string;
+    if (locked) {
+      message =
+        "Apollo encontrou a pessoa, mas email/telefone estão bloqueados. Verifique seus créditos na conta Apollo.";
+    } else if (updatedFields.length) {
+      message = `Enriquecido: ${updatedFields.length} campo(s) atualizado(s).`;
+    } else {
+      message = "Apollo encontrou a pessoa, mas nenhum campo novo a adicionar.";
+    }
 
-    return { ok: true, matched: true, fields_updated: Object.keys(patch).filter((k) => k !== "enrichment_data") };
+    return {
+      ok: true,
+      matched: true,
+      locked,
+      fields_updated: updatedFields,
+      message,
+    };
   });
+
 
 
 // ---------------------------------------------------------------------------
