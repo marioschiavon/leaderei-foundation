@@ -1,8 +1,11 @@
 import { createFileRoute, Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Shield, ArrowLeft, Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { useAuthSession, useIsMaster } from "@/lib/auth";
+import { getAgentQueuePendingCount } from "@/lib/master.functions";
 
 export const Route = createFileRoute("/_master")({
   component: MasterLayout,
