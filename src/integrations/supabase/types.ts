@@ -14,6 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_action_queue: {
+        Row: {
+          action_params: Json
+          action_type: string
+          conversation_id: string
+          created_at: string
+          error: string | null
+          executed_at: string | null
+          id: string
+          lead_id: string
+          organization_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          action_params?: Json
+          action_type: string
+          conversation_id: string
+          created_at?: string
+          error?: string | null
+          executed_at?: string | null
+          id?: string
+          lead_id: string
+          organization_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          action_params?: Json
+          action_type?: string
+          conversation_id?: string
+          created_at?: string
+          error?: string | null
+          executed_at?: string | null
+          id?: string
+          lead_id?: string
+          organization_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_action_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_action_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_action_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_action_rules: {
+        Row: {
+          action_type: string
+          auto_execute: boolean
+          created_at: string
+          enabled: boolean
+          id: string
+          organization_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          auto_execute?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          auto_execute?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_action_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_actions: {
         Row: {
           conversation_id: string | null
