@@ -189,6 +189,7 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   calcom_book_meeting: { event_type_id: 0, slot_strategy: "first_available", cancel_retry_business_days: 3 },
   calcom_cancel_booking: { reason_template: "" },
   calcom_reschedule_booking: { event_type_id: 0, strategy: "first_available" },
+  scrape_website: { url_source: "lead_website", output_key: "website_content", custom_url: "" },
   end: { reason: "" },
 };
 
