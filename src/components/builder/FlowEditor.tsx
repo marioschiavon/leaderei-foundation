@@ -1578,6 +1578,8 @@ function ConfigPanel({
   if (node.type === "ai_message") return <AiMessagePanel node={node} onChange={onChange} />;
   if (node.type === "ai_generate_text")
     return <AiGenerateTextPanel node={node} onChange={onChange} />;
+  if (node.type === "scrape_website")
+    return <ScrapeWebsitePanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
