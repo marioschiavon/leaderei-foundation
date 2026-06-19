@@ -870,6 +870,44 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
 
 
     // -----------------------------------------------------------------------
+    case "scrape_website": {
+      const cfg = step.config as {
+        output_key?: string;
+        url_source?: "lead_website" | "custom";
+        custom_url?: string | null;
+      };
+      const targetUrl = cfg.url_source === "custom" ? (cfg.custom_url ?? null) : (lead as any).website_url ?? null;
+      if (!targetUrl) {
+        const next = await findNextStep(step.document_id, step.id, "next");
+        return {
+          kind: "advance",
+          next_step_id: next,
+          delay_until: now,
+          output: { skipped: true, reason: "sem website_url" },
+        };
+      }
+      const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+      const content = await fetchWebsiteContent(targetUrl);
+      const outputKey = cfg.output_key?.trim() || "website_content";
+
+      const currentContext = (en.context ?? {}) as any;
+      const newContext = { ...currentContext, [outputKey]: content ?? "" };
+      await supabaseAdmin
+        .from("campaign_enrollments")
+        .update({ context: newContext })
+        .eq("id", en.id);
+      en.context = newContext;
+
+      const next = await findNextStep(step.document_id, step.id, "next");
+      return {
+        kind: "advance",
+        next_step_id: next,
+        delay_until: now,
+        output: { scraped: !!content, chars: content?.length ?? 0, key: outputKey },
+      };
+    }
+
+    // -----------------------------------------------------------------------
     case "end": {
       const cfg = step.config as { reason?: string };
       return { kind: "complete", output: { reason: cfg.reason ?? null, ended_at: now.toISOString() } };
