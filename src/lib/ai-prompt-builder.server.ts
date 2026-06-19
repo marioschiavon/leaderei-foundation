@@ -56,6 +56,7 @@ export type BuildPromptArgs = {
   lead?: LeadContext;
   channelHint?: "whatsapp" | "email" | "linkedin" | null;
   taskInstruction?: string | null; // e.g. "Escreva a primeira mensagem fria."
+  websiteContent?: string | null;
 };
 
 function findPreset(presets: TonePreset[], kind: TonePreset["kind"], slug?: string | null) {
