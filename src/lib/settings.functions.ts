@@ -290,10 +290,12 @@ export const updateMemberRole = createServerFn({ method: "POST" })
       }
     }
 
-    const { error } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("organization_members")
       .update({ role: data.role, updated_at: new Date().toISOString() })
-      .eq("id", data.member_id);
+      .eq("id", data.member_id)
+      .eq("organization_id", m.organization_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
