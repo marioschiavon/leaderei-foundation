@@ -413,6 +413,9 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     .map((m) => `- [${m.category}] ${m.key}: ${m.value}`)
     .join("\n");
 
+  const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+  const websiteContent = await fetchWebsiteContent((lead as any).website_url);
+
   const systemPrompt = [
     settings.master_system_prompt?.trim() ?? "",
     "",
@@ -425,6 +428,7 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     offeredSlots.length ? `[Horários já oferecidos anteriormente]\n${offeredSlots.map(formatSlotPt).join("\n")}\nUse 'confirmar_agendamento' apenas com um destes ISOs: ${offeredSlots.join(", ")}` : "",
     `[Lead]\nNome: ${lead.full_name ?? "—"} | Empresa: ${lead.company_name ?? "—"} | Cargo: ${lead.job_title ?? "—"}`,
     memoryLines ? `[O que a IA já sabe sobre este lead]\n${memoryLines}` : "",
+    websiteContent ? `[Site da empresa]\n${websiteContent}` : "",
     "",
     "[Instruções do menu]",
     "Você DEVE chamar a função decide_action com exatamente uma ação. Não escreva texto livre fora da function call.",
