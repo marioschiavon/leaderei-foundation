@@ -152,6 +152,7 @@ const PALETTE: Array<{
   { type: "calcom_cancel_booking", label: "Cancelar reunião", icon: CalendarX, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
+  { type: "scrape_website", label: "Visitar site do lead", icon: Globe, enabled: true },
   { type: "end", label: "Fim do fluxo", icon: Flag, enabled: true },
 ];
 
