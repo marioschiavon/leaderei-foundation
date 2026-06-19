@@ -110,6 +110,7 @@ type StepType =
   | "calcom_book_meeting"
   | "calcom_cancel_booking"
   | "calcom_reschedule_booking"
+  | "scrape_website"
   | "end";
 
 type StepData = {
