@@ -107,6 +107,11 @@ const CalRescheduleBookingConfig = z.object({
   event_type_id: z.number().int().positive(),
   strategy: z.enum(["first_available", "lead_picks_link"]).default("first_available"),
 });
+const ScrapeWebsiteConfig = z.object({
+  url_source: z.enum(["lead_website", "custom"]).default("lead_website"),
+  custom_url: z.string().max(500).optional().nullable(),
+  output_key: z.string().max(64).default("website_content"),
+});
 
 function validateConfigForType(type: StepType, config: unknown): unknown {
   switch (type) {
