@@ -34,3 +34,21 @@ export const getConversationMessages = createServerFn({ method: "POST" })
       messages: msgsRes.data ?? [],
     };
   });
+
+export const getLeadMemorySummary = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ lead_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { data: rows, error } = await context.supabase
+      .from("lead_memory_items")
+      .select("id, category, key, value, source, created_at, updated_at")
+      .eq("lead_id", data.lead_id)
+      .is("archived_at", null)
+      .order("category", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });

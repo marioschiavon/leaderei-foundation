@@ -19,7 +19,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { listConversations, getMyContext, acceptLead, archiveLead } from "@/lib/tenant.functions";
-import { getConversationMessages } from "@/lib/inbox.functions";
+import { getConversationMessages, getLeadMemorySummary } from "@/lib/inbox.functions";
 import { sendWhatsAppMessage } from "@/lib/hook7.functions";
 import { assumeConversation, returnToAgent } from "@/lib/conversation-agent.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,6 +94,7 @@ function InboxPage() {
         if (payload.new?.conversation_id) {
           queryClient.invalidateQueries({ queryKey: ["conv-messages", payload.new.conversation_id] });
         }
+        queryClient.invalidateQueries({ queryKey: ["lead-memory-summary"] });
       })
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "messages",
@@ -620,11 +621,64 @@ function LeadDetails({ convId, onClose }: { convId: string; onClose: () => void 
             )}
           </div>
 
+          <LeadMemoryPanel leadId={lead.id} />
+
           <a href={`/dashboard/leads?id=${lead.id}`} className="inline-flex items-center gap-1 text-xs text-brand hover:underline">
             Abrir lead <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       )}
     </aside>
+  );
+}
+
+const MEMORY_CATEGORY_LABEL: Record<string, string> = {
+  contato: "Contato",
+  empresa: "Empresa",
+  intencao: "Intenção",
+  nota_manual: "Notas",
+};
+
+function LeadMemoryPanel({ leadId }: { leadId: string }) {
+  const fetchFn = useServerFn(getLeadMemorySummary);
+  const { data, isLoading } = useQuery({
+    queryKey: ["lead-memory-summary", leadId],
+    queryFn: () => fetchFn({ data: { lead_id: leadId } }),
+  });
+  if (isLoading) return null;
+  const items = data ?? [];
+  const grouped = new Map<string, typeof items>();
+  for (const it of items) {
+    const arr = grouped.get(it.category) ?? [];
+    arr.push(it);
+    grouped.set(it.category, arr);
+  }
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
+        <Bot className="h-3.5 w-3.5 text-brand" /> Memória da IA
+      </div>
+      {items.length === 0 ? (
+        <div className="text-xs text-muted-foreground">A IA ainda não coletou informações sobre este lead.</div>
+      ) : (
+        <div className="space-y-2 text-xs">
+          {Array.from(grouped.entries()).map(([cat, arr]) => (
+            <div key={cat}>
+              <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                {MEMORY_CATEGORY_LABEL[cat] ?? cat}
+              </div>
+              <ul className="mt-0.5 space-y-0.5">
+                {arr.slice(0, 3).map((it) => (
+                  <li key={it.id}>
+                    <span className="text-muted-foreground">{it.key}:</span>{" "}
+                    <span className="text-foreground">{it.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

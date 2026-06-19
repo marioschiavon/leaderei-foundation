@@ -647,3 +647,93 @@ export const reviewAgentAction = createServerFn({ method: "POST" })
 
 
 
+
+// ---------------------------------------------------------------------------
+// Lead memory items (master_admin)
+// ---------------------------------------------------------------------------
+
+const MEMORY_CATEGORIES = ["contato", "empresa", "intencao", "nota_manual"] as const;
+
+export const getLeadDetailsForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ lead_id: z.string().uuid() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { data: lead, error } = await supabaseAdmin
+      .from("leads")
+      .select("id, organization_id, full_name, email, phone, company_name, job_title, status, temperature, created_at")
+      .eq("id", data.lead_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!lead) throw new Error("Lead não encontrado.");
+    const { data: org } = await supabaseAdmin
+      .from("organizations").select("id, name").eq("id", lead.organization_id).maybeSingle();
+    return { lead, org };
+  });
+
+export const getLeadMemory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ lead_id: z.string().uuid() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("lead_memory_items")
+      .select("id, organization_id, lead_id, category, key, value, source, confidence, created_at, updated_at")
+      .eq("lead_id", data.lead_id)
+      .is("archived_at", null)
+      .order("category", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const addLeadMemoryItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    lead_id: z.string().uuid(),
+    organization_id: z.string().uuid(),
+    category: z.enum(MEMORY_CATEGORIES),
+    key: z.string().min(1).max(80),
+    value: z.string().min(1).max(500),
+  }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { error } = await supabaseAdmin.from("lead_memory_items").insert({
+      lead_id: data.lead_id,
+      organization_id: data.organization_id,
+      category: data.category,
+      key: data.key,
+      value: data.value,
+      source: "master_manual",
+      confidence: null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateLeadMemoryItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    item_id: z.string().uuid(),
+    value: z.string().min(1).max(500),
+  }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { error } = await supabaseAdmin.from("lead_memory_items")
+      .update({ value: data.value, source: "master_manual", updated_at: new Date().toISOString() })
+      .eq("id", data.item_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const archiveLeadMemoryItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { error } = await supabaseAdmin.from("lead_memory_items")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", data.item_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
