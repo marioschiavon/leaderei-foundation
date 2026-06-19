@@ -110,7 +110,7 @@ function getStoredAiText(en: Enrollment, label: string): string | null {
 async function loadLead(lead_id: string) {
   const { data, error } = await supabaseAdmin
     .from("leads")
-    .select("id, organization_id, full_name, email, phone, company_name, job_title, tags, custom_fields, status, temperature")
+    .select("id, organization_id, full_name, email, phone, company_name, job_title, tags, custom_fields, status, temperature, website_url")
     .eq("id", lead_id)
     .maybeSingle();
   if (error) throw new Error(`load lead: ${error.message}`);
