@@ -365,7 +365,7 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
 
   // 3. Load lead + history + AI settings + memory
   const [{ data: lead }, { data: msgs }, { data: settings }, { data: profile }, { data: presets }, { data: memory }] = await Promise.all([
-    supabaseAdmin.from("leads").select("id, full_name, email, phone, company_name, job_title, industry, city, country, custom_fields").eq("id", lead_id).maybeSingle(),
+    supabaseAdmin.from("leads").select("id, full_name, email, phone, company_name, job_title, industry, city, country, custom_fields, website_url").eq("id", lead_id).maybeSingle(),
     supabaseAdmin.from("messages").select("direction, body, created_at, sent_by_ai").eq("conversation_id", conversation_id).order("created_at", { ascending: true }).limit(20),
     supabaseAdmin.from("ai_platform_settings").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle(),
     supabaseAdmin.from("ai_org_profile").select("*").eq("organization_id", organization_id).maybeSingle(),
@@ -413,6 +413,9 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     .map((m) => `- [${m.category}] ${m.key}: ${m.value}`)
     .join("\n");
 
+  const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+  const websiteContent = await fetchWebsiteContent((lead as any).website_url);
+
   const systemPrompt = [
     settings.master_system_prompt?.trim() ?? "",
     "",
@@ -425,6 +428,7 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     offeredSlots.length ? `[Horários já oferecidos anteriormente]\n${offeredSlots.map(formatSlotPt).join("\n")}\nUse 'confirmar_agendamento' apenas com um destes ISOs: ${offeredSlots.join(", ")}` : "",
     `[Lead]\nNome: ${lead.full_name ?? "—"} | Empresa: ${lead.company_name ?? "—"} | Cargo: ${lead.job_title ?? "—"}`,
     memoryLines ? `[O que a IA já sabe sobre este lead]\n${memoryLines}` : "",
+    websiteContent ? `[Site da empresa]\n${websiteContent}` : "",
     "",
     "[Instruções do menu]",
     "Você DEVE chamar a função decide_action com exatamente uma ação. Não escreva texto livre fora da function call.",

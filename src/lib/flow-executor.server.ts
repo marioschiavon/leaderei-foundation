@@ -110,7 +110,7 @@ function getStoredAiText(en: Enrollment, label: string): string | null {
 async function loadLead(lead_id: string) {
   const { data, error } = await supabaseAdmin
     .from("leads")
-    .select("id, organization_id, full_name, email, phone, company_name, job_title, tags, custom_fields, status, temperature")
+    .select("id, organization_id, full_name, email, phone, company_name, job_title, tags, custom_fields, status, temperature, website_url")
     .eq("id", lead_id)
     .maybeSingle();
   if (error) throw new Error(`load lead: ${error.message}`);
@@ -609,6 +609,11 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       if (!hasOpenAIKey()) return { kind: "permanent_fail", error: "OPENAI_API_KEY ausente." };
 
       const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
+      const leadForPrompt = (leadFullRes.data ?? lead) as any;
+      const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+      const websiteContent =
+        ((en.context as any)?.website_content as string | undefined) ||
+        (await fetchWebsiteContent(leadForPrompt?.website_url));
       const { system, user } = buildPrompt({
         masterSystemPrompt: settings.master_system_prompt ?? "",
         orgProfile: profileRes.data ?? null,
@@ -621,9 +626,10 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
           must_include: cfg.must_include ?? null,
         },
         presets: (presetsRes.data ?? []) as any,
-        lead: (leadFullRes.data ?? lead) as any,
+        lead: leadForPrompt,
         channelHint: channel,
         taskInstruction: cfg.task_instruction ?? null,
+        websiteContent,
       });
 
       let aiText = "";
@@ -777,6 +783,11 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       if (!hasOpenAIKey()) return { kind: "permanent_fail", error: "OPENAI_API_KEY ausente." };
 
       const { buildPrompt } = await import("@/lib/ai-prompt-builder.server");
+      const leadForPrompt = (leadFullRes.data ?? lead) as any;
+      const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+      const websiteContent =
+        ((en.context as any)?.website_content as string | undefined) ||
+        (await fetchWebsiteContent(leadForPrompt?.website_url));
       const { system, user } = buildPrompt({
         masterSystemPrompt: settings.master_system_prompt ?? "",
         orgProfile: profileRes.data ?? null,
@@ -789,9 +800,10 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
           must_include: cfg.must_include ?? null,
         },
         presets: (presetsRes.data ?? []) as any,
-        lead: (leadFullRes.data ?? lead) as any,
+        lead: leadForPrompt,
         channelHint: cfg.channel_hint ?? null,
         taskInstruction: cfg.task_instruction ?? null,
+        websiteContent,
       });
 
       let aiText = "";
@@ -856,6 +868,44 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
     }
 
 
+
+    // -----------------------------------------------------------------------
+    case "scrape_website": {
+      const cfg = step.config as {
+        output_key?: string;
+        url_source?: "lead_website" | "custom";
+        custom_url?: string | null;
+      };
+      const targetUrl = cfg.url_source === "custom" ? (cfg.custom_url ?? null) : (lead as any).website_url ?? null;
+      if (!targetUrl) {
+        const next = await findNextStep(step.document_id, step.id, "next");
+        return {
+          kind: "advance",
+          next_step_id: next,
+          delay_until: now,
+          output: { skipped: true, reason: "sem website_url" },
+        };
+      }
+      const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+      const content = await fetchWebsiteContent(targetUrl);
+      const outputKey = cfg.output_key?.trim() || "website_content";
+
+      const currentContext = (en.context ?? {}) as any;
+      const newContext = { ...currentContext, [outputKey]: content ?? "" };
+      await supabaseAdmin
+        .from("campaign_enrollments")
+        .update({ context: newContext })
+        .eq("id", en.id);
+      en.context = newContext;
+
+      const next = await findNextStep(step.document_id, step.id, "next");
+      return {
+        kind: "advance",
+        next_step_id: next,
+        delay_until: now,
+        output: { scraped: !!content, chars: content?.length ?? 0, key: outputKey },
+      };
+    }
 
     // -----------------------------------------------------------------------
     case "end": {

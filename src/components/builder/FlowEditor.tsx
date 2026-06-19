@@ -50,6 +50,7 @@ import {
   CalendarX,
   CalendarClock,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,6 +110,7 @@ type StepType =
   | "calcom_book_meeting"
   | "calcom_cancel_booking"
   | "calcom_reschedule_booking"
+  | "scrape_website"
   | "end";
 
 type StepData = {
@@ -150,6 +152,7 @@ const PALETTE: Array<{
   { type: "calcom_cancel_booking", label: "Cancelar reunião", icon: CalendarX, enabled: true },
   { type: "message_linkedin", label: "LinkedIn", icon: Linkedin, enabled: false },
   { type: "action", label: "Ação", icon: Zap, enabled: false },
+  { type: "scrape_website", label: "Visitar site do lead", icon: Globe, enabled: true },
   { type: "end", label: "Fim do fluxo", icon: Flag, enabled: true },
 ];
 
@@ -186,6 +189,7 @@ const DEFAULT_CONFIG: Record<StepType, Record<string, any>> = {
   calcom_book_meeting: { event_type_id: 0, slot_strategy: "first_available", cancel_retry_business_days: 3 },
   calcom_cancel_booking: { reason_template: "" },
   calcom_reschedule_booking: { event_type_id: 0, strategy: "first_available" },
+  scrape_website: { url_source: "lead_website", output_key: "website_content", custom_url: "" },
   end: { reason: "" },
 };
 
@@ -728,6 +732,29 @@ function AiGenerateTextNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function ScrapeWebsiteNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { output_key?: string; url_source?: string; custom_url?: string };
+  const key = cfg.output_key?.trim() || "website_content";
+  const source = cfg.url_source === "custom" ? (cfg.custom_url || "URL customizada") : "Site do lead";
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Globe} label="Visitar site do lead" />
+      <div style={{ padding: "10px 12px", fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ fontSize: 11, color: COLORS.muted }}>🌐 {source}</span>
+        <span style={{
+          alignSelf: "flex-start",
+          fontSize: 11, padding: "2px 6px", borderRadius: 4,
+          background: "#dbeafe", color: "#1d4ed8", fontWeight: 500,
+        }}>
+          💾 {key}
+        </span>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
@@ -739,6 +766,7 @@ const nodeTypes = {
   calcom_book_meeting: CalBookMeetingNode,
   calcom_cancel_booking: CalCancelNode,
   calcom_reschedule_booking: CalRescheduleNode,
+  scrape_website: ScrapeWebsiteNode,
   end: EndStepNode,
 } as any;
 
@@ -1550,6 +1578,8 @@ function ConfigPanel({
   if (node.type === "ai_message") return <AiMessagePanel node={node} onChange={onChange} />;
   if (node.type === "ai_generate_text")
     return <AiGenerateTextPanel node={node} onChange={onChange} />;
+  if (node.type === "scrape_website")
+    return <ScrapeWebsitePanel node={node} onChange={onChange} />;
   return <p className="text-sm text-muted-foreground">Sem editor disponível.</p>;
 }
 
@@ -1756,6 +1786,61 @@ function CalCancelPanel({
       <p className="text-xs text-muted-foreground">
         Cancela a reunião ativa mais recente do lead. Suporta variáveis tipo <code>{`{{ lead.first_name }}`}</code>.
       </p>
+    </div>
+  );
+}
+
+function ScrapeWebsitePanel({
+  node,
+  onChange,
+}: {
+  node: StepNode;
+  onChange: (patch: Record<string, any>) => void;
+}) {
+  const cfg = node.data.config as {
+    url_source?: "lead_website" | "custom";
+    custom_url?: string;
+    output_key?: string;
+  };
+  const source = cfg.url_source ?? "lead_website";
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label>Fonte da URL</Label>
+        <Select
+          value={source}
+          onValueChange={(v) => onChange({ url_source: v })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="lead_website">Site do lead (website_url)</SelectItem>
+            <SelectItem value="custom">URL customizada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {source === "custom" ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="scrape-custom-url">URL</Label>
+          <Input
+            id="scrape-custom-url"
+            value={cfg.custom_url ?? ""}
+            onChange={(e) => onChange({ custom_url: e.target.value })}
+            placeholder="https://exemplo.com"
+          />
+        </div>
+      ) : null}
+      <div className="space-y-1.5">
+        <Label htmlFor="scrape-output-key">Salvar como</Label>
+        <Input
+          id="scrape-output-key"
+          value={cfg.output_key ?? ""}
+          onChange={(e) => onChange({ output_key: e.target.value })}
+          placeholder="website_content"
+        />
+        <p className="text-xs text-muted-foreground">
+          O conteúdo ficará disponível no contexto do fluxo. Steps de IA seguintes usarão automaticamente quando a chave for <code>website_content</code>.
+        </p>
+      </div>
     </div>
   );
 }

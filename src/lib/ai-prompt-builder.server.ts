@@ -56,6 +56,7 @@ export type BuildPromptArgs = {
   lead?: LeadContext;
   channelHint?: "whatsapp" | "email" | "linkedin" | null;
   taskInstruction?: string | null; // e.g. "Escreva a primeira mensagem fria."
+  websiteContent?: string | null;
 };
 
 function findPreset(presets: TonePreset[], kind: TonePreset["kind"], slug?: string | null) {
@@ -126,6 +127,11 @@ function channelLine(channel?: "whatsapp" | "email" | "linkedin" | null): string
   return `\n\n[Canal]\n${map[channel]}`;
 }
 
+function websiteBlock(content?: string | null): string {
+  if (!content?.trim()) return "";
+  return `\n\n[Site da empresa]\n${content.trim()}`;
+}
+
 export function buildPrompt(args: BuildPromptArgs): { system: string; user: string } {
   const system = args.masterSystemPrompt.trim();
 
@@ -135,6 +141,7 @@ export function buildPrompt(args: BuildPromptArgs): { system: string; user: stri
     channelLine(args.channelHint),
     stepExtras(args.stepConfig),
     leadBlock(args.lead ?? null),
+    websiteBlock(args.websiteContent),
     `\n\n[Tarefa]\n${args.taskInstruction?.trim() || "Escreva a mensagem agora. Responda apenas com o texto final, sem comentários."}`,
   ].filter(Boolean).join("");
 

@@ -1869,6 +1869,33 @@ export type Database = {
           },
         ]
       }
+      lead_website_cache: {
+        Row: {
+          content: string
+          content_length: number
+          expires_at: string
+          id: string
+          scraped_at: string
+          url: string
+        }
+        Insert: {
+          content: string
+          content_length: number
+          expires_at?: string
+          id?: string
+          scraped_at?: string
+          url: string
+        }
+        Update: {
+          content?: string
+          content_length?: number
+          expires_at?: string
+          id?: string
+          scraped_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           apollo_person_id: string | null
