@@ -327,10 +327,12 @@ export const removeMember = createServerFn({ method: "POST" })
         throw new Error("Não é possível remover o último administrador.");
       }
     }
-    const { error } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("organization_members")
       .update({ status: "suspended", updated_at: new Date().toISOString() })
-      .eq("id", data.member_id);
+      .eq("id", data.member_id)
+      .eq("organization_id", m.organization_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
