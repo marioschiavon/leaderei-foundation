@@ -38,6 +38,7 @@ import { Route as AppDashboardBuilderIndexRouteImport } from './routes/_app.dash
 import { Route as ApiPublicHooksRunFlowTickRouteImport } from './routes/api/public/hooks/run-flow-tick'
 import { Route as ApiPublicHooksCalcomRouteImport } from './routes/api/public/hooks/calcom'
 import { Route as ApiPublicHooksAgentTickRouteImport } from './routes/api/public/hooks/agent-tick'
+import { Route as MasterMasterLeadsLeadIdRouteImport } from './routes/_master.master.leads.$leadId'
 import { Route as AppDashboardLeadsApolloRouteImport } from './routes/_app.dashboard.leads.apollo'
 import { Route as AppDashboardLeadsLeadIdRouteImport } from './routes/_app.dashboard.leads.$leadId'
 import { Route as AppDashboardBuilderDocumentIdRouteImport } from './routes/_app.dashboard.builder.$documentId'
@@ -189,6 +190,11 @@ const ApiPublicHooksAgentTickRoute = ApiPublicHooksAgentTickRouteImport.update({
   path: '/api/public/hooks/agent-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MasterMasterLeadsLeadIdRoute = MasterMasterLeadsLeadIdRouteImport.update({
+  id: '/master/leads/$leadId',
+  path: '/master/leads/$leadId',
+  getParentRoute: () => MasterRoute,
+} as any)
 const AppDashboardLeadsApolloRoute = AppDashboardLeadsApolloRouteImport.update({
   id: '/apollo',
   path: '/apollo',
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
   '/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
+  '/master/leads/$leadId': typeof MasterMasterLeadsLeadIdRoute
   '/api/public/hooks/agent-tick': typeof ApiPublicHooksAgentTickRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
   '/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
+  '/master/leads/$leadId': typeof MasterMasterLeadsLeadIdRoute
   '/api/public/hooks/agent-tick': typeof ApiPublicHooksAgentTickRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/_app/dashboard/builder/$documentId': typeof AppDashboardBuilderDocumentIdRoute
   '/_app/dashboard/leads/$leadId': typeof AppDashboardLeadsLeadIdRoute
   '/_app/dashboard/leads/apollo': typeof AppDashboardLeadsApolloRoute
+  '/_master/master/leads/$leadId': typeof MasterMasterLeadsLeadIdRoute
   '/api/public/hooks/agent-tick': typeof ApiPublicHooksAgentTickRoute
   '/api/public/hooks/calcom': typeof ApiPublicHooksCalcomRoute
   '/api/public/hooks/run-flow-tick': typeof ApiPublicHooksRunFlowTickRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/dashboard/builder/$documentId'
     | '/dashboard/leads/$leadId'
     | '/dashboard/leads/apollo'
+    | '/master/leads/$leadId'
     | '/api/public/hooks/agent-tick'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
@@ -361,6 +371,7 @@ export interface FileRouteTypes {
     | '/dashboard/builder/$documentId'
     | '/dashboard/leads/$leadId'
     | '/dashboard/leads/apollo'
+    | '/master/leads/$leadId'
     | '/api/public/hooks/agent-tick'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
@@ -395,6 +406,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/builder/$documentId'
     | '/_app/dashboard/leads/$leadId'
     | '/_app/dashboard/leads/apollo'
+    | '/_master/master/leads/$leadId'
     | '/api/public/hooks/agent-tick'
     | '/api/public/hooks/calcom'
     | '/api/public/hooks/run-flow-tick'
@@ -621,6 +633,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksAgentTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_master/master/leads/$leadId': {
+      id: '/_master/master/leads/$leadId'
+      path: '/master/leads/$leadId'
+      fullPath: '/master/leads/$leadId'
+      preLoaderRoute: typeof MasterMasterLeadsLeadIdRouteImport
+      parentRoute: typeof MasterRoute
+    }
     '/_app/dashboard/leads/apollo': {
       id: '/_app/dashboard/leads/apollo'
       path: '/apollo'
@@ -707,6 +726,7 @@ interface MasterRouteChildren {
   MasterMasterPlatformRoute: typeof MasterMasterPlatformRoute
   MasterMasterUsersRoute: typeof MasterMasterUsersRoute
   MasterMasterIndexRoute: typeof MasterMasterIndexRoute
+  MasterMasterLeadsLeadIdRoute: typeof MasterMasterLeadsLeadIdRoute
 }
 
 const MasterRouteChildren: MasterRouteChildren = {
@@ -718,6 +738,7 @@ const MasterRouteChildren: MasterRouteChildren = {
   MasterMasterPlatformRoute: MasterMasterPlatformRoute,
   MasterMasterUsersRoute: MasterMasterUsersRoute,
   MasterMasterIndexRoute: MasterMasterIndexRoute,
+  MasterMasterLeadsLeadIdRoute: MasterMasterLeadsLeadIdRoute,
 }
 
 const MasterRouteWithChildren =
