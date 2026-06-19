@@ -732,6 +732,29 @@ function AiGenerateTextNode({ data, selected }: NodeProps<StepNode>) {
   );
 }
 
+function ScrapeWebsiteNode({ data, selected }: NodeProps<StepNode>) {
+  const cfg = data.config as { output_key?: string; url_source?: string; custom_url?: string };
+  const key = cfg.output_key?.trim() || "website_content";
+  const source = cfg.url_source === "custom" ? (cfg.custom_url || "URL customizada") : "Site do lead";
+  return (
+    <NodeShell selected={selected} isEntry={data.is_entry} hasError={!!data.errorMessage}>
+      <Handle type="target" position={Position.Left} style={{ background: COLORS.edge }} />
+      <NodeHeader icon={Globe} label="Visitar site do lead" />
+      <div style={{ padding: "10px 12px", fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ fontSize: 11, color: COLORS.muted }}>🌐 {source}</span>
+        <span style={{
+          alignSelf: "flex-start",
+          fontSize: 11, padding: "2px 6px", borderRadius: 4,
+          background: "#dbeafe", color: "#1d4ed8", fontWeight: 500,
+        }}>
+          💾 {key}
+        </span>
+      </div>
+      <Handle type="source" position={Position.Right} style={{ background: COLORS.edge }} />
+    </NodeShell>
+  );
+}
+
 const nodeTypes = {
   message_email: EmailStepNode,
   message_whatsapp: WhatsAppStepNode,
@@ -743,6 +766,7 @@ const nodeTypes = {
   calcom_book_meeting: CalBookMeetingNode,
   calcom_cancel_booking: CalCancelNode,
   calcom_reschedule_booking: CalRescheduleNode,
+  scrape_website: ScrapeWebsiteNode,
   end: EndStepNode,
 } as any;
 
