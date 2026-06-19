@@ -1790,6 +1790,61 @@ function CalCancelPanel({
   );
 }
 
+function ScrapeWebsitePanel({
+  node,
+  onChange,
+}: {
+  node: StepNode;
+  onChange: (patch: Record<string, any>) => void;
+}) {
+  const cfg = node.data.config as {
+    url_source?: "lead_website" | "custom";
+    custom_url?: string;
+    output_key?: string;
+  };
+  const source = cfg.url_source ?? "lead_website";
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label>Fonte da URL</Label>
+        <Select
+          value={source}
+          onValueChange={(v) => onChange({ url_source: v })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="lead_website">Site do lead (website_url)</SelectItem>
+            <SelectItem value="custom">URL customizada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {source === "custom" ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="scrape-custom-url">URL</Label>
+          <Input
+            id="scrape-custom-url"
+            value={cfg.custom_url ?? ""}
+            onChange={(e) => onChange({ custom_url: e.target.value })}
+            placeholder="https://exemplo.com"
+          />
+        </div>
+      ) : null}
+      <div className="space-y-1.5">
+        <Label htmlFor="scrape-output-key">Salvar como</Label>
+        <Input
+          id="scrape-output-key"
+          value={cfg.output_key ?? ""}
+          onChange={(e) => onChange({ output_key: e.target.value })}
+          placeholder="website_content"
+        />
+        <p className="text-xs text-muted-foreground">
+          O conteúdo ficará disponível no contexto do fluxo. Steps de IA seguintes usarão automaticamente quando a chave for <code>website_content</code>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function EndPanel({
   node,
   onChange,
