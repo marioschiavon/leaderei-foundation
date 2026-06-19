@@ -19,6 +19,7 @@ const STEP_TYPES = [
   "calcom_book_meeting",
   "calcom_cancel_booking",
   "calcom_reschedule_booking",
+  "scrape_website",
   "end",
 ] as const;
 export type StepType = (typeof STEP_TYPES)[number];
