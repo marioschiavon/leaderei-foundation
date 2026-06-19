@@ -141,6 +141,8 @@ function validateConfigForType(type: StepType, config: unknown): unknown {
       return AiMessageConfig.parse(config ?? {});
     case "ai_generate_text":
       return AiGenerateTextConfig.parse(config ?? {});
+    case "scrape_website":
+      return ScrapeWebsiteConfig.parse(config ?? {});
   }
 }
 
