@@ -766,7 +766,7 @@ A IA atua em três momentos:
 
 | Fonte | Caminho | Risco |
 |---|---|---|
-| Site da empresa | **Jina AI Reader** (URL → markdown limpo) | Baixo — conteúdo público |
+| Site da empresa | **fetch nativo + extração de HTML** (title, meta description, texto visível) | Baixo — conteúdo público |
 | Apollo (já comprado) | Dados que vêm no enriquecimento (cargo, setor, etc) | Zero |
 | LinkedIn ativo (raspagem) | Não fazer | Alto risco regulatório |
 
@@ -781,7 +781,7 @@ Pedido do Juliano em reunião: cada marca/cliente final do operador tem **prompt
 | Modelo principal | **OpenAI** (gpt-4.1-mini default, gpt-4.1 / gpt-4o-mini permitidos) | Chave **nativa da plataforma**, gerenciada pelo master admin. Sem chave por cliente. |
 | Áudio / voz (futuro) | ElevenLabs | Diferencial — vendedor manda áudio personalizado por IA |
 | Vídeo (longo prazo) | Possivelmente MiniMax (mais barato) | Apresentações personalizadas |
-| Scraping | Jina AI Reader | Free tier generoso |
+| Scraping | fetch nativo + extração de HTML | Sem dependência externa, zero custo |
 | Fallback multi-provider (Claude/Gemini) | ⏳ Futuro | Fase 2 |
 
 ### 6.5 Modelo proprietário (longo prazo)
@@ -950,7 +950,7 @@ Lista das dívidas conhecidas em ordem de prioridade:
 
 ### Fase 3 — Inteligência (planejada)
 
-- IA de scraping (Jina) + geração de abordagem personalizada
+- IA de scraping (fetch nativo + extração de HTML) + geração de abordagem personalizada
 - Prompts customizados por marca/cliente
 - IA negociadora de agendamento (consome API Cal.com em linguagem natural)
 - Sistema de score comportamental
