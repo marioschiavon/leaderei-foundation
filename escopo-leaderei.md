@@ -781,7 +781,7 @@ Pedido do Juliano em reunião: cada marca/cliente final do operador tem **prompt
 | Modelo principal | **OpenAI** (gpt-4.1-mini default, gpt-4.1 / gpt-4o-mini permitidos) | Chave **nativa da plataforma**, gerenciada pelo master admin. Sem chave por cliente. |
 | Áudio / voz (futuro) | ElevenLabs | Diferencial — vendedor manda áudio personalizado por IA |
 | Vídeo (longo prazo) | Possivelmente MiniMax (mais barato) | Apresentações personalizadas |
-| Scraping | Jina AI Reader | Free tier generoso |
+| Scraping | fetch nativo + extração de HTML | Sem dependência externa, zero custo |
 | Fallback multi-provider (Claude/Gemini) | ⏳ Futuro | Fase 2 |
 
 ### 6.5 Modelo proprietário (longo prazo)
