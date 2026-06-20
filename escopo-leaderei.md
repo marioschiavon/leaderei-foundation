@@ -950,7 +950,7 @@ Lista das dívidas conhecidas em ordem de prioridade:
 
 ### Fase 3 — Inteligência (planejada)
 
-- IA de scraping (Jina) + geração de abordagem personalizada
+- IA de scraping (fetch nativo + extração de HTML) + geração de abordagem personalizada
 - Prompts customizados por marca/cliente
 - IA negociadora de agendamento (consome API Cal.com em linguagem natural)
 - Sistema de score comportamental
