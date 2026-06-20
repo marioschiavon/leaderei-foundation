@@ -766,7 +766,7 @@ A IA atua em três momentos:
 
 | Fonte | Caminho | Risco |
 |---|---|---|
-| Site da empresa | **Jina AI Reader** (URL → markdown limpo) | Baixo — conteúdo público |
+| Site da empresa | **fetch nativo + extração de HTML** (title, meta description, texto visível) | Baixo — conteúdo público |
 | Apollo (já comprado) | Dados que vêm no enriquecimento (cargo, setor, etc) | Zero |
 | LinkedIn ativo (raspagem) | Não fazer | Alto risco regulatório |
 
