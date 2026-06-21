@@ -154,36 +154,47 @@ serve(async (req: Request) => {
 });
 
 
-async function handleMessage(supabase: any, instance: any, data: any) {
+async function handleMessage(supabase: any, instance: any, data: any): Promise<"processed" | "ignored"> {
   const info = data?.Info;
-  if (!info || info.IsGroup === true) return;
+  if (!info) return "ignored";
+
+  // Block groups, broadcasts, newsletters, status updates
+  const chatJid: string = String(info.Chat || info.Sender || "");
+  const isGroupLike =
+    info.IsGroup === true ||
+    /@(g\.us|broadcast|newsletter)$/i.test(chatJid) ||
+    chatJid === "status@broadcast";
+  if (isGroupLike) {
+    console.log("[hook7-webhook] ignored group/broadcast/newsletter", { chatJid });
+    return "ignored";
+  }
 
   const externalId = info.ID;
-  if (!externalId) return;
+  if (!externalId) return "ignored";
 
   const { data: existing } = await supabase
     .from("messages")
     .select("id")
     .eq("external_message_id", externalId)
     .maybeSingle();
-  if (existing) return;
+  if (existing) return "ignored";
 
   const isOutbound = info.IsFromMe === true;
   const otherJid = isOutbound
     ? (info.RecipientAlt || info.Chat)
     : (info.Sender || info.SenderAlt);
   const otherPhone = stripJid(otherJid);
-  if (!otherPhone) return;
+  if (!otherPhone) return "ignored";
 
   const text =
     data?.Message?.conversation ??
     data?.Message?.extendedTextMessage?.text ??
     null;
-  if (!text) return;
+  if (!text) return "ignored";
 
   let { data: lead } = await supabase
     .from("leads")
-    .select("id")
+    .select("id, needs_review, status, archived_at")
     .eq("organization_id", instance.organization_id)
     .eq("phone", otherPhone)
     .maybeSingle();
@@ -198,18 +209,18 @@ async function handleMessage(supabase: any, instance: any, data: any) {
         needs_review: true,
         review_reason: "inbound_from_unknown_whatsapp",
       })
-      .select("id")
+      .select("id, needs_review, status, archived_at")
       .single();
     if (leadErr) {
       console.error("[hook7-webhook] lead insert failed", { error: leadErr.message });
-      return;
+      return "processed";
     }
     lead = newLead;
   }
 
   let { data: conv } = await supabase
     .from("conversations")
-    .select("id")
+    .select("id, agent_paused, ai_enabled")
     .eq("organization_id", instance.organization_id)
     .eq("lead_id", lead.id)
     .eq("channel", "whatsapp")
@@ -223,11 +234,11 @@ async function handleMessage(supabase: any, instance: any, data: any) {
         lead_id: lead.id,
         channel: "whatsapp",
       })
-      .select("id")
+      .select("id, agent_paused, ai_enabled")
       .single();
     if (convErr) {
       console.error("[hook7-webhook] conversation insert failed", { error: convErr.message });
-      return;
+      return "processed";
     }
     conv = newConv;
   }
@@ -246,14 +257,12 @@ async function handleMessage(supabase: any, instance: any, data: any) {
     created_at: ts,
   });
   if (msgErr) {
-    // unique violation on external_message_id = idempotency hit; safe to ignore
     if (!String(msgErr.message || "").toLowerCase().includes("duplicate")) {
       console.error("[hook7-webhook] message insert failed", { error: msgErr.message });
     }
-    return;
+    return "processed";
   }
 
-  // update conversation last_message_*
   await supabase
     .from("conversations")
     .update({
@@ -264,14 +273,27 @@ async function handleMessage(supabase: any, instance: any, data: any) {
     })
     .eq("id", conv.id);
 
-  // Trigger conversation agent on INBOUND only, when not paused by human.
+  // Only trigger the AI on INBOUND messages, when the conversation is not paused
+  // and the lead is "confirmed" (not needing manual review, not archived).
   if (!isOutbound) {
-    const { data: convCheck } = await supabase
-      .from("conversations")
-      .select("agent_paused, ai_enabled")
-      .eq("id", conv.id)
-      .maybeSingle();
-    if (convCheck && !convCheck.agent_paused && convCheck.ai_enabled !== false) {
+    const leadConfirmed =
+      lead.needs_review === false &&
+      lead.status !== "archived" &&
+      lead.archived_at == null;
+    const convActive = !conv.agent_paused && conv.ai_enabled !== false;
+
+    if (!leadConfirmed) {
+      console.log("[hook7-webhook] AI skipped — lead needs review / archived", {
+        lead_id: lead.id,
+        needs_review: lead.needs_review,
+        status: lead.status,
+        archived_at: lead.archived_at,
+      });
+    } else if (!convActive) {
+      console.log("[hook7-webhook] AI skipped — conversation paused / ai_enabled=false", {
+        conversation_id: conv.id,
+      });
+    } else {
       const { error: schedErr } = await supabase.rpc("schedule_agent_response", {
         _organization_id: instance.organization_id,
         _conversation_id: conv.id,
@@ -282,6 +304,8 @@ async function handleMessage(supabase: any, instance: any, data: any) {
       }
     }
   }
+
+  return "processed";
 }
 
 async function handleReceipt(supabase: any, instance: any, data: any, state: any) {
