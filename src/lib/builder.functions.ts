@@ -449,6 +449,7 @@ export const getBuilderDocumentByCampaign = createServerFn({ method: "POST" })
       // Seed entry step
       const { error: seedErr } = await supabase.from("flow_steps").insert({
         document_id: docId,
+        organization_id: campaign.organization_id ?? orgId,
         type: "ai_message",
         position_x: 100,
         position_y: 200,
