@@ -1,56 +1,56 @@
-## O que está acontecendo
+## Problema
 
-Ao clicar em "Desconectar" um WhatsApp:
+No `supabase/functions/hook7-webhook/index.ts`, `handleMessage` hoje:
 
-1. `disconnectHook7Instance` chama `POST /instance/disconnect` no Hook7 e grava `status='disconnected'` no banco.
-2. **O endpoint `/instance/disconnect` do Hook7 só fecha o socket — não encerra a sessão do WhatsApp.** O Hook7 então reabre a conexão automaticamente usando as credenciais salvas e dispara um webhook `Connected`.
-3. `handleConnected` no edge function `hook7-webhook` faz `update hook7_instances set status='connected'` cegamente — sobrescrevendo a desconexão que o usuário acabou de pedir.
-
-Resultado: a instância "reconecta sozinha" segundos depois.
-
-As outras integrações (Apollo, Pipedrive, Cal.com, Resend) só apagam/marcam `integration_credentials` localmente — não têm esse problema. Vou só revisar mensagens de erro e idempotência, sem mudanças funcionais.
+1. Pula apenas `info.IsGroup === true`. JIDs de grupo / broadcast / newsletter sem essa flag passam direto.
+2. Quando uma mensagem chega de telefone desconhecido, ele cria o lead com `needs_review=true` **e em seguida** agenda a resposta da IA. Resultado: a IA responde qualquer um que mandar mensagem.
+3. Não checa `needs_review` nem `status='archived'` antes de chamar `schedule_agent_response`.
 
 ## O que vou fazer
 
-### 1. Logout real no WhatsApp (Hook7)
+Edição única em `supabase/functions/hook7-webhook/index.ts`, função `handleMessage`:
 
-Em `disconnectHook7Instance` (`src/lib/hook7.functions.ts`):
+### 1. Bloquear grupos / broadcasts / newsletters
+Logo após obter `info`, descartar e retornar `'ignored'` quando:
+- `info.IsGroup === true`, ou
+- `info.Chat` / `info.Sender` termina em `@g.us`, `@broadcast`, `@newsletter` ou é `status@broadcast`.
 
-- Chamar `POST /instance/logout` primeiro (encerra a sessão WhatsApp de verdade, força novo QR na próxima conexão).
-- Se o Hook7 não tiver `/instance/logout` nessa versão, cair para `/instance/disconnect`.
-- Marcar a instância localmente com `status='disconnected'` e gravar um novo campo `user_disconnected_at = now()` (ver passo 2).
+### 2. Lead desconhecido → criar, salvar no inbox, NÃO responder
+Mantém a criação automática do lead com `needs_review=true` e `review_reason='inbound_from_unknown_whatsapp'` (como já faz hoje). A mensagem inbound continua sendo gravada normalmente na `conversations` + `messages` (vai aparecer no inbox).
 
-### 2. Ignorar eventos `Connected` obsoletos
+### 3. Gate da IA por `needs_review` / `status`
+Substituir o bloco atual:
+```ts
+if (!isOutbound) {
+  const { data: convCheck } = await supabase
+    .from('conversations').select('agent_paused, ai_enabled')...
+  if (convCheck && !convCheck.agent_paused && convCheck.ai_enabled !== false) {
+    await supabase.rpc('schedule_agent_response', {...})
+  }
+}
+```
+por uma versão que **só** chama `schedule_agent_response` quando, simultaneamente:
+- `isOutbound === false`
+- conversa: `agent_paused === false` e `ai_enabled !== false`
+- lead: `needs_review === false` **e** `status <> 'archived'` **e** `archived_at IS NULL`
 
-- Migração: adicionar coluna `user_disconnected_at timestamptz` em `public.hook7_instances`.
-- `handleConnected` no webhook passa a ignorar o evento quando:
-  - `user_disconnected_at IS NOT NULL` **e** `user_disconnected_at >= last_connected_at` (ou nos últimos 60s).
-  - Registra `webhook_events.status = 'ignored'` com motivo `stale_connected_after_user_disconnect`.
-- Quando o usuário clica "Reconectar" (ou inicia novo connect/QR), zeramos `user_disconnected_at` para permitir que um próximo `Connected` real volte a marcar como conectado.
+Para isso vou reler o lead com `select('needs_review, status, archived_at')` (ou já trazer esses campos no `select` inicial do lookup) e usar no `if`. Quando o gate barrar, logar:
+`[hook7-webhook] AI skipped — lead needs review / archived` com `lead_id` e motivo.
 
-### 3. UI
+### 4. Marcar eventos como `ignored` quando aplicável
+`handleMessage` passa a retornar `'processed' | 'ignored'`. No `switch` do `serve`, se vier `'ignored'`, gravo `processStatus = 'ignored'` em `webhook_events` (hoje qualquer non-throw vira `processed`). Motivos possíveis: `group_or_broadcast`, `no_text_body`.
 
-- Em `WhatsAppManagerDialog` (`disconnectMut.onSuccess`): além de invalidar `["hook7-instances"]`, mostrar toast "Desconectado. Será preciso ler o QR de novo para reconectar." para deixar claro que o logout é definitivo.
-- Sem mudanças no fluxo de polling de status.
+> Mensagem inbound de lead `needs_review=true` conta como `processed` (a mensagem foi salva no inbox), só a IA é que não responde — esse caso **não** vira `ignored`.
 
-### 4. Verificação das outras integrações
+## Fora de escopo
+- UI de revisão de leads / inbox (não pedido).
+- Mudanças no `conversation-agent` em si.
+- Outras integrações (Apollo, Pipedrive, Cal.com, Resend, email).
+- Auto-promover lead para "confirmado" — continua sendo ação manual do usuário (desmarcar `needs_review`).
 
-Apenas leitura/verificação (sem código novo):
-- Apollo / Pipedrive / Cal.com / Resend: confirmar que `disconnect*` desativa `integration_credentials` e que `status='disconnected'` é refletido na listagem. Documentar resultado na resposta — sem alterações se estiverem ok.
+## Arquivos
+- `supabase/functions/hook7-webhook/index.ts` — única alteração funcional.
 
-## Detalhes técnicos
-
-**Arquivos alterados**
-- `src/lib/hook7.functions.ts` — `disconnectHook7Instance`, `reconnectHook7Instance`, `connectHook7Instance` (reset de `user_disconnected_at`).
-- `supabase/functions/hook7-webhook/index.ts` — `handleConnected` passa a verificar `user_disconnected_at`.
-- `src/components/app/WhatsAppManagerDialog.tsx` — texto do toast de desconexão.
-- Migração: `ALTER TABLE public.hook7_instances ADD COLUMN user_disconnected_at timestamptz`.
-
-**Risco / rollback**
-- Se `/instance/logout` não existir no Hook7, o fallback para `/instance/disconnect` mantém o comportamento atual + a proteção do `user_disconnected_at` no webhook já resolve o "reconectar sozinho".
-- Compatível com instâncias antigas (coluna nullable).
-
-**Fora de escopo**
-- Mudanças no fluxo de conexão inicial / QR.
-- Renomear / arquivar instância.
-- Outras integrações além de WhatsApp (apenas verificação).
+## Risco / rollback
+- Risco baixo: mudança mais restritiva. Para a IA voltar a responder um número, basta o usuário abrir o lead no inbox e marcar como revisado (`needs_review=false`).
+- Conversas com leads já confirmados continuam exatamente como hoje.
