@@ -1,0 +1,1 @@
+ALTER TABLE public.hook7_instances ADD COLUMN IF NOT EXISTS user_disconnected_at timestamptz;

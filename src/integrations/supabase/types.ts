@@ -1390,6 +1390,7 @@ export type Database = {
           status: string
           token_encrypted: string | null
           updated_at: string
+          user_disconnected_at: string | null
         }
         Insert: {
           archived_at?: string | null
@@ -1411,6 +1412,7 @@ export type Database = {
           status?: string
           token_encrypted?: string | null
           updated_at?: string
+          user_disconnected_at?: string | null
         }
         Update: {
           archived_at?: string | null
@@ -1432,6 +1434,7 @@ export type Database = {
           status?: string
           token_encrypted?: string | null
           updated_at?: string
+          user_disconnected_at?: string | null
         }
         Relationships: [
           {
