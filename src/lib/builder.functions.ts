@@ -518,6 +518,7 @@ export const saveBuilderDocument = createServerFn({ method: "POST" })
       const stepRows = data.steps.map((s) => ({
         id: s.id,
         document_id: data.document_id,
+        organization_id: doc.organization_id,
         type: s.type,
         position_x: s.position_x,
         position_y: s.position_y,
@@ -535,6 +536,7 @@ export const saveBuilderDocument = createServerFn({ method: "POST" })
       const trRows = data.transitions.map((t) => ({
         id: t.id,
         document_id: data.document_id,
+        organization_id: doc.organization_id,
         from_step_id: t.from_step_id,
         to_step_id: t.to_step_id,
         branch: t.branch,
