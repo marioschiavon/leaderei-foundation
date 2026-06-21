@@ -1215,6 +1215,7 @@ export type Database = {
           document_id: string
           id: string
           is_entry: boolean
+          organization_id: string
           position_x: number
           position_y: number
           type: string
@@ -1226,6 +1227,7 @@ export type Database = {
           document_id: string
           id?: string
           is_entry?: boolean
+          organization_id: string
           position_x?: number
           position_y?: number
           type: string
@@ -1237,6 +1239,7 @@ export type Database = {
           document_id?: string
           id?: string
           is_entry?: boolean
+          organization_id?: string
           position_x?: number
           position_y?: number
           type?: string
@@ -1250,6 +1253,13 @@ export type Database = {
             referencedRelation: "builder_documents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "flow_steps_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       flow_transitions: {
@@ -1259,6 +1269,7 @@ export type Database = {
           document_id: string
           from_step_id: string
           id: string
+          organization_id: string
           to_step_id: string
         }
         Insert: {
@@ -1267,6 +1278,7 @@ export type Database = {
           document_id: string
           from_step_id: string
           id?: string
+          organization_id: string
           to_step_id: string
         }
         Update: {
@@ -1275,6 +1287,7 @@ export type Database = {
           document_id?: string
           from_step_id?: string
           id?: string
+          organization_id?: string
           to_step_id?: string
         }
         Relationships: [
@@ -1290,6 +1303,13 @@ export type Database = {
             columns: ["from_step_id"]
             isOneToOne: false
             referencedRelation: "flow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_transitions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
