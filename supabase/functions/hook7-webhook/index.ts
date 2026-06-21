@@ -74,7 +74,7 @@ serve(async (req: Request) => {
 
     const { data: instance } = await supabase
       .from("hook7_instances")
-      .select("id, organization_id, archived_at")
+      .select("id, organization_id, archived_at, user_disconnected_at")
       .eq("external_id", instanceId)
       .eq("organization_id", org.id)
       .maybeSingle();
