@@ -180,7 +180,12 @@ function InstanceActionsMenu({
   });
   const disconnectMut = useMutation({
     mutationFn: () => disconnectFn({ data: { instance_id: instance.id } }),
-    onSuccess: () => { toast.success("Desconectado."); invalidateAll(); },
+    onSuccess: () => {
+      toast.success("Desconectado.", {
+        description: "Será preciso ler o QR novamente para reconectar.",
+      });
+      invalidateAll();
+    },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao desconectar."),
   });
   const deleteMut = useMutation({
