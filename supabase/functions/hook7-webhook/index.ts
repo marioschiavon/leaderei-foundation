@@ -94,9 +94,11 @@ serve(async (req: Request) => {
     let processError: string | null = null;
     try {
       switch (event) {
-        case "Message":
-          await handleMessage(supabase, instance, body.data);
+        case "Message": {
+          const res = await handleMessage(supabase, instance, body.data);
+          if (res === "ignored") processStatus = "ignored";
           break;
+        }
         case "Receipt":
           await handleReceipt(supabase, instance, body.data, body.state);
           break;
