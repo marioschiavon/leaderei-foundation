@@ -74,7 +74,7 @@ serve(async (req: Request) => {
 
     const { data: instance } = await supabase
       .from("hook7_instances")
-      .select("id, organization_id, archived_at")
+      .select("id, organization_id, archived_at, user_disconnected_at")
       .eq("external_id", instanceId)
       .eq("organization_id", org.id)
       .maybeSingle();
@@ -301,6 +301,16 @@ async function handleReceipt(supabase: any, instance: any, data: any, state: any
 }
 
 async function handleConnected(supabase: any, instance: any, data: any) {
+  // If the user explicitly disconnected, ignore Connected events for a grace
+  // window so the saved WhatsApp session auto-reconnect doesn't overwrite
+  // the user's intent.
+  const userDisc = instance.user_disconnected_at ? new Date(instance.user_disconnected_at).getTime() : 0;
+  if (userDisc > 0 && Date.now() - userDisc < 5 * 60 * 1000) {
+    console.log("[hook7-webhook] ignoring Connected after user_disconnect", {
+      instanceId: instance.id, user_disconnected_at: instance.user_disconnected_at,
+    });
+    return;
+  }
   const phoneFromJid = stripJid(data?.jid);
   await supabase
     .from("hook7_instances")

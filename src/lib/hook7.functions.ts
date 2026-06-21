@@ -430,7 +430,12 @@ export const connectHook7Instance = createServerFn({ method: "POST" })
     });
     await supabase
       .from("hook7_instances")
-      .update({ status: "qr_ready", last_qr_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({
+        status: "qr_ready",
+        last_qr_at: new Date().toISOString(),
+        user_disconnected_at: null,
+        updated_at: new Date().toISOString(),
+      } as any)
       .eq("id", inst.id);
     return { ok: true };
   });
@@ -503,16 +508,31 @@ export const disconnectHook7Instance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { inst, token } = await loadInstanceForAction(supabase, userId, data.instance_id);
+    // Logout encerra a sessão do WhatsApp; disconnect só fecha o socket
+    // (e o Hook7 reabre sozinho, disparando um Connected fantasma).
+    let loggedOut = false;
     try {
-      await hook7Fetch("/instance/disconnect", { method: "POST", apikey: token, body: {} });
+      await hook7Fetch("/instance/logout", { method: "POST", apikey: token, body: {} });
+      loggedOut = true;
     } catch (e: any) {
-      // swallow remote error if instance already gone, but still mark local
+      console.warn(`[hook7] logout failed, falling back to disconnect (instance_id=${inst.id}): ${e?.message ?? "unknown"}`);
+      try {
+        await hook7Fetch("/instance/disconnect", { method: "POST", apikey: token, body: {} });
+      } catch {
+        // swallow — local state will reflect the user's intent regardless
+      }
     }
+    const nowIso = new Date().toISOString();
     await supabase
       .from("hook7_instances")
-      .update({ status: "disconnected", last_disconnected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({
+        status: "disconnected",
+        last_disconnected_at: nowIso,
+        user_disconnected_at: nowIso,
+        updated_at: nowIso,
+      } as any)
       .eq("id", inst.id);
-    return { ok: true };
+    return { ok: true, logged_out: loggedOut };
   });
 
 export const reconnectHook7Instance = createServerFn({ method: "POST" })
@@ -534,7 +554,12 @@ export const reconnectHook7Instance = createServerFn({ method: "POST" })
     }
     await supabase
       .from("hook7_instances")
-      .update({ status: "qr_ready", last_qr_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({
+        status: "qr_ready",
+        last_qr_at: new Date().toISOString(),
+        user_disconnected_at: null,
+        updated_at: new Date().toISOString(),
+      } as any)
       .eq("id", inst.id);
     return { ok: true };
   });
