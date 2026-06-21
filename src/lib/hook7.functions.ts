@@ -430,7 +430,12 @@ export const connectHook7Instance = createServerFn({ method: "POST" })
     });
     await supabase
       .from("hook7_instances")
-      .update({ status: "qr_ready", last_qr_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({
+        status: "qr_ready",
+        last_qr_at: new Date().toISOString(),
+        user_disconnected_at: null,
+        updated_at: new Date().toISOString(),
+      } as any)
       .eq("id", inst.id);
     return { ok: true };
   });
