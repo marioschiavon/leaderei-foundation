@@ -105,6 +105,9 @@ serve(async (req: Request) => {
         case "Connected":
           await handleConnected(supabase, instance, body.data);
           break;
+        case "PairSuccess":
+          await handlePairSuccess(supabase, instance, body.data);
+          break;
         case "LoggedOut":
           await handleLoggedOut(supabase, instance, body.data);
           break;
