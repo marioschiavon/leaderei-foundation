@@ -65,7 +65,7 @@ const SLUG_BRAND: Record<string, Brand> = {
 };
 
 const STATUS_META: Record<string, { label: string; icon: LucideIcon; className: string; helper: string }> = {
-  connected:    { label: "Conectado",    icon: CheckCircle2,  className: "bg-emerald-500/10 text-emerald-700",  helper: "Integração ativa para este tenant." },
+  connected:    { label: "Conectado",    icon: CheckCircle2,  className: "bg-emerald-500/10 text-emerald-700",  helper: "Integração ativa para esta conta." },
   pending:      { label: "Pendente",     icon: Clock3,        className: "bg-amber-500/10 text-amber-700",       helper: "Setup iniciado, aguardando conclusão." },
   error:        { label: "Erro",         icon: AlertTriangle, className: "bg-destructive/10 text-destructive",   helper: "Última sincronização ou autenticação falhou." },
   disconnected: { label: "Desconectado", icon: Circle,        className: "bg-muted text-muted-foreground",       helper: "Provider disponível, sem conexão ativa." },
