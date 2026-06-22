@@ -353,7 +353,32 @@ async function handleConnected(supabase: any, instance: any, data: any) {
     .eq("id", instance.id);
 }
 
+async function handlePairSuccess(supabase: any, instance: any, data: any) {
+  const userDisc = instance.user_disconnected_at ? new Date(instance.user_disconnected_at).getTime() : 0;
+  if (userDisc > 0 && Date.now() - userDisc < 5 * 60 * 1000) {
+    console.log("[hook7-webhook] ignoring PairSuccess after user_disconnect", {
+      instanceId: instance.id, user_disconnected_at: instance.user_disconnected_at,
+    });
+    return;
+  }
+  const phoneFromJid =
+    stripJid(data?.jid) ||
+    stripJid(data?.JID) ||
+    stripJid(data?.ID) ||
+    stripJid(data?.id);
+  const profileName = data?.pushName ?? data?.PushName ?? data?.businessName ?? null;
+  const patch: Record<string, any> = {
+    status: "connected",
+    last_connected_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (phoneFromJid) patch.phone_number = phoneFromJid;
+  if (profileName) patch.connected_profile_name = profileName;
+  await supabase.from("hook7_instances").update(patch).eq("id", instance.id);
+}
+
 async function handleLoggedOut(supabase: any, instance: any, data: any) {
+
   const reason = Number(data?.Reason);
   let newStatus = "disconnected";
   if (reason === 403) newStatus = "banned";
