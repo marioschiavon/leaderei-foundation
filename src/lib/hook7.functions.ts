@@ -347,7 +347,7 @@ export const createHook7Instance = createServerFn({ method: "POST" })
       owner_user_id = data.owner_user_id ?? userId;
     }
 
-    const { data: ins, error: insErr } = await supabase
+    const { data: ins, error: insErr } = await supabaseAdmin
       .from("hook7_instances")
       .insert({
         organization_id: org.id,
@@ -373,10 +373,11 @@ export const createHook7Instance = createServerFn({ method: "POST" })
     });
     if (tokErr) {
       // rollback: delete local + remote
-      await supabase.from("hook7_instances").delete().eq("id", ins.id);
+      await supabaseAdmin.from("hook7_instances").delete().eq("id", ins.id);
       try { await hook7Fetch(`/instance/${encodeURIComponent(ext_name)}`, { method: "DELETE", apikey, timeoutMs: 8000 }); } catch {}
       throw new Error(`Falha ao salvar token: ${tokErr.message}`);
     }
+
 
     return { instance: ins };
   });
