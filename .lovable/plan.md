@@ -1,56 +1,33 @@
-## Problema
 
-No `supabase/functions/hook7-webhook/index.ts`, `handleMessage` hoje:
+## Objetivo
 
-1. Pula apenas `info.IsGroup === true`. JIDs de grupo / broadcast / newsletter sem essa flag passam direto.
-2. Quando uma mensagem chega de telefone desconhecido, ele cria o lead com `needs_review=true` **e em seguida** agenda a resposta da IA. Resultado: a IA responde qualquer um que mandar mensagem.
-3. Não checa `needs_review` nem `status='archived'` antes de chamar `schedule_agent_response`.
+Fazer **Renomear**, **Apagar** e **Reconectar** funcionarem no menu de cada instância de WhatsApp. As opções continuam exatamente onde estão — nenhuma é removida.
 
-## O que vou fazer
+## Diagnóstico
 
-Edição única em `supabase/functions/hook7-webhook/index.ts`, função `handleMessage`:
+1. **Renomear e Apagar** — os componentes que mostram o input de renomear e a confirmação de apagar estão sendo renderizados *dentro* do modal principal de WhatsApp. Modais aninhados do Radix UI entram em conflito: o item do menu é clicado e dispara a abertura, mas o conteúdo fica preso atrás do overlay do modal pai e parece não responder. Isso bate com o que se vê na gravação da sessão.
 
-### 1. Bloquear grupos / broadcasts / newsletters
-Logo após obter `info`, descartar e retornar `'ignored'` quando:
-- `info.IsGroup === true`, ou
-- `info.Chat` / `info.Sender` termina em `@g.us`, `@broadcast`, `@newsletter` ou é `status@broadcast`.
+2. **Reconectar** — a chamada ao servidor acontece e o status muda no banco, mas o painel com o QR Code (necessário para escanear novamente) nunca aparece. O usuário só vê um toast e nada mais — por isso parece que não fez nada.
 
-### 2. Lead desconhecido → criar, salvar no inbox, NÃO responder
-Mantém a criação automática do lead com `needs_review=true` e `review_reason='inbound_from_unknown_whatsapp'` (como já faz hoje). A mensagem inbound continua sendo gravada normalmente na `conversations` + `messages` (vai aparecer no inbox).
+## Correções (todas no arquivo `src/components/app/WhatsAppManagerDialog.tsx`)
 
-### 3. Gate da IA por `needs_review` / `status`
-Substituir o bloco atual:
-```ts
-if (!isOutbound) {
-  const { data: convCheck } = await supabase
-    .from('conversations').select('agent_paused, ai_enabled')...
-  if (convCheck && !convCheck.agent_paused && convCheck.ai_enabled !== false) {
-    await supabase.rpc('schedule_agent_response', {...})
-  }
-}
-```
-por uma versão que **só** chama `schedule_agent_response` quando, simultaneamente:
-- `isOutbound === false`
-- conversa: `agent_paused === false` e `ai_enabled !== false`
-- lead: `needs_review === false` **e** `status <> 'archived'` **e** `archived_at IS NULL`
+### 1. Renomear funcionar
+Mover apenas a **renderização** do diálogo de renomear (não o item de menu) para o nível do componente pai, como irmão do modal principal — mesmo padrão já usado hoje pelo `ConnectFlowDialog`. O item "Renomear" continua no dropdown; clicar nele continua abrindo o input — só que agora o input aparece de verdade na tela e o botão Salvar grava.
 
-Para isso vou reler o lead com `select('needs_review, status, archived_at')` (ou já trazer esses campos no `select` inicial do lookup) e usar no `if`. Quando o gate barrar, logar:
-`[hook7-webhook] AI skipped — lead needs review / archived` com `lead_id` e motivo.
+### 2. Apagar funcionar
+Mesma reestruturação para o `AlertDialog` de confirmação ("Apagar instância?"). O item "Apagar" continua no dropdown; clicar mostra a confirmação corretamente e o botão Apagar executa a exclusão.
 
-### 4. Marcar eventos como `ignored` quando aplicável
-`handleMessage` passa a retornar `'processed' | 'ignored'`. No `switch` do `serve`, se vier `'ignored'`, gravo `processStatus = 'ignored'` em `webhook_events` (hoje qualquer non-throw vira `processed`). Motivos possíveis: `group_or_broadcast`, `no_text_body`.
-
-> Mensagem inbound de lead `needs_review=true` conta como `processed` (a mensagem foi salva no inbox), só a IA é que não responde — esse caso **não** vira `ignored`.
+### 3. Reconectar funcionar
+O item "Reconectar" continua no dropdown. Comportamento novo ao clicar:
+1. Chama `reconnectHook7Instance` (já existe no servidor — sem mudanças).
+2. Em caso de sucesso, abre automaticamente o painel de QR Code (`ConnectFlowDialog` com `reuseInstanceId` = id da instância) para o usuário escanear.
+3. O toast "Reconectando…" continua aparecendo como feedback.
 
 ## Fora de escopo
-- UI de revisão de leads / inbox (não pedido).
-- Mudanças no `conversation-agent` em si.
-- Outras integrações (Apollo, Pipedrive, Cal.com, Resend, email).
-- Auto-promover lead para "confirmado" — continua sendo ação manual do usuário (desmarcar `needs_review`).
+- Nenhuma server function é alterada.
+- Nenhum item de menu é adicionado ou removido.
+- Edge function `hook7-webhook` não é tocada.
+- Lógica de desconexão (corrigida em iteração anterior) não é tocada.
 
-## Arquivos
-- `supabase/functions/hook7-webhook/index.ts` — única alteração funcional.
-
-## Risco / rollback
-- Risco baixo: mudança mais restritiva. Para a IA voltar a responder um número, basta o usuário abrir o lead no inbox e marcar como revisado (`needs_review=false`).
-- Conversas com leads já confirmados continuam exatamente como hoje.
+## Risco
+Baixo. Mudança somente de estrutura JSX em um único arquivo de UI. Backend inalterado.

@@ -52,10 +52,16 @@ function relTime(iso?: string | null): string {
   return `há ${d} d`;
 }
 
+type InstanceLite = { id: string; display_name: string };
+
 export function WhatsAppManagerDialog({
   open, onOpenChange,
 }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const qc = useQueryClient();
   const fetchList = useServerFn(listHook7Instances);
+  const reconnectFn = useServerFn(reconnectHook7Instance);
+  const disconnectFn = useServerFn(disconnectHook7Instance);
+
   const { data, isLoading, refetch } = useQuery({
     enabled: open,
     queryKey: ["hook7-instances"],
@@ -69,117 +75,31 @@ export function WhatsAppManagerDialog({
   const [connectOpen, setConnectOpen] = useState(false);
   const [reuseId, setReuseId] = useState<string | null>(null);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>WhatsApp via Hook7</DialogTitle>
-          <DialogDescription>
-            Conecte um ou mais números de WhatsApp para usar em campanhas.
-          </DialogDescription>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="grid place-items-center py-12 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : instances.length === 0 ? (
-          <div className="rounded-xl border bg-surface-muted/30 p-8 text-center">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand/10">
-              <QrCode className="h-5 w-5 text-brand" />
-            </div>
-            <p className="mt-3 font-medium">Nenhuma instância conectada</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Conecte um número para enviar mensagens em campanhas.
-            </p>
-            <Button className="mt-4" onClick={() => setConnectOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" /> Conectar WhatsApp
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {instances.map((inst: any) => {
-              const meta = STATUS_META[inst.status] ?? STATUS_META.disconnected;
-              return (
-                <div key={inst.id} className="rounded-lg border bg-surface p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{inst.display_name}</span>
-                        <Badge className={`${meta.cls} border-transparent font-normal`}>
-                          {meta.dot} {meta.label}
-                        </Badge>
-                      </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {inst.phone_number
-                          ? `+${inst.phone_number}`
-                          : inst.status === "connected"
-                            ? (inst.connected_profile_name ? `WhatsApp: ${inst.connected_profile_name}` : "Conectado")
-                            : "Aguardando pareamento"}
-                        {" · "}
-                        Última conexão: {relTime(inst.last_connected_at)}
-                      </div>
-                    </div>
-                    <InstanceActionsMenu
-                      key={inst.id}
-                      instance={inst}
-                      onShowQr={() => { setReuseId(inst.id); setConnectOpen(true); }}
-                      onChanged={refetch}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-
-            <Button variant="outline" className="w-full" onClick={() => { setReuseId(null); setConnectOpen(true); }}>
-              <Plus className="mr-1 h-4 w-4" /> Adicionar outra instância
-            </Button>
-          </div>
-        )}
-      </DialogContent>
-
-      <ConnectFlowDialog
-        open={connectOpen}
-        onOpenChange={(v) => { setConnectOpen(v); if (!v) { setReuseId(null); refetch(); } }}
-        mode={mode}
-        reuseInstanceId={reuseId}
-      />
-    </Dialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Per-instance actions menu — one component per instance so all hooks
-// (useServerFn, useMutation, useState) live at the TOP of a real component
-// body, never inside callbacks or .map iterations.
-// ---------------------------------------------------------------------------
-
-function InstanceActionsMenu({
-  instance, onShowQr, onChanged,
-}: {
-  instance: any;
-  onShowQr: () => void;
-  onChanged: () => void;
-}) {
-  const qc = useQueryClient();
-  const reconnectFn = useServerFn(reconnectHook7Instance);
-  const disconnectFn = useServerFn(disconnectHook7Instance);
-  const deleteFn = useServerFn(deleteHook7Instance);
-  const renameFn = useServerFn(renameHook7Instance);
+  // Lifted state for action dialogs — rendered as SIBLINGS of the main Dialog
+  // so the nested-modal focus/overlay conflict from Radix is avoided.
+  const [renameTarget, setRenameTarget] = useState<InstanceLite | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InstanceLite | null>(null);
 
   const invalidateAll = () => {
-    onChanged();
+    refetch();
     qc.invalidateQueries({ queryKey: ["hook7-instances"] });
     qc.invalidateQueries({ queryKey: ["integrations"] });
   };
 
   const reconnectMut = useMutation({
-    mutationFn: () => reconnectFn({ data: { instance_id: instance.id } }),
-    onSuccess: () => { toast.success("Reconectando…"); invalidateAll(); },
+    mutationFn: (instance_id: string) => reconnectFn({ data: { instance_id } }),
+    onSuccess: (_r, instance_id) => {
+      toast.success("Reconectando…", { description: "Escaneie o QR para finalizar." });
+      invalidateAll();
+      // Open the QR flow reusing the existing instance so the user can scan again.
+      setReuseId(instance_id);
+      setConnectOpen(true);
+    },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao reconectar."),
   });
+
   const disconnectMut = useMutation({
-    mutationFn: () => disconnectFn({ data: { instance_id: instance.id } }),
+    mutationFn: (instance_id: string) => disconnectFn({ data: { instance_id } }),
     onSuccess: () => {
       toast.success("Desconectado.", {
         description: "Será preciso ler o QR novamente para reconectar.",
@@ -188,118 +108,266 @@ function InstanceActionsMenu({
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao desconectar."),
   });
-  const deleteMut = useMutation({
-    mutationFn: () => deleteFn({ data: { instance_id: instance.id, reason: "user_delete" } }),
-    onSuccess: () => { toast.success("Instância apagada."); invalidateAll(); },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao apagar."),
-  });
-  const renameMut = useMutation({
-    mutationFn: (display_name: string) =>
-      renameFn({ data: { instance_id: instance.id, display_name } }),
-    onSuccess: () => { toast.success("Renomeada."); invalidateAll(); setRenameOpen(false); },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao renomear."),
-  });
 
-  const [renameOpen, setRenameOpen] = useState(false);
-  const [renameValue, setRenameValue] = useState(instance.display_name ?? "");
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>WhatsApp via Hook7</DialogTitle>
+            <DialogDescription>
+              Conecte um ou mais números de WhatsApp para usar em campanhas.
+            </DialogDescription>
+          </DialogHeader>
 
+          {isLoading ? (
+            <div className="grid place-items-center py-12 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : instances.length === 0 ? (
+            <div className="rounded-xl border bg-surface-muted/30 p-8 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand/10">
+                <QrCode className="h-5 w-5 text-brand" />
+              </div>
+              <p className="mt-3 font-medium">Nenhuma instância conectada</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Conecte um número para enviar mensagens em campanhas.
+              </p>
+              <Button className="mt-4" onClick={() => setConnectOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" /> Conectar WhatsApp
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {instances.map((inst: any) => {
+                const meta = STATUS_META[inst.status] ?? STATUS_META.disconnected;
+                return (
+                  <div key={inst.id} className="rounded-lg border bg-surface p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium">{inst.display_name}</span>
+                          <Badge className={`${meta.cls} border-transparent font-normal`}>
+                            {meta.dot} {meta.label}
+                          </Badge>
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {inst.phone_number
+                            ? `+${inst.phone_number}`
+                            : inst.status === "connected"
+                              ? (inst.connected_profile_name ? `WhatsApp: ${inst.connected_profile_name}` : "Conectado")
+                              : "Aguardando pareamento"}
+                          {" · "}
+                          Última conexão: {relTime(inst.last_connected_at)}
+                        </div>
+                      </div>
+                      <InstanceActionsMenu
+                        instance={inst}
+                        onShowQr={() => { setReuseId(inst.id); setConnectOpen(true); }}
+                        onReconnect={() => reconnectMut.mutate(inst.id)}
+                        onDisconnect={() => disconnectMut.mutate(inst.id)}
+                        onRequestRename={() => setRenameTarget({ id: inst.id, display_name: inst.display_name ?? "" })}
+                        onRequestDelete={() => setDeleteTarget({ id: inst.id, display_name: inst.display_name ?? "" })}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <Button variant="outline" className="w-full" onClick={() => { setReuseId(null); setConnectOpen(true); }}>
+                <Plus className="mr-1 h-4 w-4" /> Adicionar outra instância
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConnectFlowDialog
+        open={connectOpen}
+        onOpenChange={(v) => { setConnectOpen(v); if (!v) { setReuseId(null); refetch(); } }}
+        mode={mode}
+        reuseInstanceId={reuseId}
+      />
+
+      <RenameInstanceDialog
+        target={renameTarget}
+        onOpenChange={(v) => { if (!v) setRenameTarget(null); }}
+        onDone={invalidateAll}
+      />
+
+      <DeleteInstanceDialog
+        target={deleteTarget}
+        onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}
+        onDone={invalidateAll}
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-instance dropdown — only emits callbacks; no nested modals.
+// ---------------------------------------------------------------------------
+
+function InstanceActionsMenu({
+  instance, onShowQr, onReconnect, onDisconnect, onRequestRename, onRequestDelete,
+}: {
+  instance: any;
+  onShowQr: () => void;
+  onReconnect: () => void;
+  onDisconnect: () => void;
+  onRequestRename: () => void;
+  onRequestDelete: () => void;
+}) {
   const status = instance.status as string;
   const canReconnect = status === "disconnected" || status === "error" || status === "banned";
   const canDisconnect = status === "connected";
   const canShowQr = status === "qr_ready" || status === "pending_qr" || status === "pairing";
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canShowQr && (
+          <DropdownMenuItem onClick={onShowQr}>
+            <QrCode className="mr-2 h-4 w-4" /> Ver QR
+          </DropdownMenuItem>
+        )}
+        {canReconnect && (
+          <DropdownMenuItem onClick={onReconnect}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Reconectar
+          </DropdownMenuItem>
+        )}
+        {canDisconnect && (
+          <DropdownMenuItem onClick={onDisconnect}>
+            <PowerOff className="mr-2 h-4 w-4" /> Desconectar
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={onRequestRename}>
+          <Pencil className="mr-2 h-4 w-4" /> Renomear
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onClick={onRequestDelete}>
+          <Trash2 className="mr-2 h-4 w-4" /> Apagar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rename dialog — rendered as a SIBLING of the main Dialog.
+// ---------------------------------------------------------------------------
+
+function RenameInstanceDialog({
+  target, onOpenChange, onDone,
+}: {
+  target: InstanceLite | null;
+  onOpenChange: (v: boolean) => void;
+  onDone: () => void;
+}) {
+  const renameFn = useServerFn(renameHook7Instance);
+  const [value, setValue] = useState("");
+
+  useEffect(() => {
+    if (target) setValue(target.display_name ?? "");
+  }, [target]);
+
+  const renameMut = useMutation({
+    mutationFn: (display_name: string) =>
+      renameFn({ data: { instance_id: target!.id, display_name } }),
+    onSuccess: () => {
+      toast.success("Renomeada.");
+      onDone();
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao renomear."),
+  });
+
+  const open = !!target;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Renomear instância</DialogTitle>
+          <DialogDescription>O nome ajuda a identificar a instância na lista.</DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Label htmlFor="rename-input">Novo nome</Label>
+          <Input
+            id="rename-input"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            maxLength={60}
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            disabled={
+              renameMut.isPending ||
+              !value.trim() ||
+              value.trim() === target?.display_name
+            }
+            onClick={() => renameMut.mutate(value.trim())}
+          >
+            {renameMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {canShowQr && (
-            <DropdownMenuItem onClick={onShowQr}>
-              <QrCode className="mr-2 h-4 w-4" /> Ver QR
-            </DropdownMenuItem>
-          )}
-          {canReconnect && (
-            <DropdownMenuItem onClick={() => reconnectMut.mutate()}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Reconectar
-            </DropdownMenuItem>
-          )}
-          {canDisconnect && (
-            <DropdownMenuItem onClick={() => disconnectMut.mutate()}>
-              <PowerOff className="mr-2 h-4 w-4" /> Desconectar
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem
-            onClick={() => { setRenameValue(instance.display_name ?? ""); setRenameOpen(true); }}
-          >
-            <Pencil className="mr-2 h-4 w-4" /> Renomear
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-destructive"
-            onClick={() => setConfirmDeleteOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" /> Apagar
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Renomear instância</DialogTitle>
-            <DialogDescription>O nome ajuda a identificar a instância na lista.</DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Label htmlFor="rename-input">Novo nome</Label>
-            <Input
-              id="rename-input"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              maxLength={60}
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRenameOpen(false)}>Cancelar</Button>
-            <Button
-              disabled={
-                renameMut.isPending ||
-                !renameValue.trim() ||
-                renameValue.trim() === instance.display_name
-              }
-              onClick={() => renameMut.mutate(renameValue.trim())}
-            >
-              {renameMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+// ---------------------------------------------------------------------------
+// Delete confirmation — rendered as a SIBLING of the main Dialog.
+// ---------------------------------------------------------------------------
 
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar instância "{instance.display_name}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza? Esta ação não pode ser desfeita. A instância será removida do Hook7 e arquivada.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { setConfirmDeleteOpen(false); deleteMut.mutate(); }}
-            >
-              Apagar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+function DeleteInstanceDialog({
+  target, onOpenChange, onDone,
+}: {
+  target: InstanceLite | null;
+  onOpenChange: (v: boolean) => void;
+  onDone: () => void;
+}) {
+  const deleteFn = useServerFn(deleteHook7Instance);
+  const deleteMut = useMutation({
+    mutationFn: () => deleteFn({ data: { instance_id: target!.id, reason: "user_delete" } }),
+    onSuccess: () => {
+      toast.success("Instância apagada.");
+      onDone();
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao apagar."),
+  });
+
+  const open = !!target;
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Apagar instância "{target?.display_name}"?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza? Esta ação não pode ser desfeita. A instância será removida do Hook7 e arquivada.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleteMut.isPending}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={deleteMut.isPending}
+            onClick={(e) => { e.preventDefault(); deleteMut.mutate(); }}
+          >
+            {deleteMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Apagar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
