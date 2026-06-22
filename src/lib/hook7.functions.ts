@@ -574,7 +574,7 @@ export const deleteHook7Instance = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => DeleteSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: inst, error } = await supabase
+    const { data: inst, error } = await supabaseAdmin
       .from("hook7_instances")
       .select("id, organization_id, external_name, status, archived_at")
       .eq("id", data.instance_id)
@@ -600,10 +600,14 @@ export const deleteHook7Instance = createServerFn({ method: "POST" })
     } catch {
       // best-effort
     }
-    await supabase
+    // Use admin client: RLS UPDATE for master_admin (no longer covered by a
+    // policy) silently affects 0 rows. Authorization was already enforced
+    // above via requireOrgAdmin.
+    const { error: updErr } = await supabaseAdmin
       .from("hook7_instances")
       .update({ archived_at: new Date().toISOString(), status: "disconnected", updated_at: new Date().toISOString() })
       .eq("id", inst.id);
+    if (updErr) throw new Error(updErr.message);
     if (reason !== "user_delete") {
       console.warn(`[hook7] instance archived via ${reason}: instance_id=${inst.id}, last_status=${inst.status}, user_id=${userId}`);
     }
@@ -621,17 +625,19 @@ export const renameHook7Instance = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => RenameSchema.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: inst } = await supabase
+    const { data: inst } = await supabaseAdmin
       .from("hook7_instances").select("id, organization_id").eq("id", data.instance_id).maybeSingle();
     if (!inst) throw new Error("Instância não encontrada.");
     await requireOrgAdmin(supabase, userId, inst.organization_id);
-    const { error } = await supabase
+    // Use admin client to avoid silent 0-row RLS updates for master_admin.
+    const { error } = await supabaseAdmin
       .from("hook7_instances")
       .update({ display_name: data.display_name, updated_at: new Date().toISOString() })
       .eq("id", inst.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 // ---------------------------------------------------------------------------
 // Send WhatsApp message (used by Inbox composer; reusable by Builder later)
