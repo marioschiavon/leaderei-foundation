@@ -142,7 +142,12 @@ export const updateKnowledgeItem = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const orgId = await getOrgId(context.supabase, context.userId);
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const patch: {
+      updated_at: string;
+      title?: string;
+      name?: string;
+      content?: string;
+    } = { updated_at: new Date().toISOString() };
     if (data.title !== undefined) {
       patch.title = data.title;
       patch.name = data.title;
