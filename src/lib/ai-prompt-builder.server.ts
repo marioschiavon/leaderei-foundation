@@ -48,6 +48,13 @@ export type LeadContext = {
   custom_fields?: Record<string, unknown> | null;
 } | null;
 
+export type OrgKnowledge = {
+  ai_instructions?: string | null;
+  highlights?: string | null;
+  items?: Array<{ title: string; content: string; kind: string }>;
+  org_website_content?: string | null;
+} | null;
+
 export type BuildPromptArgs = {
   masterSystemPrompt: string;
   orgProfile: OrgProfile | null;
@@ -57,6 +64,7 @@ export type BuildPromptArgs = {
   channelHint?: "whatsapp" | "email" | "linkedin" | null;
   taskInstruction?: string | null; // e.g. "Escreva a primeira mensagem fria."
   websiteContent?: string | null;
+  orgKnowledge?: OrgKnowledge;
 };
 
 function findPreset(presets: TonePreset[], kind: TonePreset["kind"], slug?: string | null) {
