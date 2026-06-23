@@ -30,6 +30,7 @@ import { Route as MasterMasterAgentQueueRouteImport } from './routes/_master.mas
 import { Route as AppDashboardSettingsRouteImport } from './routes/_app.dashboard.settings'
 import { Route as AppDashboardPipelineRouteImport } from './routes/_app.dashboard.pipeline'
 import { Route as AppDashboardLeadsRouteImport } from './routes/_app.dashboard.leads'
+import { Route as AppDashboardKnowledgeRouteImport } from './routes/_app.dashboard.knowledge'
 import { Route as AppDashboardIntegrationsRouteImport } from './routes/_app.dashboard.integrations'
 import { Route as AppDashboardInboxRouteImport } from './routes/_app.dashboard.inbox'
 import { Route as AppDashboardCampaignsRouteImport } from './routes/_app.dashboard.campaigns'
@@ -147,6 +148,11 @@ const AppDashboardLeadsRoute = AppDashboardLeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => AppDashboardRoute,
 } as any)
+const AppDashboardKnowledgeRoute = AppDashboardKnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => AppDashboardRoute,
+} as any)
 const AppDashboardIntegrationsRoute =
   AppDashboardIntegrationsRouteImport.update({
     id: '/integrations',
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
+  '/dashboard/knowledge': typeof AppDashboardKnowledgeRoute
   '/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/dashboard/inbox': typeof AppDashboardInboxRoute
   '/dashboard/integrations': typeof AppDashboardIntegrationsRoute
+  '/dashboard/knowledge': typeof AppDashboardKnowledgeRoute
   '/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/dashboard/settings': typeof AppDashboardSettingsRoute
   '/master/agent-queue': typeof MasterMasterAgentQueueRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/_app/dashboard/campaigns': typeof AppDashboardCampaignsRoute
   '/_app/dashboard/inbox': typeof AppDashboardInboxRoute
   '/_app/dashboard/integrations': typeof AppDashboardIntegrationsRoute
+  '/_app/dashboard/knowledge': typeof AppDashboardKnowledgeRoute
   '/_app/dashboard/leads': typeof AppDashboardLeadsRouteWithChildren
   '/_app/dashboard/pipeline': typeof AppDashboardPipelineRoute
   '/_app/dashboard/settings': typeof AppDashboardSettingsRoute
@@ -325,6 +334,7 @@ export interface FileRouteTypes {
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
     | '/dashboard/integrations'
+    | '/dashboard/knowledge'
     | '/dashboard/leads'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
@@ -357,6 +367,7 @@ export interface FileRouteTypes {
     | '/dashboard/campaigns'
     | '/dashboard/inbox'
     | '/dashboard/integrations'
+    | '/dashboard/knowledge'
     | '/dashboard/pipeline'
     | '/dashboard/settings'
     | '/master/agent-queue'
@@ -391,6 +402,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard/campaigns'
     | '/_app/dashboard/inbox'
     | '/_app/dashboard/integrations'
+    | '/_app/dashboard/knowledge'
     | '/_app/dashboard/leads'
     | '/_app/dashboard/pipeline'
     | '/_app/dashboard/settings'
@@ -577,6 +589,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardLeadsRouteImport
       parentRoute: typeof AppDashboardRoute
     }
+    '/_app/dashboard/knowledge': {
+      id: '/_app/dashboard/knowledge'
+      path: '/knowledge'
+      fullPath: '/dashboard/knowledge'
+      preLoaderRoute: typeof AppDashboardKnowledgeRouteImport
+      parentRoute: typeof AppDashboardRoute
+    }
     '/_app/dashboard/integrations': {
       id: '/_app/dashboard/integrations'
       path: '/integrations'
@@ -683,6 +702,7 @@ interface AppDashboardRouteChildren {
   AppDashboardCampaignsRoute: typeof AppDashboardCampaignsRoute
   AppDashboardInboxRoute: typeof AppDashboardInboxRoute
   AppDashboardIntegrationsRoute: typeof AppDashboardIntegrationsRoute
+  AppDashboardKnowledgeRoute: typeof AppDashboardKnowledgeRoute
   AppDashboardLeadsRoute: typeof AppDashboardLeadsRouteWithChildren
   AppDashboardPipelineRoute: typeof AppDashboardPipelineRoute
   AppDashboardSettingsRoute: typeof AppDashboardSettingsRoute
@@ -695,6 +715,7 @@ const AppDashboardRouteChildren: AppDashboardRouteChildren = {
   AppDashboardCampaignsRoute: AppDashboardCampaignsRoute,
   AppDashboardInboxRoute: AppDashboardInboxRoute,
   AppDashboardIntegrationsRoute: AppDashboardIntegrationsRoute,
+  AppDashboardKnowledgeRoute: AppDashboardKnowledgeRoute,
   AppDashboardLeadsRoute: AppDashboardLeadsRouteWithChildren,
   AppDashboardPipelineRoute: AppDashboardPipelineRoute,
   AppDashboardSettingsRoute: AppDashboardSettingsRoute,

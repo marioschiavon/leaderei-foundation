@@ -14,6 +14,7 @@ import {
   Blocks,
   KanbanSquare,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 import {
   Sidebar,
