@@ -416,6 +416,31 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
   const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
   const websiteContent = await fetchWebsiteContent((lead as any).website_url);
 
+  // Org knowledge base (instructions + highlights + items + own site)
+  const { loadOrgKnowledge } = await import("@/lib/org-knowledge.server");
+  const orgKnowledge = await loadOrgKnowledge(organization_id);
+  const knowledgeParts: string[] = [];
+  if (orgKnowledge?.ai_instructions?.trim()) {
+    knowledgeParts.push(`[Instruções de Abordagem da IA — SIGA RIGOROSAMENTE]\n${orgKnowledge.ai_instructions.trim()}`);
+  }
+  if (orgKnowledge?.highlights?.trim()) {
+    knowledgeParts.push(`[Destaques e Argumentos de Autoridade]\n${orgKnowledge.highlights.trim()}`);
+  }
+  if (orgKnowledge?.items?.length) {
+    const texts = orgKnowledge.items
+      .slice(0, 8)
+      .filter((i) => i.content?.trim())
+      .map((i) => `## ${i.title || "Item"}\n${i.content.trim().slice(0, 1500)}`);
+    if (texts.length) knowledgeParts.push(`[Base de Conhecimento da Empresa]\n${texts.join("\n\n")}`);
+  }
+  if (orgKnowledge?.org_website_content?.trim()) {
+    knowledgeParts.push(`[Site da Empresa — informação complementar]\n${orgKnowledge.org_website_content.trim()}`);
+  }
+  const knowledgeBlock = knowledgeParts.length
+    ? knowledgeParts.join("\n\n").slice(0, 5000) +
+      `\n\nIMPORTANTE: As instruções de abordagem e a base de conhecimento acima têm prioridade máxima. Dados coletados automaticamente são complementares. Nunca contradiga as instruções manuais.`
+    : "";
+
   const systemPrompt = [
     settings.master_system_prompt?.trim() ?? "",
     "",
@@ -423,6 +448,7 @@ async function processAgentJob(jobId: string): Promise<{ ok: boolean; error?: st
     goal,
     "",
     brandLines.length ? `[Marca]\n${brandLines.join("\n")}` : "",
+    knowledgeBlock,
     toneFragments.length ? `[Estilo]\n${toneFragments.join("\n")}` : "",
     `[Canal]\nA conversa está acontecendo via ${conv.channel === "whatsapp" ? "WhatsApp (mensagens curtas, informais)" : "e-mail"}.`,
     offeredSlots.length ? `[Horários já oferecidos anteriormente]\n${offeredSlots.map(formatSlotPt).join("\n")}\nUse 'confirmar_agendamento' apenas com um destes ISOs: ${offeredSlots.join(", ")}` : "",
