@@ -791,6 +791,8 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
       const websiteContent =
         ((en.context as any)?.website_content as string | undefined) ||
         (await fetchWebsiteContent(leadForPrompt?.website_url));
+      const { loadOrgKnowledge } = await import("@/lib/org-knowledge.server");
+      const orgKnowledge = await loadOrgKnowledge(en.organization_id);
       const { system, user } = buildPrompt({
         masterSystemPrompt: settings.master_system_prompt ?? "",
         orgProfile: profileRes.data ?? null,
@@ -807,6 +809,7 @@ async function executeStep(en: Enrollment, step: Step): Promise<StepOutcome> {
         channelHint: cfg.channel_hint ?? null,
         taskInstruction: cfg.task_instruction ?? null,
         websiteContent,
+        orgKnowledge,
       });
 
       let aiText = "";
