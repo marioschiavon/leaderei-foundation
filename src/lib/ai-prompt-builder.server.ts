@@ -140,11 +140,44 @@ function websiteBlock(content?: string | null): string {
   return `\n\n[Site da empresa]\n${content.trim()}`;
 }
 
+function orgKnowledgeBlock(k?: OrgKnowledge): string {
+  if (!k) return "";
+  const parts: string[] = [];
+  const MAX_ITEM_CHARS = 1500;
+  const MAX_ITEMS = 8;
+  const MAX_TOTAL = 5000;
+
+  if (k.ai_instructions?.trim()) {
+    parts.push(`[Instruções de Abordagem da IA — SIGA RIGOROSAMENTE]\n${k.ai_instructions.trim()}`);
+  }
+  if (k.highlights?.trim()) {
+    parts.push(`[Destaques e Argumentos de Autoridade]\n${k.highlights.trim()}`);
+  }
+  if (k.items?.length) {
+    const texts = k.items
+      .slice(0, MAX_ITEMS)
+      .filter((i) => i.content?.trim())
+      .map((i) => `## ${i.title || "Sem título"}\n${i.content.trim().slice(0, MAX_ITEM_CHARS)}`);
+    if (texts.length) {
+      parts.push(`[Base de Conhecimento da Empresa]\n${texts.join("\n\n")}`);
+    }
+  }
+  if (k.org_website_content?.trim()) {
+    parts.push(`[Site da Empresa — informação complementar]\n${k.org_website_content.trim()}`);
+  }
+
+  if (!parts.length) return "";
+  const block = `\n\n${parts.join("\n\n")}`.slice(0, MAX_TOTAL);
+  const hierarchy = `\n\nIMPORTANTE: As instruções de abordagem e a base de conhecimento acima têm prioridade máxima. Dados coletados automaticamente (site da empresa, dados do lead) são complementares. Nunca contradiga as instruções manuais com base nos dados automáticos.`;
+  return block + hierarchy;
+}
+
 export function buildPrompt(args: BuildPromptArgs): { system: string; user: string } {
   const system = args.masterSystemPrompt.trim();
 
   const userParts = [
     brandBlock(args.orgProfile),
+    orgKnowledgeBlock(args.orgKnowledge),
     presetsBlock(args.presets, args.stepConfig, args.orgProfile),
     channelLine(args.channelHint),
     stepExtras(args.stepConfig),
