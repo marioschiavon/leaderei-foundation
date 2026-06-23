@@ -14,6 +14,7 @@ import {
   Blocks,
   KanbanSquare,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +55,7 @@ const WORKSPACE: NavItem[] = [
   { title: "Leads", url: "/dashboard/leads", icon: Users },
   { title: "Pipeline", url: "/dashboard/pipeline", icon: KanbanSquare, badge: "Em breve" },
   { title: "Campanhas", url: "/dashboard/campaigns", icon: Send },
+  { title: "Base de Conhecimento", url: "/dashboard/knowledge", icon: BookOpen },
   { title: "Caixa de entrada", url: "/dashboard/inbox", icon: Inbox },
 ];
 

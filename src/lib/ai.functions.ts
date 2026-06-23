@@ -295,6 +295,9 @@ export const previewAiMessage = createServerFn({ method: "POST" })
       };
     }
 
+    const { loadOrgKnowledge } = await import("@/lib/org-knowledge.server");
+    const orgKnowledge = await loadOrgKnowledge(orgId);
+
     const { system, user } = buildPrompt({
       masterSystemPrompt: settings.master_system_prompt,
       orgProfile: profileRes.data ?? null,
@@ -303,6 +306,7 @@ export const previewAiMessage = createServerFn({ method: "POST" })
       lead: lead as any,
       channelHint: data.channel ?? null,
       taskInstruction: data.task_instruction ?? null,
+      orgKnowledge,
     });
 
     const result = await callOpenAI({
