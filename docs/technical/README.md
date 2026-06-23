@@ -156,8 +156,30 @@ Ainda fora de escopo:
 - `user` ainda existe em partes do schema como papel legado, mas a UI já trata esse membro como agente operacional.
 - Não foram abertas novas áreas. O foco foi fechar consumo de dados reais nos módulos prioritários.
 
-## 11. Histórico recente
+## 11. RLS unificada para integrações (Apollo / Pipedrive)
 
+As policies de `integration_credentials` e `pipedrive_sync_runs` foram recriadas para usar o mesmo padrão dos demais módulos:
+
+```text
+has_role(auth.uid(), 'master_admin')
+  OR (is_org_member(auth.uid(), organization_id)
+      AND has_role(auth.uid(), 'company_admin'))
+```
+
+Efeitos:
+
+- `master_admin` consegue operar credenciais e sync runs de qualquer organização (não precisa também ter `company_admin`).
+- `company_admin` continua gerenciando exclusivamente as integrações da própria org.
+- Tabelas auxiliares (`apollo_api_calls`, `apollo_search_cache`, `organization_integrations`, `integration_providers`) seguem abertas para qualquer membro ativo da org — não foram tocadas.
+
+## 12. Hook7 / WhatsApp — sincronização de status
+
+A Edge Function `hook7-webhook` recebe os eventos `connection.update` do Hook7 e atualiza `hook7_instances.status` em tempo real. Após o pareamento via QR Code, o status passa de `pending` → `connected` automaticamente, sem necessidade de refresh manual. O nome do dispositivo (`Google Chrome (Evolution Go)`) é registrado pelo próprio Hook7 e exibido na UI a partir do payload `connection.update`.
+
+## 13. Histórico recente
+
+- 2026-06-23 — RLS unificada em `integration_credentials` e `pipedrive_sync_runs` (master_admin + company_admin da org).
+- 2026-06-23 — Hook7 webhook passa a sincronizar status `connected` imediatamente após leitura do QR Code.
 - 2026-05-22 — Dashboard consolidado com dados reais por tenant.
 - 2026-05-22 — Sidebar passou a exibir organização ativa e papel do usuário.
 - 2026-05-22 — Leads ligados ao banco com filtros reais, detalhe e atividade.

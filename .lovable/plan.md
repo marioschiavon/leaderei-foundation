@@ -1,34 +1,16 @@
-## Diagnóstico
+## Contexto
+As mudanças mais recentes ainda **não constam** nos documentos do projeto. É necessário atualizar:
 
-As políticas RLS de duas tabelas usadas pelas integrações exigem **explicitamente** o papel `company_admin`:
+1. **Doc técnico** (`docs/technical/README.md`) — adicionar seção sobre as políticas RLS unificadas para `integration_credentials` e `pipedrive_sync_runs` (permissão `master_admin` + `company_admin` membro da org).
+2. **Manual do usuário** (`docs/user/README.md`) — atualizar a seção WhatsApp/Hook7 para refletir que o status agora sincroniza corretamente após leitura do QR Code e que o nome do dispositivo (Google Chrome / Evolution Go) já aparece automaticamente.
+3. **Changelog** (`docs/user/UPDATES.md`) — registrar a correção de RLS para Apollo e Pipedrive, e a correção de sincronização de status do WhatsApp/Hook7, possivelmente como patch da v0.4 ou abertura da v0.5.
 
-- `integration_credentials` → política "Org admins manage integration credentials"
-- `pipedrive_sync_runs` → política "Org admins manage pipedrive_sync_runs"
+## Escopo do plano
+- Revisar e atualizar os 3 arquivos de documentação mencionados.
+- Não alterar código da aplicação.
+- Manter linguagem e formato consistentes com os documentos existentes.
 
-Verifiquei no banco: usuários **master_admin** (Nico, Mario S7) possuem apenas a role `master_admin` e **não** possuem `company_admin`. Por isso, quando esses usuários (ou qualquer membro convidado com papel `user`) tentam conectar Apollo/Pipedrive, o INSERT em `integration_credentials` é bloqueado com "permission denied / row-level security".
-
-Os fluxos de servidor (`connectApollo`, `connectPipedrive`) já validam que o usuário pertence à organização ativa antes de gravar — então a restrição extra de RLS está sendo dupla e inconsistente com o restante do código (que segue o padrão `master_admin OR (org member AND company_admin)`, como já visto em `hook7_instances`).
-
-## O que mudar
-
-**Apenas uma migration de RLS** — sem alterar código de aplicação.
-
-Atualizar as policies das duas tabelas para permitir:
-
-```text
-has_role(auth.uid(), 'master_admin')
-  OR (is_org_member(auth.uid(), organization_id)
-      AND has_role(auth.uid(), 'company_admin'))
-```
-
-Tabelas afetadas:
-1. `public.integration_credentials` — recriar a policy "Org admins manage integration credentials" (cmd ALL) com a condição acima em USING e WITH CHECK.
-2. `public.pipedrive_sync_runs` — recriar a policy "Org admins manage pipedrive_sync_runs" (cmd ALL) com a mesma condição.
-
-Sem mudanças em `apollo_api_calls`, `apollo_search_cache`, `organization_integrations`, `integration_providers` — já permitem qualquer membro ativo da org.
-
-## Fora do escopo
-
-- Não mexer no fluxo de provisionamento (`provision_user_account`) nem conceder `company_admin` adicional a master_admins.
-- Não alterar server functions de Apollo/Pipedrive.
-- Não tocar nas integrações Hook7/WhatsApp.
+## Entregáveis
+- `docs/technical/README.md` atualizado.
+- `docs/user/README.md` atualizado.
+- `docs/user/UPDATES.md` atualizado.
