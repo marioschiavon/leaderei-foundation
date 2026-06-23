@@ -1,18 +1,17 @@
-## Trocar o favicon da S7 pelo da Leaderei
+## Problema
+Favicon atual é um "l" genérico branco em quadrado laranja, com bordas brancas aparecendo na aba do navegador (o fundo é branco, não transparente).
 
-### Situação atual
-- O projeto possui um `public/favicon.ico` herdado da S7.
-- As logos da Leaderei já existem em `src/assets/brand/` (color, black, white, gray).
-- O `<head>` em `src/routes/__root.tsx` não contém link explícito para favicon.\n
-### O que será feito
-1. **Gerar favicon.ico** a partir da logo `leaderei-color.png` (ou outra versão escolhida), criando um arquivo `.ico` multi-resolução (16x16, 32x32) para compatibilidade com abas e atalhos.
-2. **Substituir** `public/favicon.ico` pelo novo arquivo da Leaderei.
-3. **Adicionar link no `<head>`** em `src/routes/__root.tsx` para garantir que todos os navegadores utilizem o favicon correto (`<link rel="icon" href="/favicon.ico" />`).
+## Solução
+1. **Gerar novo ícone** em PNG com:
+   - Círculo laranja Leaderei (preenchido, cor da marca)
+   - **O "l" da logo Leaderei** (mesmo desenho/tipografia da wordmark em `src/assets/brand/leaderei-color.png`, porém em branco) centralizado dentro do círculo
+   - **Fundo totalmente transparente** ao redor do círculo
+2. **Converter para `.ico`** multi-resolução (16×16, 32×32, 48×48) preservando transparência.
+3. **Substituir** em `public/`:
+   - `favicon.ico`
+   - `favicon-512.png`
+   - `apple-touch-icon.png`
+4. **Manter** os `<link>` em `src/routes/__root.tsx` — sem alterações.
 
-### Decisão pendente
-Qual versão da logo prefere como base do favicon?
-- **Colorida** (laranja Leaderei) — recomendada, a cor chama atenção na aba.
-- **Preta** — mais sóbria, funciona bem em temas claros e escuros.
-- **Branca** — para fundos escuros do navegador (menos comum como padrão).
-
-Se não houver preferência, usarei a **colorida**.
+## Resultado
+Círculo laranja com o "l" característico da Leaderei em branco, sem fundo branco/quadrado ao redor — flutua limpo na aba do navegador.
