@@ -462,6 +462,10 @@ export const acceptLead = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const CREDENTIAL_REQUIRED_SLUGS = new Set([
+  "apollo", "pipedrive", "resend", "cal_com", "hubspot", "linkedin",
+]);
+
 export const listIntegrations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -478,14 +482,33 @@ export const listIntegrations = createServerFn({ method: "GET" })
     if (providers.error) throw new Error(providers.error.message);
     if (connections.error) throw new Error(connections.error.message);
 
-    const byProvider = new Map(
-      (connections.data ?? []).map((c) => [c.provider_id, c]),
-    );
-    return (providers.data ?? []).map((p) => ({
-      ...p,
-      connection: byProvider.get(p.id) ?? null,
-    }));
+    const connRows = connections.data ?? [];
+    const connIds = connRows.map((c) => c.id);
+    let credIntegrationIds = new Set<string>();
+    if (connIds.length > 0) {
+      const { data: creds, error: credErr } = await context.supabase
+        .from("integration_credentials")
+        .select("integration_id")
+        .in("integration_id", connIds);
+      if (credErr) throw new Error(credErr.message);
+      credIntegrationIds = new Set((creds ?? []).map((c) => c.integration_id));
+    }
+
+    const byProvider = new Map(connRows.map((c) => [c.provider_id, c]));
+    return (providers.data ?? []).map((p) => {
+      const conn = byProvider.get(p.id) ?? null;
+      if (
+        conn
+        && CREDENTIAL_REQUIRED_SLUGS.has(p.slug)
+        && !credIntegrationIds.has(conn.id)
+        && conn.status !== "disconnected"
+      ) {
+        return { ...p, connection: { ...conn, status: "disconnected" as const } };
+      }
+      return { ...p, connection: conn };
+    });
   });
+
 
 const CreateLeadSchema = z.object({
   full_name: z.string().trim().min(1).max(120),

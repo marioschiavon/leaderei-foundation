@@ -1,23 +1,26 @@
 ## Causa raiz
 
-As tabelas `integration_credentials` e `pipedrive_sync_runs` no schema `public` **não possuem GRANTs** para os roles `authenticated` e `service_role`. Sem GRANT, a Data API do Supabase (PostgREST) retorna `permission denied`, mesmo com policies RLS corretas. Por isso o erro atinge todos os usuários.
+A página `/dashboard/integrations` lê o status diretamente da coluna `organization_integrations.status`. Existem hoje linhas com `status = 'connected'` mas **sem credencial correspondente** em `integration_credentials` — sobras de tentativas de conexão anteriores (quando o GRANT estava faltando, o upsert de `organization_integrations` chegou a entrar mas o insert de credenciais não). Resultado: Apollo, Pipedrive e Resend aparecem "Conectado" mesmo sem chave válida.
 
-A migration anterior recriou as policies RLS, mas não concedeu os privilégios de tabela — passo obrigatório.
+Confirmação no banco:
+
+```text
+apollo     | org 48190…  | status=connected | has_cred=false
+apollo     | org a7414…  | status=connected | has_cred=false
+pipedrive  | org 48190…  | status=connected | has_cred=false
+resend     | org a7414…  | status=connected | has_cred=false
+```
 
 ## Correção
 
-Migration única adicionando os GRANTs faltantes:
+Duas frentes, na mesma rodada:
 
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.integration_credentials TO authenticated;
-GRANT ALL ON public.integration_credentials TO service_role;
+1. **Limpeza de dados (migração SQL)** — para os providers que exigem credencial (`apollo`, `pipedrive`, `resend`, `cal_com`, `hubspot`, `linkedin`), marcar como `disconnected` toda linha de `organization_integrations` sem credencial em `integration_credentials`. Hook7/WhatsApp segue intocado (status real vem de `hook7_instances`).
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.pipedrive_sync_runs TO authenticated;
-GRANT ALL ON public.pipedrive_sync_runs TO service_role;
-```
-
-Sem GRANT para `anon` — todas as policies dessas tabelas exigem usuário autenticado.
+2. **Blindagem no servidor** — em `listIntegrations` (`src/lib/tenant.functions.ts`), também buscar `integration_credentials` da organização e, para os providers acima, sobrescrever o status como `disconnected` quando não houver credencial. Garante que futuras inconsistências não voltem a enganar a UI.
 
 ## Fora de escopo
 
-Nenhuma alteração de código, RLS ou outras tabelas.
+- WhatsApp/Hook7 (já trata status próprio na UI).
+- Reescrita dos fluxos de connect/disconnect.
+- Mudanças visuais.
