@@ -175,6 +175,7 @@ export type Database = {
       }
       ai_org_profile: {
         Row: {
+          ai_instructions: string | null
           brand_name: string | null
           brand_voice: string | null
           conversation_agent_goal: string | null
@@ -185,14 +186,17 @@ export type Database = {
           default_length_slug: string | null
           default_mood_slug: string | null
           forbidden_words: string[]
+          highlights: string | null
           icp_description: string | null
           organization_id: string
           product_description: string | null
           updated_at: string
           updated_by: string | null
           value_proposition: string | null
+          website_url: string | null
         }
         Insert: {
+          ai_instructions?: string | null
           brand_name?: string | null
           brand_voice?: string | null
           conversation_agent_goal?: string | null
@@ -203,14 +207,17 @@ export type Database = {
           default_length_slug?: string | null
           default_mood_slug?: string | null
           forbidden_words?: string[]
+          highlights?: string | null
           icp_description?: string | null
           organization_id: string
           product_description?: string | null
           updated_at?: string
           updated_by?: string | null
           value_proposition?: string | null
+          website_url?: string | null
         }
         Update: {
+          ai_instructions?: string | null
           brand_name?: string | null
           brand_voice?: string | null
           conversation_agent_goal?: string | null
@@ -221,12 +228,14 @@ export type Database = {
           default_length_slug?: string | null
           default_mood_slug?: string | null
           forbidden_words?: string[]
+          highlights?: string | null
           icp_description?: string | null
           organization_id?: string
           product_description?: string | null
           updated_at?: string
           updated_by?: string | null
           value_proposition?: string | null
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -1568,8 +1577,10 @@ export type Database = {
       }
       knowledge_sources: {
         Row: {
+          content: string | null
           created_at: string
           created_by: string | null
+          file_path: string | null
           id: string
           kind: Database["public"]["Enums"]["knowledge_source_kind"]
           last_synced_at: string | null
@@ -1578,11 +1589,14 @@ export type Database = {
           settings: Json
           source_url: string | null
           status: Database["public"]["Enums"]["knowledge_source_status"]
+          title: string | null
           updated_at: string
         }
         Insert: {
+          content?: string | null
           created_at?: string
           created_by?: string | null
+          file_path?: string | null
           id?: string
           kind: Database["public"]["Enums"]["knowledge_source_kind"]
           last_synced_at?: string | null
@@ -1591,11 +1605,14 @@ export type Database = {
           settings?: Json
           source_url?: string | null
           status?: Database["public"]["Enums"]["knowledge_source_status"]
+          title?: string | null
           updated_at?: string
         }
         Update: {
+          content?: string | null
           created_at?: string
           created_by?: string | null
+          file_path?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["knowledge_source_kind"]
           last_synced_at?: string | null
@@ -1604,6 +1621,7 @@ export type Database = {
           settings?: Json
           source_url?: string | null
           status?: Database["public"]["Enums"]["knowledge_source_status"]
+          title?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2955,7 +2973,7 @@ export type Database = {
         | "skipped"
       integration_status: "disconnected" | "connected" | "error" | "pending"
       job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
-      knowledge_source_kind: "url" | "file" | "text" | "faq"
+      knowledge_source_kind: "url" | "file" | "text" | "faq" | "document"
       knowledge_source_status: "pending" | "syncing" | "ready" | "error"
       lead_activity_type:
         | "note"
@@ -3184,7 +3202,7 @@ export const Constants = {
       flow_step_run_status: ["pending", "running", "done", "failed", "skipped"],
       integration_status: ["disconnected", "connected", "error", "pending"],
       job_status: ["pending", "running", "completed", "failed", "cancelled"],
-      knowledge_source_kind: ["url", "file", "text", "faq"],
+      knowledge_source_kind: ["url", "file", "text", "faq", "document"],
       knowledge_source_status: ["pending", "syncing", "ready", "error"],
       lead_activity_type: [
         "note",
