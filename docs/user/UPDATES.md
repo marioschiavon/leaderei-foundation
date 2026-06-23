@@ -26,6 +26,8 @@
 - **Builder mais flexível**: agora é possível **excluir uma conexão** entre nós e **religar** arrastando a ponta da seta para outro nó.
 - **Novo nó inicial padrão**: novos fluxos já abrem com o nó "Mensagem com IA" no lugar do antigo nó de email.
 - **Reforço de segurança** no acesso aos dados entre organizações.
+- **Correção — Apollo e Pipedrive para todos os admins**: novos usuários `company_admin` voltam a conseguir conectar e operar Apollo e Pipedrive na própria organização. `master_admin` também passa a operar essas integrações em qualquer organização sem precisar de papel adicional.
+- **Correção — WhatsApp/Hook7 sincroniza status na hora**: após escanear o QR Code, a instância passa imediatamente de "Pendente" para "Conectado" e o nome do dispositivo (ex.: `Google Chrome (Evolution Go)`) já aparece preenchido automaticamente.
 
 ---
 

@@ -125,7 +125,8 @@ O provider **WhatsApp** usa o Hook7 (API própria da S7) para conectar números 
 
 - A **chave global do Hook7** é configurada pelo operador da plataforma (S7) via variável de ambiente do servidor (`HOOK7_GLOBAL_APIKEY`). O `master_admin` pode verificar status e testar a conexão em **Master → Plataforma → WhatsApp · Hook7**, mas **não** pode visualizar ou alterar o valor pela UI. A **URL base** continua editável pela UI (não é segredo).
 - O prefixo de nomes de instância é controlado pela variável `HOOK7_INSTANCE_PREFIX` (padrão `lead`).
-- Em cada organização, o `company_admin` abre **Integrações → WhatsApp → Gerenciar instâncias** para criar uma instância, gerar o QR Code e escaneá-lo no app WhatsApp do celular. O status é atualizado a cada 3 segundos e expira em 2 minutos se ninguém parear.
+- Em cada organização, o `company_admin` abre **Integrações → WhatsApp → Gerenciar instâncias** para criar uma instância, gerar o QR Code e escaneá-lo no app WhatsApp do celular. O status é atualizado a cada 3 segundos e expira em 2 minutos se ninguém parear. Após o pareamento, o status muda automaticamente para **Conectado** e o nome do dispositivo (ex.: `Google Chrome (Evolution Go)`) aparece preenchido sem ação do usuário.
+- **Acesso às integrações:** tanto o `master_admin` (em qualquer organização) quanto o `company_admin` (na própria organização) podem conectar e operar Apollo, Pipedrive e demais integrações. Usuários comuns continuam apenas consumindo os dados resultantes.
 - O modo de uso (compartilhado pela organização ou por usuário) é definido em **Configurações → WhatsApp**. Em modo "por usuário", cada instância pertence a um membro específico.
 - Tokens de instância são armazenados criptografados (pgp_sym_encrypt) e só são acessíveis via função SECURITY DEFINER para administradores da organização ou pelo service role.
 
