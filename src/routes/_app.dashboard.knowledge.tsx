@@ -3,18 +3,20 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BookOpen, Sparkles, Globe, Star, FileText, Link as LinkIcon, FileUp, Pencil, Trash2, Loader2 } from "lucide-react";
+import { BookOpen, Sparkles, Globe, Star, FileText, Link as LinkIcon, FileUp, Pencil, Trash2, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 import {
   getOrgKnowledgeBase,
   saveAiInstructions,
   saveHighlights,
   saveOrgWebsiteUrl,
+  indexOrgWebsite,
   createKnowledgeItem,
   updateKnowledgeItem,
   deleteKnowledgeItem,
   extractUrlContent,
   uploadKnowledgeDoc,
 } from "@/lib/knowledge.functions";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
