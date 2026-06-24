@@ -1,17 +1,39 @@
-## Problema
-Favicon atual é um "l" genérico branco em quadrado laranja, com bordas brancas aparecendo na aba do navegador (o fundo é branco, não transparente).
+## Causa
+A policy `Org admins manage ai_org_profile` checa `has_role(auth.uid(), 'company_admin')` na tabela `user_roles`. O usuário atual tem `master_admin` em `user_roles` e é `company_admin` apenas em `organization_members` — por isso INSERT/UPDATE da base de conhecimento falha com "new row violates row-level security policy".
 
-## Solução
-1. **Gerar novo ícone** em PNG com:
-   - Círculo laranja Leaderei (preenchido, cor da marca)
-   - **O "l" da logo Leaderei** (mesmo desenho/tipografia da wordmark em `src/assets/brand/leaderei-color.png`, porém em branco) centralizado dentro do círculo
-   - **Fundo totalmente transparente** ao redor do círculo
-2. **Converter para `.ico`** multi-resolução (16×16, 32×32, 48×48) preservando transparência.
-3. **Substituir** em `public/`:
-   - `favicon.ico`
-   - `favicon-512.png`
-   - `apple-touch-icon.png`
-4. **Manter** os `<link>` em `src/routes/__root.tsx` — sem alterações.
+## Regra desejada
+- `master_admin` → pode alterar `ai_org_profile` de qualquer organização.
+- `company_admin` → pode alterar apenas o registro da própria organização.
 
-## Resultado
-Círculo laranja com o "l" característico da Leaderei em branco, sem fundo branco/quadrado ao redor — flutua limpo na aba do navegador.
+## Migration
+```sql
+DROP POLICY "Org admins manage ai_org_profile" ON public.ai_org_profile;
+
+CREATE POLICY "Org admins manage ai_org_profile"
+ON public.ai_org_profile
+FOR ALL
+TO authenticated
+USING (
+  has_role(auth.uid(), 'master_admin')
+  OR EXISTS (
+    SELECT 1 FROM public.organization_members m
+    WHERE m.user_id = auth.uid()
+      AND m.organization_id = ai_org_profile.organization_id
+      AND m.status = 'active'
+      AND m.role = 'company_admin'
+  )
+)
+WITH CHECK (
+  has_role(auth.uid(), 'master_admin')
+  OR EXISTS (
+    SELECT 1 FROM public.organization_members m
+    WHERE m.user_id = auth.uid()
+      AND m.organization_id = ai_org_profile.organization_id
+      AND m.status = 'active'
+      AND m.role = 'company_admin'
+  )
+);
+```
+
+## Escopo
+- Apenas a policy de `ai_org_profile`. Sem alterações de código.
