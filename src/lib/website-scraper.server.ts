@@ -77,6 +77,85 @@ function htmlToText(html: string): { title: string | null; description: string |
   return { title, description, body };
 }
 
+export type ScrapeResult = {
+  content: string | null;
+  error: string | null;
+  fetchedAt: string;
+  contentLength: number;
+};
+
+export async function fetchWebsiteContentVerbose(
+  websiteUrl: string | null | undefined,
+): Promise<ScrapeResult> {
+  const fetchedAt = new Date().toISOString();
+  if (!websiteUrl?.trim()) return { content: null, error: "URL vazia.", fetchedAt, contentLength: 0 };
+  const url = normalizeUrl(websiteUrl);
+  if (!url) return { content: null, error: "URL inválida.", fetchedAt, contentLength: 0 };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        },
+        redirect: "follow",
+        signal: controller.signal,
+      });
+    } catch (e: any) {
+      clearTimeout(timeout);
+      const msg = e?.name === "AbortError"
+        ? `Tempo esgotado após ${TIMEOUT_MS / 1000}s.`
+        : `Falha de rede: ${e?.message ?? "desconhecida"}.`;
+      return { content: null, error: msg, fetchedAt, contentLength: 0 };
+    }
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      return { content: null, error: `Site retornou HTTP ${res.status}.`, fetchedAt, contentLength: 0 };
+    }
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.toLowerCase().includes("text/html")) {
+      return { content: null, error: `Tipo de conteúdo não suportado (${ct || "desconhecido"}).`, fetchedAt, contentLength: 0 };
+    }
+
+    const buf = await res.arrayBuffer();
+    const slice = buf.byteLength > MAX_HTML_BYTES ? buf.slice(0, MAX_HTML_BYTES) : buf;
+    const html = new TextDecoder("utf-8", { fatal: false }).decode(slice);
+    if (!html?.trim()) return { content: null, error: "Página vazia.", fetchedAt, contentLength: 0 };
+
+    const { title, description, body } = htmlToText(html);
+    const parts: string[] = [];
+    if (title) parts.push(`Title: ${title}`);
+    if (description) parts.push(`Description: ${description}`);
+    if (body) parts.push(body);
+    const content = parts.join("\n\n").slice(0, MAX_CONTENT_CHARS).trim();
+
+    if (!content) return { content: null, error: "Não foi possível extrair texto da página.", fetchedAt, contentLength: 0 };
+
+    // Cache opcional (best-effort)
+    try {
+      await supabaseAdmin
+        .from("lead_website_cache")
+        .upsert(
+          { url, content, content_length: content.length, scraped_at: fetchedAt },
+          { onConflict: "url" },
+        );
+    } catch (err: any) {
+      console.warn(`[scraper] erro ao gravar cache de ${url}:`, err?.message ?? err);
+    }
+
+    return { content, error: null, fetchedAt, contentLength: content.length };
+  } catch (err: any) {
+    return { content: null, error: `Erro inesperado: ${err?.message ?? "desconhecido"}.`, fetchedAt, contentLength: 0 };
+  }
+}
+
 /**
  * Retorna conteúdo do site em texto limpo, truncado em MAX_CONTENT_CHARS.
  * Usa cache de 7 dias. Retorna null em caso de falha (nunca lança exceção).
@@ -88,7 +167,7 @@ export async function fetchWebsiteContent(
   const url = normalizeUrl(websiteUrl);
   if (!url) return null;
 
-  // 1. Verificar cache
+  // Verificar cache primeiro
   try {
     const { data: cached } = await supabaseAdmin
       .from("lead_website_cache")
@@ -102,70 +181,10 @@ export async function fetchWebsiteContent(
     console.warn(`[scraper] erro ao ler cache de ${url}:`, err?.message ?? err);
   }
 
-  // 2. Scraping via fetch nativo
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      console.warn(`[scraper] HTTP ${res.status} para ${url}`);
-      return null;
-    }
-    const ct = res.headers.get("content-type") ?? "";
-    if (!ct.toLowerCase().includes("text/html")) {
-      console.warn(`[scraper] content-type ${ct} ignorado para ${url}`);
-      return null;
-    }
-
-    // Lê até MAX_HTML_BYTES para evitar páginas gigantes
-    const buf = await res.arrayBuffer();
-    const slice = buf.byteLength > MAX_HTML_BYTES ? buf.slice(0, MAX_HTML_BYTES) : buf;
-    const html = new TextDecoder("utf-8", { fatal: false }).decode(slice);
-    if (!html?.trim()) return null;
-
-    const { title, description, body } = htmlToText(html);
-    const parts: string[] = [];
-    if (title) parts.push(`Title: ${title}`);
-    if (description) parts.push(`Description: ${description}`);
-    if (body) parts.push(body);
-    const content = parts.join("\n\n").slice(0, MAX_CONTENT_CHARS).trim();
-
-    if (!content) return null;
-
-    // 3. Salvar no cache (upsert)
-    try {
-      await supabaseAdmin
-        .from("lead_website_cache")
-        .upsert(
-          {
-            url,
-            content,
-            content_length: content.length,
-            scraped_at: new Date().toISOString(),
-          },
-          { onConflict: "url" },
-        );
-    } catch (err: any) {
-      console.warn(`[scraper] erro ao gravar cache de ${url}:`, err?.message ?? err);
-    }
-
-    return content;
-  } catch (err: any) {
-    console.warn(`[scraper] erro ao scraping ${url}:`, err?.message ?? err);
-    return null;
-  }
+  const r = await fetchWebsiteContentVerbose(websiteUrl);
+  return r.content;
 }
+
 
 /**
  * Limpa entradas expiradas do cache (pode ser chamado periodicamente).
