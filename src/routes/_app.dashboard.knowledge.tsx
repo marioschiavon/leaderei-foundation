@@ -114,29 +114,15 @@ function KnowledgePage() {
       </Card>
 
       {/* Card 2 — Site */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5" /> Site da empresa</CardTitle>
-          <CardDescription>A IA usará o conteúdo do site como contexto complementar.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              placeholder="https://suaempresa.com.br"
-            />
-            <Button onClick={() => mSaveSite.mutate(websiteUrl)} disabled={mSaveSite.isPending}>Salvar</Button>
-          </div>
-          {data?.websiteCache?.fetched_at ? (
-            <div className="text-xs text-muted-foreground">
-              ✅ Indexado · preview: <span className="italic">{data.websiteCache.preview}</span>
-            </div>
-          ) : websiteUrl ? (
-            <div className="text-xs text-muted-foreground">⏳ Não indexado ainda — salve para iniciar.</div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <WebsiteCard
+        websiteUrl={websiteUrl}
+        setWebsiteUrl={setWebsiteUrl}
+        savedUrl={data?.websiteUrl ?? null}
+        index={data?.websiteIndex}
+        onSave={(v) => mSaveSite.mutate(v)}
+        isSaving={mSaveSite.isPending}
+      />
+
 
       {/* Card 3 — Destaques */}
       <Card>
