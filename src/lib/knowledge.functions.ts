@@ -24,7 +24,7 @@ export const getOrgKnowledgeBase = createServerFn({ method: "GET" })
     const [profileRes, itemsRes] = await Promise.all([
       context.supabase
         .from("ai_org_profile")
-        .select("ai_instructions, highlights, website_url")
+        .select("ai_instructions, highlights, website_url, website_indexed_at, website_index_status, website_index_error, website_content_length, website_preview")
         .eq("organization_id", orgId)
         .maybeSingle(),
       context.supabase
@@ -35,19 +35,18 @@ export const getOrgKnowledgeBase = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false }),
     ]);
 
-    let cacheStatus: { fetched_at: string | null; preview: string | null } = { fetched_at: null, preview: null };
-    const websiteUrl = (profileRes.data as any)?.website_url as string | null | undefined;
-    if (websiteUrl) {
-      const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
-      const content = await fetchWebsiteContent(websiteUrl);
-      if (content) cacheStatus = { fetched_at: new Date().toISOString(), preview: content.slice(0, 200) };
-    }
-
+    const p: any = profileRes.data ?? {};
     return {
-      aiInstructions: (profileRes.data as any)?.ai_instructions ?? null,
-      highlights: (profileRes.data as any)?.highlights ?? null,
-      websiteUrl: websiteUrl ?? null,
-      websiteCache: cacheStatus,
+      aiInstructions: p.ai_instructions ?? null,
+      highlights: p.highlights ?? null,
+      websiteUrl: p.website_url ?? null,
+      websiteIndex: {
+        status: (p.website_index_status ?? null) as "success" | "error" | "pending" | null,
+        indexedAt: p.website_indexed_at ?? null,
+        error: p.website_index_error ?? null,
+        contentLength: p.website_content_length ?? null,
+        preview: p.website_preview ?? null,
+      },
       items: (itemsRes.data ?? []) as any[],
     };
   });
@@ -87,14 +86,74 @@ export const saveOrgWebsiteUrl = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const orgId = await getOrgId(context.supabase, context.userId);
     const url = data.website_url?.trim() || null;
-    await upsertProfileField(context.supabase, orgId, "website_url", url);
-    // fire-and-forget cache warmup
-    if (url) {
-      const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
-      fetchWebsiteContent(url).catch(() => null);
-    }
+    // Reseta status ao trocar/limpar URL — indexação fica explícita.
+    const { error } = await context.supabase
+      .from("ai_org_profile")
+      .upsert(
+        {
+          organization_id: orgId,
+          website_url: url,
+          website_indexed_at: null,
+          website_index_status: null,
+          website_index_error: null,
+          website_content_length: null,
+          website_preview: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "organization_id" },
+      );
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ----- Index website (síncrono, com feedback) -----
+export const indexOrgWebsite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const orgId = await getOrgId(context.supabase, context.userId);
+    const { data: prof } = await context.supabase
+      .from("ai_org_profile")
+      .select("website_url")
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    const url = (prof as any)?.website_url as string | null | undefined;
+    if (!url) throw new Error("Nenhum site cadastrado.");
+
+    const { fetchWebsiteContentVerbose } = await import("@/lib/website-scraper.server");
+    const r = await fetchWebsiteContentVerbose(url);
+
+    const patch = r.content
+      ? {
+          website_indexed_at: r.fetchedAt,
+          website_index_status: "success",
+          website_index_error: null,
+          website_content_length: r.contentLength,
+          website_preview: r.content.slice(0, 200),
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          website_indexed_at: r.fetchedAt,
+          website_index_status: "error",
+          website_index_error: r.error ?? "Falha desconhecida.",
+          website_content_length: null,
+          website_preview: null,
+          updated_at: new Date().toISOString(),
+        };
+
+    const { error } = await context.supabase
+      .from("ai_org_profile")
+      .upsert({ organization_id: orgId, ...patch }, { onConflict: "organization_id" });
+    if (error) throw new Error(error.message);
+
+    return {
+      ok: r.content !== null,
+      error: r.error,
+      contentLength: r.contentLength,
+      preview: r.content ? r.content.slice(0, 200) : null,
+      fetchedAt: r.fetchedAt,
+    };
+  });
+
 
 // ----- Knowledge items CRUD -----
 const KindSchema = z.enum(["text", "url", "file", "document", "faq"]);
