@@ -193,6 +193,11 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           value_proposition: string | null
+          website_content_length: number | null
+          website_index_error: string | null
+          website_index_status: string | null
+          website_indexed_at: string | null
+          website_preview: string | null
           website_url: string | null
         }
         Insert: {
@@ -214,6 +219,11 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           value_proposition?: string | null
+          website_content_length?: number | null
+          website_index_error?: string | null
+          website_index_status?: string | null
+          website_indexed_at?: string | null
+          website_preview?: string | null
           website_url?: string | null
         }
         Update: {
@@ -235,6 +245,11 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           value_proposition?: string | null
+          website_content_length?: number | null
+          website_index_error?: string | null
+          website_index_status?: string | null
+          website_indexed_at?: string | null
+          website_preview?: string | null
           website_url?: string | null
         }
         Relationships: []
