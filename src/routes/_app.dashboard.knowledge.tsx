@@ -64,7 +64,7 @@ function KnowledgePage() {
   });
   const mSaveSite = useMutation({
     mutationFn: (v: string) => saveSite({ data: { website_url: v || null } }),
-    onSuccess: () => { toast.success("Site salvo. Indexando…"); qc.invalidateQueries({ queryKey: ["org-knowledge-base"] }); },
+    onSuccess: () => { toast.success("Site salvo."); qc.invalidateQueries({ queryKey: ["org-knowledge-base"] }); },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar."),
   });
 
