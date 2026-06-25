@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Plus, Search, Building2, Play, Pause, AlertCircle, Loader2, Users, Database } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Building2, Play, Pause, AlertCircle, Loader2, Users, Database, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -14,8 +14,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { listCompanies, createCompany, setCompanyStatus } from "@/lib/master.functions";
 import { StatusPill, type CompanyStatus } from "./_master.master.index";
+import { OrgDetailSheet, type OrgSummary } from "@/components/app/OrgDetailSheet";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_master/master/organizations")({
@@ -36,6 +38,7 @@ function OrgsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [openCreate, setOpenCreate] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<OrgSummary | null>(null);
 
   const filtered = useMemo(() => {
     return (data ?? []).filter((c) => {
@@ -119,6 +122,7 @@ function OrgsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Membros</TableHead>
                 <TableHead className="text-right">Limites</TableHead>
+                <TableHead>Base</TableHead>
                 <TableHead>Criada em</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
@@ -127,20 +131,24 @@ function OrgsPage() {
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <div className="h-6 animate-pulse rounded bg-surface-muted/50" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <EmptyOrgs onCreate={() => setOpenCreate(true)} hasFilters={query !== "" || statusFilter !== "all"} />
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id}>
+                  <TableRow
+                    key={c.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedOrg({ id: c.id, name: c.name, slug: c.slug, status: c.status, created_at: c.created_at })}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <div className="grid h-8 w-8 place-items-center rounded-md border bg-surface-muted/50 text-muted-foreground">
@@ -157,10 +165,17 @@ function OrgsPage() {
                       <span className="mx-1.5 text-border-strong">·</span>
                       <div className="inline-flex items-center gap-1.5"><Database className="h-3 w-3" />{c.max_leads.toLocaleString("pt-BR")}</div>
                     </TableCell>
+                    <TableCell>
+                      {(c as any).has_knowledge ? (
+                        <Badge variant="secondary" className="gap-1"><BookOpen className="h-3 w-3" />Base</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(c.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <RowActions
                         id={c.id}
                         status={c.status as CompanyStatus}
@@ -176,6 +191,7 @@ function OrgsPage() {
       )}
 
       <CreateOrgDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={invalidate} />
+      <OrgDetailSheet org={selectedOrg} onClose={() => setSelectedOrg(null)} onStatusChanged={invalidate} />
     </div>
   );
 }
