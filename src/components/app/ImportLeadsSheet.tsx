@@ -524,7 +524,7 @@ export function ImportLeadsSheet({
                 </table>
               </div>
               <p className="text-xs text-muted-foreground">
-                * Campos obrigatórios. Linhas sem nome ou email válido serão ignoradas.
+                * Campos obrigatórios. Linhas sem nome, ou sem email nem telefone, serão ignoradas.
               </p>
             </div>
           )}
