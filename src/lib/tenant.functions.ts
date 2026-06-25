@@ -119,6 +119,7 @@ const ListLeadsInput = z.object({
   status: z.string().trim().max(40).optional().default("all"),
   source_slug: z.string().trim().max(80).optional().default("all"),
   channel: z.enum(["any", "email", "whatsapp", "both"]).optional().default("any"),
+  date_from: z.string().trim().max(20).optional().default(""),
   page: z.number().int().min(1).optional().default(1),
   page_size: z.number().int().min(10).max(200).optional().default(50),
 });
