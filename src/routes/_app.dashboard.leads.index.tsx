@@ -525,39 +525,6 @@ function LeadsPage() {
   );
 }
 
-function FilterPills({
-  label,
-  value,
-  onChange,
-  items,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  items: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="flex flex-wrap items-center gap-1">
-        {items.map((item) => (
-          <button
-            key={item.value}
-            onClick={() => onChange(item.value)}
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-xs transition-colors",
-              value === item.value
-                ? "border-brand bg-brand/10 text-brand"
-                : "border-transparent bg-surface-muted/40 text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 const newLeadSchema = z.object({
   full_name: z.string().trim().min(1, "Nome obrigatório").max(120),
