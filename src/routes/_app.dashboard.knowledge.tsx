@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BookOpen, Sparkles, Globe, Star, FileText, Link as LinkIcon, FileUp, Pencil, Trash2, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { BookOpen, Sparkles, Star, FileText, Link as LinkIcon, FileUp, Pencil, Trash2, Loader2 } from "lucide-react";
 import {
   getOrgKnowledgeBase,
   saveAiInstructions,
@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { WebsiteCard } from "@/components/app/WebsiteCard";
 
 export const Route = createFileRoute("/_app/dashboard/knowledge")({
   component: KnowledgePage,
