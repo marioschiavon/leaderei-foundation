@@ -124,7 +124,7 @@ function LeadsPage() {
   const fetchSources = useServerFn(listLeadSources);
 
   const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: ["leads", search.q, search.status, search.source, search.channel, search.page, search.page_size],
+    queryKey: ["leads", search.q, search.status, search.source, search.channel, search.date_from, search.page, search.page_size],
     queryFn: () =>
       fetchLeads({
         data: {
@@ -132,6 +132,7 @@ function LeadsPage() {
           status: search.status,
           source_slug: search.source,
           channel: search.channel,
+          date_from: search.date_from,
           page: search.page,
           page_size: search.page_size,
         },
