@@ -385,6 +385,8 @@ function LeadDetailPage() {
             </Grid2>
           </Section>
 
+          <LeadInsightsPanel leadId={leadId} websiteUrl={lead.website_url} />
+
           <Section title="Campanhas" icon={Send}>
             {enrollments.length === 0 ? (
               <Empty>Este lead ainda não foi inscrito em nenhuma campanha.</Empty>
