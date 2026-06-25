@@ -95,6 +95,7 @@ const editSchema = z.object({
   employee_count: z.string().trim().regex(/^\d*$/, "Só números").max(10),
   website_url: z.string().trim().max(255),
   linkedin_url: z.string().trim().max(255),
+  company_linkedin_url: z.string().trim().max(255),
   city: z.string().trim().max(120),
   state: z.string().trim().max(120),
   country: z.string().trim().max(120),
