@@ -45,18 +45,39 @@ export const listCompanies = createServerFn({ method: "GET" })
 
     const ids = (organizations ?? []).map((o) => o.id);
     const counts: Record<string, number> = {};
+    const hasKB = new Set<string>();
     if (ids.length) {
-      const { data: members, error: mErr } = await supabaseAdmin
-        .from("organization_members")
-        .select("organization_id")
-        .in("organization_id", ids);
-      if (mErr) throw new Error(mErr.message);
-      for (const m of members ?? []) {
+      const [membersRes, profilesRes, ksRes] = await Promise.all([
+        supabaseAdmin
+          .from("organization_members")
+          .select("organization_id")
+          .in("organization_id", ids),
+        supabaseAdmin
+          .from("ai_org_profile")
+          .select("organization_id, ai_instructions")
+          .in("organization_id", ids),
+        supabaseAdmin
+          .from("knowledge_sources")
+          .select("organization_id")
+          .in("organization_id", ids)
+          .eq("status", "ready")
+          .not("content", "is", null),
+      ]);
+      if (membersRes.error) throw new Error(membersRes.error.message);
+      for (const m of membersRes.data ?? []) {
         counts[m.organization_id] = (counts[m.organization_id] ?? 0) + 1;
       }
+      for (const p of profilesRes.data ?? []) {
+        if (p.ai_instructions && String(p.ai_instructions).trim()) hasKB.add(p.organization_id);
+      }
+      for (const k of ksRes.data ?? []) hasKB.add(k.organization_id);
     }
 
-    return (organizations ?? []).map((o) => ({ ...o, member_count: counts[o.id] ?? 0 }));
+    return (organizations ?? []).map((o) => ({
+      ...o,
+      member_count: counts[o.id] ?? 0,
+      has_knowledge: hasKB.has(o.id),
+    }));
   });
 
 export const getMasterOverview = createServerFn({ method: "GET" })
