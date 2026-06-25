@@ -38,6 +38,7 @@ function OrgsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [openCreate, setOpenCreate] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<OrgSummary | null>(null);
 
   const filtered = useMemo(() => {
     return (data ?? []).filter((c) => {
