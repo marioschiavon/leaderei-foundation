@@ -131,20 +131,24 @@ function OrgsPage() {
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <div className="h-6 animate-pulse rounded bg-surface-muted/50" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <EmptyOrgs onCreate={() => setOpenCreate(true)} hasFilters={query !== "" || statusFilter !== "all"} />
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id}>
+                  <TableRow
+                    key={c.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedOrg({ id: c.id, name: c.name, slug: c.slug, status: c.status, created_at: c.created_at })}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <div className="grid h-8 w-8 place-items-center rounded-md border bg-surface-muted/50 text-muted-foreground">
@@ -161,10 +165,17 @@ function OrgsPage() {
                       <span className="mx-1.5 text-border-strong">·</span>
                       <div className="inline-flex items-center gap-1.5"><Database className="h-3 w-3" />{c.max_leads.toLocaleString("pt-BR")}</div>
                     </TableCell>
+                    <TableCell>
+                      {(c as any).has_knowledge ? (
+                        <Badge variant="secondary" className="gap-1"><BookOpen className="h-3 w-3" />Base</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(c.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <RowActions
                         id={c.id}
                         status={c.status as CompanyStatus}
@@ -180,6 +191,7 @@ function OrgsPage() {
       )}
 
       <CreateOrgDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={invalidate} />
+      <OrgDetailSheet org={selectedOrg} onClose={() => setSelectedOrg(null)} onStatusChanged={invalidate} />
     </div>
   );
 }
