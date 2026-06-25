@@ -735,6 +735,7 @@ export const importLeads = createServerFn({ method: "POST" })
 
       const websiteRaw = get("website_url");
       const linkedinRaw = get("linkedin_url");
+      const companyLinkedinRaw = get("company_linkedin_url");
       const employeeRaw = get("employee_count");
 
       // tags: accept array or delimited string
@@ -756,13 +757,14 @@ export const importLeads = createServerFn({ method: "POST" })
       const row: Record<string, unknown> = {
         organization_id,
         full_name: full_name.slice(0, 120),
-        email: email.slice(0, 255),
-        phone: get("phone") || null,
+        email: emailToInsert,
+        phone: phone || null,
         mobile_phone: get("mobile_phone") || null,
         corporate_phone: get("corporate_phone") || null,
         secondary_email: get("secondary_email").toLowerCase() || null,
         personal_email: get("personal_email").toLowerCase() || null,
         company_name: get("company_name") || null,
+        company_linkedin_url: companyLinkedinRaw ? normalizeUrl(companyLinkedinRaw) : null,
         job_title: get("job_title") || null,
         seniority: get("seniority") || null,
         department: get("department") || null,
