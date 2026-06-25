@@ -758,3 +758,310 @@ export const archiveLeadMemoryItem = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------------------------------------------------------------------------
+// Org detail + knowledge base (master scope)
+// ---------------------------------------------------------------------------
+
+const OrgIdSchema = z.object({ organization_id: z.string().uuid() });
+
+export const getMasterOrgDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => OrgIdSchema.parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const orgId = data.organization_id;
+
+    const [leadsRes, campaignsRes, membersRes, hookAllRes, hookConnRes] = await Promise.all([
+      supabaseAdmin.from("leads").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabaseAdmin.from("campaigns").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabaseAdmin.from("organization_members").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabaseAdmin.from("hook7_instances").select("*", { count: "exact", head: true }).eq("organization_id", orgId).is("archived_at", null),
+      supabaseAdmin.from("hook7_instances").select("*", { count: "exact", head: true }).eq("organization_id", orgId).is("archived_at", null).eq("status", "connected"),
+    ]);
+
+    return {
+      counts: {
+        leads: leadsRes.count ?? 0,
+        campaigns: campaignsRes.count ?? 0,
+        members: membersRes.count ?? 0,
+        whatsapp_total: hookAllRes.count ?? 0,
+        whatsapp_connected: hookConnRes.count ?? 0,
+      },
+    };
+  });
+
+export const getOrgKnowledgeBaseForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => OrgIdSchema.parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const orgId = data.organization_id;
+
+    const [profileRes, itemsRes] = await Promise.all([
+      supabaseAdmin
+        .from("ai_org_profile")
+        .select("ai_instructions, highlights, website_url, website_indexed_at, website_index_status, website_index_error, website_content_length, website_preview")
+        .eq("organization_id", orgId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("knowledge_sources")
+        .select("id, title, name, content, kind, source_url, file_path, status, created_at, updated_at")
+        .eq("organization_id", orgId)
+        .neq("status", "error")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const p: any = profileRes.data ?? {};
+    return {
+      aiInstructions: p.ai_instructions ?? null,
+      highlights: p.highlights ?? null,
+      websiteUrl: p.website_url ?? null,
+      websiteIndex: {
+        status: (p.website_index_status ?? null) as "success" | "error" | "pending" | null,
+        indexedAt: p.website_indexed_at ?? null,
+        error: p.website_index_error ?? null,
+        contentLength: p.website_content_length ?? null,
+        preview: p.website_preview ?? null,
+      },
+      items: (itemsRes.data ?? []) as any[],
+    };
+  });
+
+async function upsertOrgProfileField(orgId: string, field: string, value: string | null) {
+  const { error } = await supabaseAdmin
+    .from("ai_org_profile")
+    .upsert(
+      { organization_id: orgId, [field]: value, updated_at: new Date().toISOString() },
+      { onConflict: "organization_id" },
+    );
+  if (error) throw new Error(error.message);
+}
+
+export const saveAiInstructionsForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({ ai_instructions: z.string().max(8000).nullable() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    await upsertOrgProfileField(data.organization_id, "ai_instructions", data.ai_instructions);
+    return { ok: true };
+  });
+
+export const saveHighlightsForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({ highlights: z.string().max(4000).nullable() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    await upsertOrgProfileField(data.organization_id, "highlights", data.highlights);
+    return { ok: true };
+  });
+
+export const saveOrgWebsiteUrlForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({ website_url: z.string().max(500).nullable() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const url = data.website_url?.trim() || null;
+    const { error } = await supabaseAdmin
+      .from("ai_org_profile")
+      .upsert(
+        {
+          organization_id: data.organization_id,
+          website_url: url,
+          website_indexed_at: null,
+          website_index_status: null,
+          website_index_error: null,
+          website_content_length: null,
+          website_preview: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "organization_id" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const indexOrgWebsiteForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => OrgIdSchema.parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const orgId = data.organization_id;
+    const { data: prof } = await supabaseAdmin
+      .from("ai_org_profile")
+      .select("website_url")
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    const url = (prof as any)?.website_url as string | null | undefined;
+    if (!url) throw new Error("Nenhum site cadastrado.");
+
+    const { fetchWebsiteContentVerbose } = await import("@/lib/website-scraper.server");
+    const r = await fetchWebsiteContentVerbose(url);
+
+    const patch = r.content
+      ? {
+          website_indexed_at: r.fetchedAt,
+          website_index_status: "success",
+          website_index_error: null,
+          website_content_length: r.contentLength,
+          website_preview: r.content.slice(0, 200),
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          website_indexed_at: r.fetchedAt,
+          website_index_status: "error",
+          website_index_error: r.error ?? "Falha desconhecida.",
+          website_content_length: null,
+          website_preview: null,
+          updated_at: new Date().toISOString(),
+        };
+
+    const { error } = await supabaseAdmin
+      .from("ai_org_profile")
+      .upsert({ organization_id: orgId, ...patch }, { onConflict: "organization_id" });
+    if (error) throw new Error(error.message);
+
+    return {
+      ok: r.content !== null,
+      error: r.error,
+      contentLength: r.contentLength,
+      preview: r.content ? r.content.slice(0, 200) : null,
+      fetchedAt: r.fetchedAt,
+    };
+  });
+
+const KindSchemaM = z.enum(["text", "url", "file", "document", "faq"]);
+
+export const createKnowledgeItemForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({
+      title: z.string().min(1).max(200),
+      content: z.string().min(1).max(50000),
+      kind: KindSchemaM,
+      source_url: z.string().max(1000).nullable().optional(),
+      file_path: z.string().max(1000).nullable().optional(),
+    }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { data: row, error } = await supabaseAdmin
+      .from("knowledge_sources")
+      .insert({
+        organization_id: data.organization_id,
+        name: data.title,
+        title: data.title,
+        content: data.content,
+        kind: data.kind as any,
+        source_url: data.source_url ?? null,
+        file_path: data.file_path ?? null,
+        status: "ready" as any,
+        created_by: context.userId,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: row.id as string };
+  });
+
+export const updateKnowledgeItemForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({
+      id: z.string().uuid(),
+      title: z.string().min(1).max(200).optional(),
+      content: z.string().min(1).max(50000).optional(),
+    }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const patch: { updated_at: string; title?: string; name?: string; content?: string } = {
+      updated_at: new Date().toISOString(),
+    };
+    if (data.title !== undefined) { patch.title = data.title; patch.name = data.title; }
+    if (data.content !== undefined) patch.content = data.content;
+    const { error } = await supabaseAdmin
+      .from("knowledge_sources")
+      .update(patch)
+      .eq("id", data.id)
+      .eq("organization_id", data.organization_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteKnowledgeItemForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { error } = await supabaseAdmin
+      .from("knowledge_sources")
+      .delete()
+      .eq("id", data.id)
+      .eq("organization_id", data.organization_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const extractUrlContentForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ url: z.string().min(4).max(1000) }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const { fetchWebsiteContent } = await import("@/lib/website-scraper.server");
+    const content = await fetchWebsiteContent(data.url);
+    if (!content) throw new Error("Não foi possível extrair conteúdo desta URL.");
+    let title = data.url;
+    try {
+      const u = new URL(data.url.startsWith("http") ? data.url : `https://${data.url}`);
+      title = `${u.hostname}${u.pathname !== "/" ? u.pathname : ""}`;
+    } catch {}
+    return { title, content };
+  });
+
+export const uploadKnowledgeDocForMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    OrgIdSchema.extend({
+      file_name: z.string().min(1).max(300),
+      file_base64: z.string().min(8),
+      file_type: z.string().max(100),
+    }).parse(i))
+  .handler(async ({ context, data }) => {
+    await assertMaster(context.userId);
+    const lower = data.file_name.toLowerCase();
+    if (!lower.endsWith(".pdf") && !lower.endsWith(".txt")) {
+      throw new Error("Formato não suportado. Apenas .pdf e .txt.");
+    }
+    const b64 = data.file_base64.replace(/^data:[^;]+;base64,/, "");
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const filePath = `${data.organization_id}/${Date.now()}_${data.file_name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("knowledge-docs")
+      .upload(filePath, binary, { contentType: data.file_type || "application/octet-stream", upsert: false });
+    if (upErr) throw new Error(`Falha no upload: ${upErr.message}`);
+
+    let extracted: { title: string; content: string | null; warning?: string } = {
+      title: data.file_name,
+      content: null,
+    };
+    try {
+      const { data: parsed, error: fnErr } = await supabaseAdmin.functions.invoke("parse-knowledge-doc", {
+        body: { file_path: filePath, file_name: data.file_name },
+      });
+      if (!fnErr && parsed) extracted = parsed as any;
+      else if (fnErr) extracted.warning = `Extração falhou: ${fnErr.message}`;
+    } catch (e: any) {
+      extracted.warning = `Extração falhou: ${String(e?.message ?? e)}`;
+    }
+
+    return {
+      file_path: filePath,
+      title: extracted.title || data.file_name,
+      content: extracted.content,
+      warning: extracted.warning,
+    };
+  });
