@@ -136,7 +136,9 @@ function KnowledgePage() {
         savedUrl={data?.websiteUrl ?? null}
         index={data?.websiteIndex}
         onSave={(v) => mSaveSite.mutate(v)}
+        onIndex={() => mIndex.mutate()}
         isSaving={mSaveSite.isPending}
+        isIndexing={mIndex.isPending}
       />
 
 
