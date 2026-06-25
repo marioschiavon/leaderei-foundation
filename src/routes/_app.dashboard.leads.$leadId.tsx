@@ -560,6 +560,9 @@ function LeadDetailPage() {
               <FieldRow label="LinkedIn" editing={editing} value={lead.linkedin_url} icon={Linkedin}>
                 <Input {...form.register("linkedin_url")} placeholder="https://linkedin.com/in/..." />
               </FieldRow>
+              <FieldRow label="LinkedIn Empresa" editing={editing} value={lead.company_linkedin_url} icon={Linkedin}>
+                <Input {...form.register("company_linkedin_url")} placeholder="https://linkedin.com/company/..." />
+              </FieldRow>
               <FieldRow label="Website" editing={editing} value={lead.website_url} icon={Globe}>
                 <Input {...form.register("website_url")} placeholder="https://..." />
               </FieldRow>
@@ -568,6 +571,13 @@ function LeadDetailPage() {
               <Button asChild variant="outline" size="sm" className="mt-2 w-full">
                 <a href={lead.linkedin_url} target="_blank" rel="noreferrer">
                   Abrir LinkedIn <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            )}
+            {!editing && lead.company_linkedin_url && (
+              <Button asChild variant="outline" size="sm" className="mt-2 w-full">
+                <a href={lead.company_linkedin_url} target="_blank" rel="noreferrer">
+                  Abrir LinkedIn da Empresa <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               </Button>
             )}
