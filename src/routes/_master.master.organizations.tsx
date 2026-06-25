@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Plus, Search, Building2, Play, Pause, AlertCircle, Loader2, Users, Database } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Building2, Play, Pause, AlertCircle, Loader2, Users, Database, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -14,8 +14,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { listCompanies, createCompany, setCompanyStatus } from "@/lib/master.functions";
 import { StatusPill, type CompanyStatus } from "./_master.master.index";
+import { OrgDetailSheet, type OrgSummary } from "@/components/app/OrgDetailSheet";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_master/master/organizations")({
