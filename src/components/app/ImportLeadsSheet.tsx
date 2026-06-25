@@ -82,6 +82,7 @@ const DB_FIELDS: DbFieldDef[] = [
   { value: "mobile_phone", label: "Celular / mobile" },
   { value: "corporate_phone", label: "Telefone corporativo" },
   { value: "company_name", label: "Empresa" },
+  { value: "company_linkedin_url", label: "LinkedIn da empresa" },
   { value: "job_title", label: "Cargo" },
   { value: "seniority", label: "Senioridade" },
   { value: "department", label: "Departamento" },
