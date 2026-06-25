@@ -190,6 +190,7 @@ function LeadDetailPage() {
           employee_count: v.employee_count ? Number(v.employee_count) : null,
           website_url: v.website_url,
           linkedin_url: v.linkedin_url,
+          company_linkedin_url: v.company_linkedin_url,
           city: v.city,
           state: v.state,
           country: v.country,
