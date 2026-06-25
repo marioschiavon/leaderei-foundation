@@ -291,9 +291,10 @@ export function ImportLeadsSheet({
 
   const hasName = usedFields.has("full_name") || (usedFields.has("first_name") && usedFields.has("last_name"));
   const hasEmail = usedFields.has("email");
+  const hasPhone = usedFields.has("phone") || usedFields.has("mobile_phone") || usedFields.has("corporate_phone");
   const missingRequired: string[] = [];
   if (!hasName) missingRequired.push("Nome completo (ou Primeiro + Sobrenome)");
-  if (!hasEmail) missingRequired.push("Email");
+  if (!hasEmail && !hasPhone) missingRequired.push("Email ou Telefone");
 
   const normalizedRows = useMemo(() => {
     return rows.map((r) => {
