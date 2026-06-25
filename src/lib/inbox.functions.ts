@@ -14,7 +14,7 @@ export const getConversationMessages = createServerFn({ method: "POST" })
         .from("conversations")
         .select(
           `id, subject, channel, status, ai_enabled, lead_id,
-           leads(id, full_name, company_name, job_title, email, phone, linkedin_url,
+           leads(id, full_name, company_name, job_title, email, phone, linkedin_url, website_url,
                  status, temperature, score, next_followup_at, needs_review, review_reason,
                  lead_sources(id, name, color))`,
         )
