@@ -57,6 +57,7 @@ type DbField =
   | "mobile_phone"
   | "corporate_phone"
   | "company_name"
+  | "company_linkedin_url"
   | "job_title"
   | "seniority"
   | "department"
@@ -74,13 +75,14 @@ const DB_FIELDS: DbFieldDef[] = [
   { value: "full_name", label: "Nome completo", required: true },
   { value: "first_name", label: "Primeiro nome" },
   { value: "last_name", label: "Sobrenome" },
-  { value: "email", label: "Email", required: true },
+  { value: "email", label: "Email" },
   { value: "secondary_email", label: "Email secundário" },
   { value: "personal_email", label: "Email pessoal" },
   { value: "phone", label: "Telefone" },
   { value: "mobile_phone", label: "Celular / mobile" },
   { value: "corporate_phone", label: "Telefone corporativo" },
   { value: "company_name", label: "Empresa" },
+  { value: "company_linkedin_url", label: "LinkedIn da empresa" },
   { value: "job_title", label: "Cargo" },
   { value: "seniority", label: "Senioridade" },
   { value: "department", label: "Departamento" },
@@ -115,6 +117,7 @@ const FIELD_PATTERNS: Array<{ field: DbField; test: (n: string) => boolean }> = 
   { field: "mobile_phone", test: (n) => /\b(mobile phone|mobile|cell phone|celular|phone mobile)\b/.test(n) },
   { field: "corporate_phone", test: (n) => /\b(corporate phone|company phone|office phone|work direct phone|work phone|telefone empresa|direct phone)\b/.test(n) },
   { field: "employee_count", test: (n) => /(employees|employee count|headcount|company size|tamanho empresa|funcionarios|# employees|num employees|n funcionarios)/.test(n) },
+  { field: "company_linkedin_url", test: (n) => /\b(company linkedin|linkedin (da )?empresa|organization linkedin|company url linkedin|linkedin company)\b/.test(n) || /linkedin.*company|company.*linkedin/.test(n) },
   { field: "linkedin_url", test: (n) => /linkedin/.test(n) },
   { field: "website_url", test: (n) => /\b(website|site|url|web|company website|site empresa)\b/.test(n) },
   { field: "industry", test: (n) => /\b(industry|setor|industria|segmento|segment)\b/.test(n) },
@@ -288,9 +291,10 @@ export function ImportLeadsSheet({
 
   const hasName = usedFields.has("full_name") || (usedFields.has("first_name") && usedFields.has("last_name"));
   const hasEmail = usedFields.has("email");
+  const hasPhone = usedFields.has("phone") || usedFields.has("mobile_phone") || usedFields.has("corporate_phone");
   const missingRequired: string[] = [];
   if (!hasName) missingRequired.push("Nome completo (ou Primeiro + Sobrenome)");
-  if (!hasEmail) missingRequired.push("Email");
+  if (!hasEmail && !hasPhone) missingRequired.push("Email ou Telefone");
 
   const normalizedRows = useMemo(() => {
     return rows.map((r) => {
@@ -520,7 +524,7 @@ export function ImportLeadsSheet({
                 </table>
               </div>
               <p className="text-xs text-muted-foreground">
-                * Campos obrigatórios. Linhas sem nome ou email válido serão ignoradas.
+                * Campos obrigatórios. Linhas sem nome, ou sem email nem telefone, serão ignoradas.
               </p>
             </div>
           )}

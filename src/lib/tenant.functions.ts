@@ -119,6 +119,7 @@ const ListLeadsInput = z.object({
   status: z.string().trim().max(40).optional().default("all"),
   source_slug: z.string().trim().max(80).optional().default("all"),
   channel: z.enum(["any", "email", "whatsapp", "both"]).optional().default("any"),
+  date_from: z.string().trim().max(20).optional().default(""),
   page: z.number().int().min(1).optional().default(1),
   page_size: z.number().int().min(10).max(200).optional().default(50),
 });
@@ -146,9 +147,9 @@ const LEAD_COLUMNS = `
   )
 `;
 
-function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any }>(
+function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any; gte: any }>(
   query: T,
-  filters: { status: string; source_slug: string; channel: string; search: string },
+  filters: { status: string; source_slug: string; channel: string; search: string; date_from?: string },
 ): T {
   let q: any = query;
   if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
@@ -159,6 +160,17 @@ function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any }>(
   else if (filters.channel === "whatsapp") q = q.not("phone", "is", null);
   else if (filters.channel === "both") {
     q = q.not("email", "is", null).not("phone", "is", null);
+  }
+  if (filters.date_from) {
+    const now = new Date();
+    let from: Date | null = null;
+    if (filters.date_from === "today") {
+      from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else {
+      const m = /^(\d+)d$/.exec(filters.date_from);
+      if (m) from = new Date(Date.now() - parseInt(m[1], 10) * 86400_000);
+    }
+    if (from) q = q.gte("created_at", from.toISOString());
   }
   if (filters.search) {
     const s = filters.search.replace(/[%,]/g, " ").trim();
@@ -562,6 +574,7 @@ const UpdateLeadSchema = z.object({
   mobile_phone: NullableStr(40),
   corporate_phone: NullableStr(40),
   company_name: NullableStr(160),
+  company_linkedin_url: NullableStr(255),
   job_title: NullableStr(160),
   seniority: NullableStr(80),
   department: NullableStr(80),
@@ -629,6 +642,7 @@ const KNOWN_LEAD_FIELDS = [
   "mobile_phone",
   "corporate_phone",
   "company_name",
+  "company_linkedin_url",
   "job_title",
   "seniority",
   "department",
@@ -706,18 +720,23 @@ export const importLeads = createServerFn({ method: "POST" })
       if (!full_name) full_name = [first, last].filter(Boolean).join(" ").trim();
 
       const email = get("email").toLowerCase();
+      const phone = get("phone");
       const parsedEmail = z.string().email().safeParse(email);
+      const hasEmail = parsedEmail.success;
+      const hasPhone = !!phone?.trim();
       if (!full_name || full_name.length < 1) {
         errors.push({ row: rowNum, message: "Nome ausente" });
         return;
       }
-      if (!parsedEmail.success) {
-        errors.push({ row: rowNum, message: "Email inválido ou ausente" });
+      if (!hasEmail && !hasPhone) {
+        errors.push({ row: rowNum, message: "Sem meio de contato: informe email ou telefone" });
         return;
       }
+      const emailToInsert = hasEmail ? email.slice(0, 255) : null;
 
       const websiteRaw = get("website_url");
       const linkedinRaw = get("linkedin_url");
+      const companyLinkedinRaw = get("company_linkedin_url");
       const employeeRaw = get("employee_count");
 
       // tags: accept array or delimited string
@@ -739,13 +758,14 @@ export const importLeads = createServerFn({ method: "POST" })
       const row: Record<string, unknown> = {
         organization_id,
         full_name: full_name.slice(0, 120),
-        email: email.slice(0, 255),
-        phone: get("phone") || null,
+        email: emailToInsert,
+        phone: phone || null,
         mobile_phone: get("mobile_phone") || null,
         corporate_phone: get("corporate_phone") || null,
         secondary_email: get("secondary_email").toLowerCase() || null,
         personal_email: get("personal_email").toLowerCase() || null,
         company_name: get("company_name") || null,
+        company_linkedin_url: companyLinkedinRaw ? normalizeUrl(companyLinkedinRaw) : null,
         job_title: get("job_title") || null,
         seniority: get("seniority") || null,
         department: get("department") || null,

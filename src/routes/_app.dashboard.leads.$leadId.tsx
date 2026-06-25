@@ -95,6 +95,7 @@ const editSchema = z.object({
   employee_count: z.string().trim().regex(/^\d*$/, "Só números").max(10),
   website_url: z.string().trim().max(255),
   linkedin_url: z.string().trim().max(255),
+  company_linkedin_url: z.string().trim().max(255),
   city: z.string().trim().max(120),
   state: z.string().trim().max(120),
   country: z.string().trim().max(120),
@@ -151,6 +152,7 @@ function LeadDetailPage() {
           employee_count: lead.employee_count != null ? String(lead.employee_count) : "",
           website_url: lead.website_url ?? "",
           linkedin_url: lead.linkedin_url ?? "",
+          company_linkedin_url: lead.company_linkedin_url ?? "",
           city: lead.city ?? "",
           state: lead.state ?? "",
           country: lead.country ?? "",
@@ -188,6 +190,7 @@ function LeadDetailPage() {
           employee_count: v.employee_count ? Number(v.employee_count) : null,
           website_url: v.website_url,
           linkedin_url: v.linkedin_url,
+          company_linkedin_url: v.company_linkedin_url,
           city: v.city,
           state: v.state,
           country: v.country,
@@ -557,6 +560,9 @@ function LeadDetailPage() {
               <FieldRow label="LinkedIn" editing={editing} value={lead.linkedin_url} icon={Linkedin}>
                 <Input {...form.register("linkedin_url")} placeholder="https://linkedin.com/in/..." />
               </FieldRow>
+              <FieldRow label="LinkedIn Empresa" editing={editing} value={lead.company_linkedin_url} icon={Linkedin}>
+                <Input {...form.register("company_linkedin_url")} placeholder="https://linkedin.com/company/..." />
+              </FieldRow>
               <FieldRow label="Website" editing={editing} value={lead.website_url} icon={Globe}>
                 <Input {...form.register("website_url")} placeholder="https://..." />
               </FieldRow>
@@ -565,6 +571,13 @@ function LeadDetailPage() {
               <Button asChild variant="outline" size="sm" className="mt-2 w-full">
                 <a href={lead.linkedin_url} target="_blank" rel="noreferrer">
                   Abrir LinkedIn <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            )}
+            {!editing && lead.company_linkedin_url && (
+              <Button asChild variant="outline" size="sm" className="mt-2 w-full">
+                <a href={lead.company_linkedin_url} target="_blank" rel="noreferrer">
+                  Abrir LinkedIn da Empresa <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               </Button>
             )}

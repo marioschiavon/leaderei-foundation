@@ -2002,6 +2002,7 @@ export type Database = {
           apollo_person_id: string | null
           archived_at: string | null
           city: string | null
+          company_linkedin_url: string | null
           company_name: string | null
           corporate_phone: string | null
           country: string | null
@@ -2044,6 +2045,7 @@ export type Database = {
           apollo_person_id?: string | null
           archived_at?: string | null
           city?: string | null
+          company_linkedin_url?: string | null
           company_name?: string | null
           corporate_phone?: string | null
           country?: string | null
@@ -2086,6 +2088,7 @@ export type Database = {
           apollo_person_id?: string | null
           archived_at?: string | null
           city?: string | null
+          company_linkedin_url?: string | null
           company_name?: string | null
           corporate_phone?: string | null
           country?: string | null

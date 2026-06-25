@@ -60,6 +60,7 @@ const searchSchema = z.object({
   status: fallback(z.string(), "all").default("all"),
   source: fallback(z.string(), "all").default("all"),
   channel: fallback(z.enum(["any", "email", "whatsapp", "both"]), "any").default("any"),
+  date_from: fallback(z.string(), "").default(""),
   page: fallback(z.number().int().min(1), 1).default(1),
   page_size: fallback(z.number().int().min(10).max(200), 50).default(50),
   tab: fallback(z.enum(["all", "review"]), "all").default("all"),
@@ -123,7 +124,7 @@ function LeadsPage() {
   const fetchSources = useServerFn(listLeadSources);
 
   const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: ["leads", search.q, search.status, search.source, search.channel, search.page, search.page_size],
+    queryKey: ["leads", search.q, search.status, search.source, search.channel, search.date_from, search.page, search.page_size],
     queryFn: () =>
       fetchLeads({
         data: {
@@ -131,6 +132,7 @@ function LeadsPage() {
           status: search.status,
           source_slug: search.source,
           channel: search.channel,
+          date_from: search.date_from,
           page: search.page,
           page_size: search.page_size,
         },
@@ -313,27 +315,44 @@ function LeadsPage() {
           </div>
 
           <div className="flex flex-1 flex-wrap items-center gap-2">
-            <FilterPills
-              label="Status"
-              value={search.status}
-              onChange={(v) => updateSearch({ status: v })}
-              items={STATUS_OPTIONS}
-            />
-            <FilterPills
-              label="Canal"
-              value={search.channel}
-              onChange={(v) => updateSearch({ channel: v as typeof search.channel })}
-              items={CHANNEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            />
-            <FilterPills
-              label="Origem"
-              value={search.source}
-              onChange={(v) => updateSearch({ source: v })}
-              items={[{ value: "all", label: "Todas" }, ...(sources ?? []).map((source) => ({
-                value: source.slug,
-                label: source.name,
-              }))]}
-            />
+            <Select value={search.status} onValueChange={(v) => updateSearch({ status: v })}>
+              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={search.channel} onValueChange={(v) => updateSearch({ channel: v as typeof search.channel })}>
+              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="Canal" /></SelectTrigger>
+              <SelectContent>
+                {CHANNEL_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={search.source} onValueChange={(v) => updateSearch({ source: v })}>
+              <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Origem" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as origens</SelectItem>
+                {(sources ?? []).map((s) => (
+                  <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={search.date_from || "__any__"}
+              onValueChange={(v) => updateSearch({ date_from: v === "__any__" ? "" : v })}
+            >
+              <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Período" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__">Qualquer data</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                <SelectItem value="90d">Últimos 90 dias</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
@@ -506,39 +525,6 @@ function LeadsPage() {
   );
 }
 
-function FilterPills({
-  label,
-  value,
-  onChange,
-  items,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  items: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="flex flex-wrap items-center gap-1">
-        {items.map((item) => (
-          <button
-            key={item.value}
-            onClick={() => onChange(item.value)}
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-xs transition-colors",
-              value === item.value
-                ? "border-brand bg-brand/10 text-brand"
-                : "border-transparent bg-surface-muted/40 text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 const newLeadSchema = z.object({
   full_name: z.string().trim().min(1, "Nome obrigatório").max(120),
