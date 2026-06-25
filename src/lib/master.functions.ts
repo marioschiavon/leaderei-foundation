@@ -832,7 +832,7 @@ async function upsertOrgProfileField(orgId: string, field: string, value: string
   const { error } = await supabaseAdmin
     .from("ai_org_profile")
     .upsert(
-      { organization_id: orgId, [field]: value, updated_at: new Date().toISOString() },
+      { organization_id: orgId, [field]: value, updated_at: new Date().toISOString() } as any,
       { onConflict: "organization_id" },
     );
   if (error) throw new Error(error.message);
