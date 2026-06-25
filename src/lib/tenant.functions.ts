@@ -719,15 +719,19 @@ export const importLeads = createServerFn({ method: "POST" })
       if (!full_name) full_name = [first, last].filter(Boolean).join(" ").trim();
 
       const email = get("email").toLowerCase();
+      const phone = get("phone");
       const parsedEmail = z.string().email().safeParse(email);
+      const hasEmail = parsedEmail.success;
+      const hasPhone = !!phone?.trim();
       if (!full_name || full_name.length < 1) {
         errors.push({ row: rowNum, message: "Nome ausente" });
         return;
       }
-      if (!parsedEmail.success) {
-        errors.push({ row: rowNum, message: "Email inválido ou ausente" });
+      if (!hasEmail && !hasPhone) {
+        errors.push({ row: rowNum, message: "Sem meio de contato: informe email ou telefone" });
         return;
       }
+      const emailToInsert = hasEmail ? email.slice(0, 255) : null;
 
       const websiteRaw = get("website_url");
       const linkedinRaw = get("linkedin_url");
