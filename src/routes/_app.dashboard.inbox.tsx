@@ -23,6 +23,7 @@ import { getConversationMessages, getLeadMemorySummary } from "@/lib/inbox.funct
 import { sendWhatsAppMessage } from "@/lib/hook7.functions";
 import { assumeConversation, returnToAgent } from "@/lib/conversation-agent.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { LeadInsightsCompact } from "@/components/app/LeadInsightsPanel";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/inbox")({
@@ -621,7 +622,10 @@ function LeadDetails({ convId, onClose }: { convId: string; onClose: () => void 
             )}
           </div>
 
+          <LeadInsightsCompact leadId={lead.id} websiteUrl={lead.website_url} />
+
           <LeadMemoryPanel leadId={lead.id} />
+
 
           <a href={`/dashboard/leads?id=${lead.id}`} className="inline-flex items-center gap-1 text-xs text-brand hover:underline">
             Abrir lead <ExternalLink className="h-3 w-3" />

@@ -1824,6 +1824,51 @@ export type Database = {
           },
         ]
       }
+      lead_insights: {
+        Row: {
+          analyzed_at: string
+          id: string
+          insights: Json
+          lead_id: string
+          organization_id: string
+          raw_summary: string | null
+          website_url: string | null
+        }
+        Insert: {
+          analyzed_at?: string
+          id?: string
+          insights?: Json
+          lead_id: string
+          organization_id: string
+          raw_summary?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          analyzed_at?: string
+          id?: string
+          insights?: Json
+          lead_id?: string
+          organization_id?: string
+          raw_summary?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_insights_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_memory_items: {
         Row: {
           archived_at: string | null

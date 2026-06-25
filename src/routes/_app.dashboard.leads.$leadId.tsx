@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { getLeadDetail, listLeadSources, updateLead, archiveLead } from "@/lib/tenant.functions";
 import { enrichLeadWithApollo } from "@/lib/apollo.functions";
+import { LeadInsightsPanel } from "@/components/app/LeadInsightsPanel";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard/leads/$leadId")({
@@ -383,6 +384,8 @@ function LeadDetailPage() {
               </FieldRow>
             </Grid2>
           </Section>
+
+          <LeadInsightsPanel leadId={leadId} websiteUrl={lead.website_url} />
 
           <Section title="Campanhas" icon={Send}>
             {enrollments.length === 0 ? (
