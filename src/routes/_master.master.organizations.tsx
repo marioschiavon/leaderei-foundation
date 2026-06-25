@@ -122,6 +122,7 @@ function OrgsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Membros</TableHead>
                 <TableHead className="text-right">Limites</TableHead>
+                <TableHead>Base</TableHead>
                 <TableHead>Criada em</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
