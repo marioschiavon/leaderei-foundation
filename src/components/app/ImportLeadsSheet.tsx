@@ -57,6 +57,7 @@ type DbField =
   | "mobile_phone"
   | "corporate_phone"
   | "company_name"
+  | "company_linkedin_url"
   | "job_title"
   | "seniority"
   | "department"
