@@ -315,27 +315,44 @@ function LeadsPage() {
           </div>
 
           <div className="flex flex-1 flex-wrap items-center gap-2">
-            <FilterPills
-              label="Status"
-              value={search.status}
-              onChange={(v) => updateSearch({ status: v })}
-              items={STATUS_OPTIONS}
-            />
-            <FilterPills
-              label="Canal"
-              value={search.channel}
-              onChange={(v) => updateSearch({ channel: v as typeof search.channel })}
-              items={CHANNEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            />
-            <FilterPills
-              label="Origem"
-              value={search.source}
-              onChange={(v) => updateSearch({ source: v })}
-              items={[{ value: "all", label: "Todas" }, ...(sources ?? []).map((source) => ({
-                value: source.slug,
-                label: source.name,
-              }))]}
-            />
+            <Select value={search.status} onValueChange={(v) => updateSearch({ status: v })}>
+              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={search.channel} onValueChange={(v) => updateSearch({ channel: v as typeof search.channel })}>
+              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="Canal" /></SelectTrigger>
+              <SelectContent>
+                {CHANNEL_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={search.source} onValueChange={(v) => updateSearch({ source: v })}>
+              <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Origem" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as origens</SelectItem>
+                {(sources ?? []).map((s) => (
+                  <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={search.date_from || "__any__"}
+              onValueChange={(v) => updateSearch({ date_from: v === "__any__" ? "" : v })}
+            >
+              <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Período" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__">Qualquer data</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                <SelectItem value="90d">Últimos 90 dias</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
