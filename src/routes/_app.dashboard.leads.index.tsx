@@ -60,6 +60,7 @@ const searchSchema = z.object({
   status: fallback(z.string(), "all").default("all"),
   source: fallback(z.string(), "all").default("all"),
   channel: fallback(z.enum(["any", "email", "whatsapp", "both"]), "any").default("any"),
+  date_from: fallback(z.string(), "").default(""),
   page: fallback(z.number().int().min(1), 1).default(1),
   page_size: fallback(z.number().int().min(10).max(200), 50).default(50),
   tab: fallback(z.enum(["all", "review"]), "all").default("all"),
