@@ -147,9 +147,9 @@ const LEAD_COLUMNS = `
   )
 `;
 
-function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any }>(
+function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any; gte: any }>(
   query: T,
-  filters: { status: string; source_slug: string; channel: string; search: string },
+  filters: { status: string; source_slug: string; channel: string; search: string; date_from?: string },
 ): T {
   let q: any = query;
   if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
@@ -160,6 +160,17 @@ function applyLeadFilters<T extends { eq: any; ilike: any; or: any; not: any }>(
   else if (filters.channel === "whatsapp") q = q.not("phone", "is", null);
   else if (filters.channel === "both") {
     q = q.not("email", "is", null).not("phone", "is", null);
+  }
+  if (filters.date_from) {
+    const now = new Date();
+    let from: Date | null = null;
+    if (filters.date_from === "today") {
+      from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else {
+      const m = /^(\d+)d$/.exec(filters.date_from);
+      if (m) from = new Date(Date.now() - parseInt(m[1], 10) * 86400_000);
+    }
+    if (from) q = q.gte("created_at", from.toISOString());
   }
   if (filters.search) {
     const s = filters.search.replace(/[%,]/g, " ").trim();
