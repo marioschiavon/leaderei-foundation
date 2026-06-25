@@ -152,6 +152,7 @@ function LeadDetailPage() {
           employee_count: lead.employee_count != null ? String(lead.employee_count) : "",
           website_url: lead.website_url ?? "",
           linkedin_url: lead.linkedin_url ?? "",
+          company_linkedin_url: lead.company_linkedin_url ?? "",
           city: lead.city ?? "",
           state: lead.state ?? "",
           country: lead.country ?? "",
