@@ -117,6 +117,7 @@ const FIELD_PATTERNS: Array<{ field: DbField; test: (n: string) => boolean }> = 
   { field: "mobile_phone", test: (n) => /\b(mobile phone|mobile|cell phone|celular|phone mobile)\b/.test(n) },
   { field: "corporate_phone", test: (n) => /\b(corporate phone|company phone|office phone|work direct phone|work phone|telefone empresa|direct phone)\b/.test(n) },
   { field: "employee_count", test: (n) => /(employees|employee count|headcount|company size|tamanho empresa|funcionarios|# employees|num employees|n funcionarios)/.test(n) },
+  { field: "company_linkedin_url", test: (n) => /\b(company linkedin|linkedin (da )?empresa|organization linkedin|company url linkedin|linkedin company)\b/.test(n) || /linkedin.*company|company.*linkedin/.test(n) },
   { field: "linkedin_url", test: (n) => /linkedin/.test(n) },
   { field: "website_url", test: (n) => /\b(website|site|url|web|company website|site empresa)\b/.test(n) },
   { field: "industry", test: (n) => /\b(industry|setor|industria|segmento|segment)\b/.test(n) },
