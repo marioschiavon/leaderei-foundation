@@ -68,6 +68,19 @@ function KnowledgePage() {
     onSuccess: () => { toast.success("Site salvo."); qc.invalidateQueries({ queryKey: ["org-knowledge-base"] }); },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar."),
   });
+  const indexFn = useServerFn(indexOrgWebsite);
+  const mIndex = useMutation({
+    mutationFn: () => indexFn(),
+    onSuccess: (r: any) => {
+      if (r?.ok) toast.success("Site indexado com sucesso.");
+      else toast.error(`Falha ao indexar: ${r?.error ?? "desconhecido"}`);
+      qc.invalidateQueries({ queryKey: ["org-knowledge-base"] });
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? "Erro ao indexar.");
+      qc.invalidateQueries({ queryKey: ["org-knowledge-base"] });
+    },
+  });
 
   const items = data?.items ?? [];
   const totalChars = items.reduce((acc: number, i: any) => acc + (i.content?.length ?? 0), 0);
