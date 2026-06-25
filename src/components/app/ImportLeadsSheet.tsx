@@ -75,7 +75,7 @@ const DB_FIELDS: DbFieldDef[] = [
   { value: "full_name", label: "Nome completo", required: true },
   { value: "first_name", label: "Primeiro nome" },
   { value: "last_name", label: "Sobrenome" },
-  { value: "email", label: "Email", required: true },
+  { value: "email", label: "Email" },
   { value: "secondary_email", label: "Email secundário" },
   { value: "personal_email", label: "Email pessoal" },
   { value: "phone", label: "Telefone" },
