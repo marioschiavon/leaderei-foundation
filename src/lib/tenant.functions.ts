@@ -574,6 +574,7 @@ const UpdateLeadSchema = z.object({
   mobile_phone: NullableStr(40),
   corporate_phone: NullableStr(40),
   company_name: NullableStr(160),
+  company_linkedin_url: NullableStr(255),
   job_title: NullableStr(160),
   seniority: NullableStr(80),
   department: NullableStr(80),
